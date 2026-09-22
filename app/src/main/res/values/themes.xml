@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema applicato prima che Compose prenda il controllo: evita il flash bianco all'avvio. -->
+    <style name="Theme.Igor" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

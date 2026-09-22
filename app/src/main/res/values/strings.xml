@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Igor</string>
+    <string name="expiry_notification_channel_name">Scadenze</string>
+    <string name="expiry_notification_channel_description">Avvisi sugli alimenti in scadenza o scaduti</string>
+</resources>

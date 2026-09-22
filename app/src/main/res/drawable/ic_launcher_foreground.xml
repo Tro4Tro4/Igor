@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Sagoma stilizzata di un frigorifero a due ante. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,26h32a4,4 0,0 1,4 4v48a4,4 0,0 1,-4 4h-32a4,4 0,0 1,-4 -4v-48a4,4 0,0 1,4 -4zM38,30v18h32v-18zM38,52v26h32v-26z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,34h3v9h-3zM42,56h3v9h-3z" />
+</vector>
