@@ -31,6 +31,13 @@ class CurrentDateTest {
     }
 
     @Test
+    fun `un nanosecondo prima di mezzanotte manca almeno un millisecondo`() {
+        val now = LocalDateTime.of(2026, 4, 1, 23, 59, 59, 999_999_999)
+
+        assertEquals(1L, millisUntilNextMidnight(now))
+    }
+
+    @Test
     fun `il flusso emette subito la data corrente`() = runTest {
         val flow = currentDateFlow { LocalDateTime.of(2026, 4, 1, 10, 0) }
 
