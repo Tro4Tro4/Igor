@@ -1,37 +1,82 @@
 package com.igor.fridge.data.prefs
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "igor_settings")
+
+/** Valori delle impostazioni in un istante dato. */
+data class Settings(
+    val warningDays: Int,
+    val notificationHour: Int,
+    val notificationsEnabled: Boolean,
+)
 
 /**
- * Preferenze dell'utente. Usa SharedPreferences: i valori sono pochi e vengono letti
- * anche dal worker in background, dove un'API sincrona semplifica il codice.
+ * Preferenze dell'utente.
+ *
+ * DataStore invece di SharedPreferences perche' i valori devono essere osservabili: un
+ * cambio di soglia deve raggiungere la lista dell'inventario senza ricrearne il ViewModel.
  */
 class SettingsStore(context: Context) {
 
-    private val prefs = context.applicationContext
-        .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val store = context.applicationContext.dataStore
 
     /** Giorni di preavviso prima della scadenza. */
-    var warningDays: Int
-        get() = prefs.getInt(KEY_WARNING_DAYS, DEFAULT_WARNING_DAYS)
-        set(value) = prefs.edit().putInt(KEY_WARNING_DAYS, value.coerceIn(0, 30)).apply()
+    val warningDays: Flow<Int> = store.data.map {
+        it[KEY_WARNING_DAYS] ?: DEFAULT_WARNING_DAYS
+    }
 
     /** Ora del giorno (0-23) in cui viene eseguito il controllo scadenze. */
-    var notificationHour: Int
-        get() = prefs.getInt(KEY_NOTIFICATION_HOUR, DEFAULT_NOTIFICATION_HOUR)
-        set(value) = prefs.edit().putInt(KEY_NOTIFICATION_HOUR, value.coerceIn(0, 23)).apply()
+    val notificationHour: Flow<Int> = store.data.map {
+        it[KEY_NOTIFICATION_HOUR] ?: DEFAULT_NOTIFICATION_HOUR
+    }
 
-    var notificationsEnabled: Boolean
-        get() = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
-        set(value) = prefs.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, value).apply()
+    val notificationsEnabled: Flow<Boolean> = store.data.map {
+        it[KEY_NOTIFICATIONS_ENABLED] ?: true
+    }
+
+    suspend fun setWarningDays(value: Int) {
+        store.edit { it[KEY_WARNING_DAYS] = value.coerceIn(0, 30) }
+    }
+
+    suspend fun setNotificationHour(value: Int) {
+        store.edit { it[KEY_NOTIFICATION_HOUR] = value.coerceIn(0, 23) }
+    }
+
+    suspend fun setNotificationsEnabled(value: Boolean) {
+        store.edit { it[KEY_NOTIFICATIONS_ENABLED] = value }
+    }
+
+    /**
+     * Lettura bloccante, per il worker delle notifiche e per l'avvio dell'Application:
+     * girano fuori da una coroutine e hanno bisogno del valore subito. E' l'unico punto
+     * del progetto in cui e' lecito bloccare su DataStore.
+     */
+    fun snapshot(): Settings = runBlocking {
+        val preferences = store.data.first()
+        Settings(
+            warningDays = preferences[KEY_WARNING_DAYS] ?: DEFAULT_WARNING_DAYS,
+            notificationHour = preferences[KEY_NOTIFICATION_HOUR] ?: DEFAULT_NOTIFICATION_HOUR,
+            notificationsEnabled = preferences[KEY_NOTIFICATIONS_ENABLED] ?: true,
+        )
+    }
 
     companion object {
-        const val PREFS_NAME = "igor_settings"
         const val DEFAULT_WARNING_DAYS = 3
         const val DEFAULT_NOTIFICATION_HOUR = 9
 
-        private const val KEY_WARNING_DAYS = "warning_days"
-        private const val KEY_NOTIFICATION_HOUR = "notification_hour"
-        private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
+        private val KEY_WARNING_DAYS = intPreferencesKey("warning_days")
+        private val KEY_NOTIFICATION_HOUR = intPreferencesKey("notification_hour")
+        private val KEY_NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
     }
 }

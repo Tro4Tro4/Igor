@@ -51,7 +51,7 @@ class InventoryViewModel(
     settingsStore: SettingsStore,
 ) : ViewModel() {
 
-    private val warningDays = settingsStore.warningDays
+    private val warningDays = settingsStore.snapshot().warningDays
     private val criteria = MutableStateFlow(Criteria())
 
     val uiState: StateFlow<InventoryUiState> =

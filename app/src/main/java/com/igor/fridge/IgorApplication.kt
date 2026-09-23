@@ -17,8 +17,9 @@ class IgorApplication : Application() {
         // Il canale va creato prima di qualsiasi notifica; e' un'operazione idempotente.
         ExpiryNotifier(this).createChannel()
 
-        if (container.settingsStore.notificationsEnabled) {
-            ExpiryWorkScheduler.schedule(this, container.settingsStore.notificationHour)
+        val settings = container.settingsStore.snapshot()
+        if (settings.notificationsEnabled) {
+            ExpiryWorkScheduler.schedule(this, settings.notificationHour)
         }
     }
 }

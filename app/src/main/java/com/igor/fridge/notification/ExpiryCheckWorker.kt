@@ -17,7 +17,7 @@ class ExpiryCheckWorker(
 
     override suspend fun doWork(): Result {
         val container = (applicationContext as IgorApplication).container
-        val settings = container.settingsStore
+        val settings = container.settingsStore.snapshot()
         if (!settings.notificationsEnabled) return Result.success()
 
         val warningDays = settings.warningDays
