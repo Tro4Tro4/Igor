@@ -30,3 +30,14 @@ enum class QuantityUnit {
     L,
     CONF,
 }
+
+/**
+ * Perche' un alimento e' uscito dall'inventario. La distinzione fra consumato e buttato
+ * e' l'unica informazione che rende sensata una statistica sugli sprechi; ERRORE marca
+ * le rimozioni annullabili dall'utente.
+ */
+enum class RemovalReason {
+    CONSUMATO,
+    BUTTATO,
+    ERRORE,
+}

@@ -1,6 +1,7 @@
 package com.igor.fridge.data.local
 
 import androidx.room.TypeConverter
+import java.time.Instant
 import java.time.LocalDate
 
 /**
@@ -32,4 +33,17 @@ class Converters {
 
     @TypeConverter
     fun fromQuantityUnit(value: QuantityUnit?): String? = value?.name
+
+    /** Gli istanti sono salvati come millisecondi dall'epoch: ordinabili in SQL. */
+    @TypeConverter
+    fun toInstant(epochMillis: Long?): Instant? = epochMillis?.let(Instant::ofEpochMilli)
+
+    @TypeConverter
+    fun fromInstant(instant: Instant?): Long? = instant?.toEpochMilli()
+
+    @TypeConverter
+    fun toRemovalReason(value: String?): RemovalReason? = value?.let(RemovalReason::valueOf)
+
+    @TypeConverter
+    fun fromRemovalReason(value: RemovalReason?): String? = value?.name
 }
