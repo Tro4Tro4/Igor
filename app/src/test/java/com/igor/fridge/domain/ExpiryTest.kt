@@ -10,7 +10,7 @@ class ExpiryTest {
 
     private val today = LocalDate.of(2026, 3, 10)
 
-    private fun item(expiry: LocalDate?) = FoodItem(name = "Latte", expiryDate = expiry)
+    private fun item(expiry: LocalDate?) = FoodItem(uuid = "a", name = "Latte", expiryDate = expiry)
 
     @Test
     fun `articolo senza data non ha giorni residui`() {

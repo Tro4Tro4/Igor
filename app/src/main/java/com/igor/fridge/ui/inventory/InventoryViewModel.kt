@@ -6,13 +6,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.igor.fridge.data.local.FoodItem
+import com.igor.fridge.data.local.RemovalReason
 import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.data.prefs.SettingsStore
 import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.ShoppingRepository
 import com.igor.fridge.domain.ExpiryStatus
+import com.igor.fridge.domain.currentDateFlow
 import com.igor.fridge.domain.expiryStatus
 import com.igor.fridge.ui.igorApplication
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,7 +25,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-enum class InventoryFilter { TUTTI, IN_SCADENZA, SCADUTI }
+enum class InventoryFilter { TUTTI, IN_SCADENZA, SCADUTI, SENZA_DATA }
 
 data class InventoryUiState(
     val items: List<FoodItem> = emptyList(),
@@ -34,6 +37,7 @@ data class InventoryUiState(
     val totalCount: Int = 0,
     val expiringCount: Int = 0,
     val expiredCount: Int = 0,
+    val noDateCount: Int = 0,
     val isLoading: Boolean = true,
     val message: String? = null,
 )
@@ -48,24 +52,29 @@ private data class Criteria(
 class InventoryViewModel(
     private val foodRepository: FoodRepository,
     private val shoppingRepository: ShoppingRepository,
-    settingsStore: SettingsStore,
+    warningDays: Flow<Int>,
+    today: Flow<LocalDate>,
 ) : ViewModel() {
 
-    private val warningDays = settingsStore.snapshot().warningDays
     private val criteria = MutableStateFlow(Criteria())
 
     val uiState: StateFlow<InventoryUiState> =
-        combine(foodRepository.observeAll(), criteria) { items, criteria ->
-            val today = LocalDate.now()
-            val statuses = items.associateBy({ it.id }, { it.expiryStatus(today, warningDays) })
+        combine(
+            foodRepository.observeAll(),
+            criteria,
+            warningDays,
+            today,
+        ) { items, criteria, warningDays, today ->
+            val statuses = items.associateBy({ it.uuid }, { it.expiryStatus(today, warningDays) })
             val visible = items.filter { item ->
                 val matchesQuery = criteria.query.isBlank() ||
                     item.name.contains(criteria.query.trim(), ignoreCase = true)
                 val matchesLocation = criteria.location == null || item.location == criteria.location
                 val matchesFilter = when (criteria.filter) {
                     InventoryFilter.TUTTI -> true
-                    InventoryFilter.IN_SCADENZA -> statuses[item.id] == ExpiryStatus.IN_SCADENZA
-                    InventoryFilter.SCADUTI -> statuses[item.id] == ExpiryStatus.SCADUTO
+                    InventoryFilter.IN_SCADENZA -> statuses[item.uuid] == ExpiryStatus.IN_SCADENZA
+                    InventoryFilter.SCADUTI -> statuses[item.uuid] == ExpiryStatus.SCADUTO
+                    InventoryFilter.SENZA_DATA -> statuses[item.uuid] == ExpiryStatus.SENZA_DATA
                 }
                 matchesQuery && matchesLocation && matchesFilter
             }
@@ -79,6 +88,7 @@ class InventoryViewModel(
                 totalCount = items.size,
                 expiringCount = statuses.values.count { it == ExpiryStatus.IN_SCADENZA },
                 expiredCount = statuses.values.count { it == ExpiryStatus.SCADUTO },
+                noDateCount = statuses.values.count { it == ExpiryStatus.SENZA_DATA },
                 isLoading = false,
                 message = criteria.message,
             )
@@ -98,7 +108,7 @@ class InventoryViewModel(
 
     fun delete(item: FoodItem) {
         viewModelScope.launch {
-            foodRepository.delete(item)
+            foodRepository.remove(item, RemovalReason.ERRORE)
             criteria.update { it.copy(message = "${item.name} eliminato") }
         }
     }
@@ -106,7 +116,7 @@ class InventoryViewModel(
     /** Segna il prodotto come consumato: esce dall'inventario ed entra nella lista della spesa. */
     fun consume(item: FoodItem) {
         viewModelScope.launch {
-            foodRepository.delete(item)
+            foodRepository.remove(item, RemovalReason.CONSUMATO)
             shoppingRepository.addIfAbsent(item.name, item.quantity, item.unit)
             criteria.update { it.copy(message = "${item.name} spostato nella lista della spesa") }
         }
@@ -115,12 +125,12 @@ class InventoryViewModel(
     /** Aggiunge alla spesa tutti i prodotti scaduti o in scadenza. */
     fun addExpiringToShoppingList() {
         viewModelScope.launch {
-            val today = LocalDate.now()
-            val candidates = foodRepository.findExpiring(today, warningDays)
+            val state = uiState.value
+            val candidates = foodRepository.findExpiring(state.today, state.warningDays)
             val added = candidates.count { shoppingRepository.addIfAbsent(it.name, it.quantity, it.unit) }
             val text = when {
                 candidates.isEmpty() -> "Nessun prodotto in scadenza"
-                added == 0 -> "Gia' presenti nella lista della spesa"
+                added == 0 -> "Già presenti nella lista della spesa"
                 added == 1 -> "1 prodotto aggiunto alla lista della spesa"
                 else -> "$added prodotti aggiunti alla lista della spesa"
             }
@@ -137,7 +147,8 @@ class InventoryViewModel(
                 InventoryViewModel(
                     foodRepository = container.foodRepository,
                     shoppingRepository = container.shoppingRepository,
-                    settingsStore = container.settingsStore,
+                    warningDays = container.settingsStore.warningDays,
+                    today = currentDateFlow(),
                 )
             }
         }

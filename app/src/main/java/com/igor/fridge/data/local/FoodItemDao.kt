@@ -14,33 +14,51 @@ interface FoodItemDao {
     @Query(
         """
         SELECT * FROM food_items
+        WHERE removedAt IS NULL
         ORDER BY (expiryDate IS NULL), expiryDate ASC, name COLLATE NOCASE ASC
         """
     )
     fun observeAll(): Flow<List<FoodItem>>
 
-    @Query("SELECT * FROM food_items WHERE id = :id")
-    suspend fun findById(id: Long): FoodItem?
+    @Query("SELECT * FROM food_items WHERE uuid = :uuid")
+    suspend fun findByUuid(uuid: String): FoodItem?
 
     /** Usato dopo la scansione per riconoscere un prodotto gia' inserito in passato. */
-    @Query("SELECT * FROM food_items WHERE barcode = :barcode ORDER BY addedAt DESC LIMIT 1")
+    @Query(
+        """
+        SELECT * FROM food_items
+        WHERE barcode = :barcode
+        ORDER BY updatedAt DESC LIMIT 1
+        """
+    )
     suspend fun findLastByBarcode(barcode: String): FoodItem?
+
+    /**
+     * Ultimo articolo con questo nome, **compresi quelli usciti dal frigo**: serve a
+     * ereditare categoria, unita' e posizione quando un prodotto rientra dalla lista
+     * della spesa o viene dettato col solo nome.
+     */
+    @Query(
+        """
+        SELECT * FROM food_items
+        WHERE name = :name COLLATE NOCASE
+        ORDER BY updatedAt DESC LIMIT 1
+        """
+    )
+    suspend fun findLastByName(name: String): FoodItem?
 
     @Query(
         """
         SELECT * FROM food_items
-        WHERE expiryDate IS NOT NULL AND expiryDate <= :limitDate
+        WHERE removedAt IS NULL AND expiryDate IS NOT NULL AND expiryDate <= :limitDate
         ORDER BY expiryDate ASC
         """
     )
     suspend fun findExpiringOnOrBefore(limitDate: LocalDate): List<FoodItem>
 
     @Upsert
-    suspend fun upsert(item: FoodItem): Long
+    suspend fun upsert(item: FoodItem)
 
     @Delete
     suspend fun delete(item: FoodItem)
-
-    @Query("DELETE FROM food_items WHERE id = :id")
-    suspend fun deleteById(id: Long)
 }

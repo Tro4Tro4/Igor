@@ -45,7 +45,7 @@ import com.igor.fridge.ui.label
 @Composable
 fun InventoryScreen(
     onAddItem: () -> Unit,
-    onEditItem: (Long) -> Unit,
+    onEditItem: (String) -> Unit,
     onOpenShoppingList: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: InventoryViewModel = viewModel(factory = InventoryViewModel.Factory),
@@ -116,12 +116,12 @@ fun InventoryScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(items = state.items, key = { it.id }) { item ->
+                    items(items = state.items, key = { it.uuid }) { item ->
                         FoodItemCard(
                             item = item,
                             today = state.today,
                             warningDays = state.warningDays,
-                            onClick = { onEditItem(item.id) },
+                            onClick = { onEditItem(item.uuid) },
                             onConsume = { viewModel.consume(item) },
                             onDelete = { viewModel.delete(item) },
                         )
@@ -161,6 +161,11 @@ private fun FilterRow(
             selected = state.filter == InventoryFilter.SCADUTI,
             onClick = { onFilterChange(InventoryFilter.SCADUTI) },
             label = { Text("Scaduti (${state.expiredCount})") },
+        )
+        FilterChip(
+            selected = state.filter == InventoryFilter.SENZA_DATA,
+            onClick = { onFilterChange(InventoryFilter.SENZA_DATA) },
+            label = { Text("Senza data (${state.noDateCount})") },
         )
         FilterChip(
             selected = state.location == null,

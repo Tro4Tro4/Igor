@@ -21,7 +21,7 @@ interface ShoppingItemDao {
     suspend fun findByName(name: String): ShoppingItem?
 
     @Upsert
-    suspend fun upsert(item: ShoppingItem): Long
+    suspend fun upsert(item: ShoppingItem)
 
     @Delete
     suspend fun delete(item: ShoppingItem)

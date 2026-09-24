@@ -3,21 +3,29 @@ package com.igor.fridge.data.local
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.time.Instant
 import java.time.LocalDate
 
 /**
  * Un alimento presente in casa.
  *
- * [expiryDate] e' nullable perche' non tutti i prodotti hanno (o riportano) una scadenza:
- * gli articoli senza data restano in inventario ma non generano notifiche.
+ * [uuid] e' generato sul dispositivo invece che da SQLite: identificatori autoincrementali
+ * collidono fra dispositivi diversi, e l'identita' deve restare valida se un domani
+ * l'inventario verra' sincronizzato.
+ *
+ * [removedAt] realizza la cancellazione logica. Una riga cancellata fisicamente sarebbe
+ * invisibile a una sincronizzazione e cancellerebbe la storia di cosa e' stato consumato.
+ *
+ * [expiryDate] e' nullable perche' non tutti i prodotti riportano una scadenza: gli
+ * articoli senza data restano in inventario ma non generano notifiche.
  */
 @Entity(
     tableName = "food_items",
-    indices = [Index("barcode"), Index("expiryDate")],
+    indices = [Index("barcode"), Index("expiryDate"), Index("name"), Index("removedAt")],
 )
 data class FoodItem(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0L,
+    @PrimaryKey
+    val uuid: String,
     val name: String,
     val barcode: String? = null,
     val category: FoodCategory = FoodCategory.ALTRO,
@@ -27,4 +35,7 @@ data class FoodItem(
     val expiryDate: LocalDate? = null,
     val addedAt: LocalDate = LocalDate.now(),
     val notes: String? = null,
+    val updatedAt: Instant = Instant.now(),
+    val removedAt: Instant? = null,
+    val removalReason: RemovalReason? = null,
 )

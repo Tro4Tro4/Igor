@@ -56,15 +56,15 @@ import java.time.ZoneOffset
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditItemScreen(
-    itemId: Long,
+    uuid: String,
     scannedBarcode: String?,
     onBarcodeConsumed: () -> Unit,
     onOpenScanner: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: EditItemViewModel = viewModel(
-        key = "edit-$itemId",
-        factory = EditItemViewModel.factory(itemId),
+        key = "edit-$uuid",
+        factory = EditItemViewModel.factory(uuid),
     ),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()

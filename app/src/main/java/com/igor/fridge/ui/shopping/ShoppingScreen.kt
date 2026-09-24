@@ -118,7 +118,7 @@ fun ShoppingScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
-                    items(items = state.items, key = { it.id }) { item ->
+                    items(items = state.items, key = { it.uuid }) { item ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

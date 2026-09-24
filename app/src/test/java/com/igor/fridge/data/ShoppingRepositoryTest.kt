@@ -1,40 +1,34 @@
 package com.igor.fridge.data
 
+import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.ShoppingItem
 import com.igor.fridge.data.local.ShoppingItemDao
 import com.igor.fridge.data.repository.ShoppingRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 
 /** DAO in memoria: la logica anti-duplicati sta nel repository, non nel database. */
 private class FakeShoppingItemDao : ShoppingItemDao {
     val items = mutableListOf<ShoppingItem>()
-    private var nextId = 1L
 
     override fun observeAll(): Flow<List<ShoppingItem>> = flowOf(items.toList())
 
     override suspend fun findByName(name: String): ShoppingItem? =
         items.firstOrNull { it.name.equals(name, ignoreCase = true) }
 
-    override suspend fun upsert(item: ShoppingItem): Long {
-        val index = items.indexOfFirst { it.id == item.id && item.id != 0L }
-        return if (index >= 0) {
-            items[index] = item
-            item.id
-        } else {
-            val id = nextId++
-            items += item.copy(id = id)
-            id
-        }
+    override suspend fun upsert(item: ShoppingItem) {
+        items.removeAll { it.uuid == item.uuid }
+        items += item
     }
 
     override suspend fun delete(item: ShoppingItem) {
-        items.removeAll { it.id == item.id }
+        items.removeAll { it.uuid == item.uuid }
     }
 
     override suspend fun deleteChecked() {
@@ -45,30 +39,59 @@ private class FakeShoppingItemDao : ShoppingItemDao {
 class ShoppingRepositoryTest {
 
     private val dao = FakeShoppingItemDao()
-    private val repository = ShoppingRepository(dao)
+    private var counter = 0
+    private val repository = ShoppingRepository(
+        dao = dao,
+        clock = { Instant.ofEpochMilli(1_774_000_000_000) },
+        newUuid = { "uuid-${++counter}" },
+    )
 
     @Test
-    fun `aggiunge una voce nuova`() = runBlocking {
+    fun `aggiunge una voce nuova`() = runTest {
         assertTrue(repository.addIfAbsent("Latte"))
         assertEquals(1, dao.items.size)
         assertEquals("Latte", dao.items.single().name)
     }
 
     @Test
-    fun `non duplica una voce gia presente`() = runBlocking {
+    fun `non crea un doppione per una voce gia presente e non spuntata`() = runTest {
         repository.addIfAbsent("Latte")
+
         assertFalse(repository.addIfAbsent("  Latte  "))
         assertEquals(1, dao.items.size)
     }
 
     @Test
-    fun `ignora un nome vuoto`() = runBlocking {
+    fun `una voce gia spuntata torna da comprare`() = runTest {
+        repository.addIfAbsent("Latte")
+        repository.setChecked(dao.items.single(), checked = true)
+
+        val changed = repository.addIfAbsent("Latte")
+
+        assertTrue(changed)
+        assertEquals(1, dao.items.size)
+        assertFalse(dao.items.single().isChecked)
+    }
+
+    @Test
+    fun `ripristinare una voce spuntata ne aggiorna quantita e unita`() = runTest {
+        repository.addIfAbsent("Latte")
+        repository.setChecked(dao.items.single(), checked = true)
+
+        repository.addIfAbsent("Latte", quantity = 2.0, unit = QuantityUnit.L)
+
+        assertEquals(2.0, dao.items.single().quantity, 0.001)
+        assertEquals(QuantityUnit.L, dao.items.single().unit)
+    }
+
+    @Test
+    fun `ignora un nome vuoto`() = runTest {
         assertFalse(repository.addIfAbsent("   "))
         assertEquals(0, dao.items.size)
     }
 
     @Test
-    fun `rimuove solo le voci spuntate`() = runBlocking {
+    fun `rimuove solo le voci spuntate`() = runTest {
         repository.addIfAbsent("Latte")
         repository.addIfAbsent("Pane")
         repository.setChecked(dao.items.first { it.name == "Latte" }, checked = true)

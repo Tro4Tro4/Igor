@@ -21,18 +21,18 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.igor.fridge.ui.edit.EditItemScreen
-import com.igor.fridge.ui.edit.NEW_ITEM_ID
+import com.igor.fridge.ui.edit.NEW_ITEM_UUID
 import com.igor.fridge.ui.inventory.InventoryScreen
 import com.igor.fridge.ui.scanner.BarcodeScannerScreen
 import com.igor.fridge.ui.shopping.ShoppingScreen
 
 object Routes {
     const val INVENTORY = "inventory"
-    const val EDIT = "edit/{itemId}"
+    const val EDIT = "edit/{uuid}"
     const val SCANNER = "scanner"
     const val SHOPPING = "shopping"
 
-    fun edit(itemId: Long): String = "edit/$itemId"
+    fun edit(uuid: String): String = "edit/$uuid"
 }
 
 @Composable
@@ -53,8 +53,8 @@ fun IgorApp(
     ) {
         composable(Routes.INVENTORY) {
             InventoryScreen(
-                onAddItem = { navController.navigate(Routes.edit(NEW_ITEM_ID)) },
-                onEditItem = { itemId -> navController.navigate(Routes.edit(itemId)) },
+                onAddItem = { navController.navigate(Routes.edit(NEW_ITEM_UUID)) },
+                onEditItem = { uuid -> navController.navigate(Routes.edit(uuid)) },
                 onOpenShoppingList = { navController.navigate(Routes.SHOPPING) },
             )
         }
@@ -62,15 +62,15 @@ fun IgorApp(
         composable(
             route = Routes.EDIT,
             arguments = listOf(
-                navArgument("itemId") {
-                    type = NavType.LongType
-                    defaultValue = NEW_ITEM_ID
+                navArgument("uuid") {
+                    type = NavType.StringType
+                    defaultValue = NEW_ITEM_UUID
                 },
             ),
         ) { backStackEntry ->
-            val itemId = backStackEntry.arguments?.getLong("itemId") ?: NEW_ITEM_ID
+            val uuid = backStackEntry.arguments?.getString("uuid") ?: NEW_ITEM_UUID
             EditItemScreen(
-                itemId = itemId,
+                uuid = uuid,
                 scannedBarcode = scannedBarcode,
                 onBarcodeConsumed = { scannedBarcode = null },
                 onOpenScanner = { navController.navigate(Routes.SCANNER) },

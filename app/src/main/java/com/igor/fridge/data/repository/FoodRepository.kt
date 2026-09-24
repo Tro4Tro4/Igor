@@ -2,28 +2,56 @@ package com.igor.fridge.data.repository
 
 import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.FoodItemDao
+import com.igor.fridge.data.local.RemovalReason
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 import java.time.LocalDate
+import java.util.UUID
 
-/** Unico punto di accesso all'inventario alimentare. */
-class FoodRepository(private val dao: FoodItemDao) {
+/**
+ * Unico punto di accesso all'inventario alimentare.
+ *
+ * Identificatore e timbro temporale si assegnano qui e in nessun altro posto: se la UI
+ * potesse dimenticarsene, un articolo finirebbe in database senza identita' stabile o
+ * senza il dato che serve a risolvere i conflitti di una futura sincronizzazione.
+ * [clock] e [newUuid] sono parametri per poter scrivere test deterministici.
+ */
+class FoodRepository(
+    private val dao: FoodItemDao,
+    private val clock: () -> Instant = Instant::now,
+    private val newUuid: () -> String = { UUID.randomUUID().toString() },
+) {
 
     fun observeAll(): Flow<List<FoodItem>> = dao.observeAll()
 
-    suspend fun findById(id: Long): FoodItem? = dao.findById(id)
+    suspend fun findByUuid(uuid: String): FoodItem? = dao.findByUuid(uuid)
 
     suspend fun findLastByBarcode(barcode: String): FoodItem? = dao.findLastByBarcode(barcode)
 
-    /** @return l'id dell'articolo salvato (nuovo o aggiornato). */
-    suspend fun save(item: FoodItem): Long = dao.upsert(item)
+    suspend fun findLastByName(name: String): FoodItem? = dao.findLastByName(name.trim())
 
-    suspend fun delete(item: FoodItem) = dao.delete(item)
+    /** @return l'articolo come e' stato salvato, con identificatore e timbro valorizzati. */
+    suspend fun save(item: FoodItem): FoodItem {
+        val stamped = item.copy(
+            uuid = item.uuid.ifBlank { newUuid() },
+            updatedAt = clock(),
+        )
+        dao.upsert(stamped)
+        return stamped
+    }
 
-    suspend fun deleteById(id: Long) = dao.deleteById(id)
+    /** Fa uscire l'articolo dall'inventario conservandone la storia. */
+    suspend fun remove(item: FoodItem, reason: RemovalReason) {
+        val now = clock()
+        dao.upsert(item.copy(removedAt = now, removalReason = reason, updatedAt = now))
+    }
 
-    /**
-     * Articoli scaduti oppure in scadenza entro [withinDays] giorni a partire da [today].
-     */
+    /** Annulla una rimozione. */
+    suspend fun restore(item: FoodItem) {
+        dao.upsert(item.copy(removedAt = null, removalReason = null, updatedAt = clock()))
+    }
+
+    /** Articoli scaduti oppure in scadenza entro [withinDays] giorni a partire da [today]. */
     suspend fun findExpiring(today: LocalDate, withinDays: Int): List<FoodItem> =
         dao.findExpiringOnOrBefore(today.plusDays(withinDays.toLong()))
 }

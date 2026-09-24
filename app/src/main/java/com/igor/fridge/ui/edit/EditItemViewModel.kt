@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.QuantityUnit
+import com.igor.fridge.data.local.RemovalReason
 import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.ui.igorApplication
@@ -19,7 +20,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 data class EditItemUiState(
-    val id: Long = NEW_ITEM_ID,
+    val uuid: String = NEW_ITEM_UUID,
     val name: String = "",
     val barcode: String? = null,
     val category: FoodCategory = FoodCategory.ALTRO,
@@ -34,26 +35,26 @@ data class EditItemUiState(
     val message: String? = null,
     val isSaved: Boolean = false,
 ) {
-    val isNew: Boolean get() = id == NEW_ITEM_ID
+    val isNew: Boolean get() = uuid == NEW_ITEM_UUID
 }
 
-/** Id convenzionale per un articolo non ancora salvato. */
-const val NEW_ITEM_ID: Long = 0L
+/** Identificatore convenzionale per un articolo non ancora salvato. */
+const val NEW_ITEM_UUID: String = "new"
 
 class EditItemViewModel(
-    private val itemId: Long,
+    private val itemUuid: String,
     private val repository: FoodRepository,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(EditItemUiState(id = itemId))
+    private val _uiState = MutableStateFlow(EditItemUiState(uuid = itemUuid))
     val uiState: StateFlow<EditItemUiState> = _uiState.asStateFlow()
 
     init {
-        if (itemId != NEW_ITEM_ID) {
+        if (itemUuid != NEW_ITEM_UUID) {
             viewModelScope.launch {
-                repository.findById(itemId)?.let { item ->
+                repository.findByUuid(itemUuid)?.let { item ->
                     _uiState.value = EditItemUiState(
-                        id = item.id,
+                        uuid = item.uuid,
                         name = item.name,
                         barcode = item.barcode,
                         category = item.category,
@@ -132,7 +133,7 @@ class EditItemViewModel(
         viewModelScope.launch {
             repository.save(
                 FoodItem(
-                    id = state.id,
+                    uuid = if (state.isNew) "" else state.uuid,
                     name = name,
                     barcode = state.barcode,
                     category = state.category,
@@ -149,22 +150,22 @@ class EditItemViewModel(
     }
 
     fun delete() {
-        val id = _uiState.value.id
-        if (id == NEW_ITEM_ID) {
+        val state = _uiState.value
+        if (state.isNew) {
             _uiState.update { it.copy(isSaved = true) }
             return
         }
         viewModelScope.launch {
-            repository.deleteById(id)
+            repository.findByUuid(state.uuid)?.let { repository.remove(it, RemovalReason.ERRORE) }
             _uiState.update { it.copy(isSaved = true) }
         }
     }
 
     companion object {
-        fun factory(itemId: Long): ViewModelProvider.Factory = viewModelFactory {
+        fun factory(itemUuid: String): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 EditItemViewModel(
-                    itemId = itemId,
+                    itemUuid = itemUuid,
                     repository = igorApplication().container.foodRepository,
                 )
             }

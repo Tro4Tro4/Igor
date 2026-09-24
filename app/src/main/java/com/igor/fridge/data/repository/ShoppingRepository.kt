@@ -4,17 +4,26 @@ import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.ShoppingItem
 import com.igor.fridge.data.local.ShoppingItemDao
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
+import java.util.UUID
 
 /** Gestisce la lista della spesa. */
-class ShoppingRepository(private val dao: ShoppingItemDao) {
+class ShoppingRepository(
+    private val dao: ShoppingItemDao,
+    private val clock: () -> Instant = Instant::now,
+    private val newUuid: () -> String = { UUID.randomUUID().toString() },
+) {
 
     fun observeAll(): Flow<List<ShoppingItem>> = dao.observeAll()
 
     /**
-     * Aggiunge una voce; se esiste gia' un articolo con lo stesso nome lo lascia invariato
-     * (evita duplicati quando si aggiungono in blocco i prodotti in scadenza).
+     * Mette il prodotto fra le cose da comprare.
      *
-     * @return true se e' stata creata una nuova voce.
+     * Se esiste gia' una voce con lo stesso nome ma e' spuntata, viene riportata da
+     * comprare invece di essere ignorata: altrimenti un prodotto consumato una seconda
+     * volta sparirebbe dall'inventario senza ricomparire in lista.
+     *
+     * @return true se la lista e' cambiata.
      */
     suspend fun addIfAbsent(
         name: String,
@@ -23,13 +32,40 @@ class ShoppingRepository(private val dao: ShoppingItemDao) {
     ): Boolean {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return false
-        if (dao.findByName(trimmed) != null) return false
-        dao.upsert(ShoppingItem(name = trimmed, quantity = quantity, unit = unit))
-        return true
+
+        val existing = dao.findByName(trimmed)
+        return when {
+            existing == null -> {
+                dao.upsert(
+                    ShoppingItem(
+                        uuid = newUuid(),
+                        name = trimmed,
+                        quantity = quantity,
+                        unit = unit,
+                        updatedAt = clock(),
+                    ),
+                )
+                true
+            }
+
+            existing.isChecked -> {
+                dao.upsert(
+                    existing.copy(
+                        isChecked = false,
+                        quantity = quantity,
+                        unit = unit,
+                        updatedAt = clock(),
+                    ),
+                )
+                true
+            }
+
+            else -> false
+        }
     }
 
     suspend fun setChecked(item: ShoppingItem, checked: Boolean) {
-        dao.upsert(item.copy(isChecked = checked))
+        dao.upsert(item.copy(isChecked = checked, updatedAt = clock()))
     }
 
     suspend fun delete(item: ShoppingItem) = dao.delete(item)
