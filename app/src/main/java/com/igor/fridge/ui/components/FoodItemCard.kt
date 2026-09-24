@@ -21,7 +21,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.igor.fridge.R
 import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.domain.ExpiryStatus
 import com.igor.fridge.domain.daysUntilExpiry
@@ -85,13 +87,13 @@ fun FoodItemCard(
             IconButton(onClick = onConsume) {
                 Icon(
                     imageVector = Icons.Filled.RemoveShoppingCart,
-                    contentDescription = "Segna come consumato e aggiungi alla spesa",
+                    contentDescription = stringResource(R.string.action_consume),
                 )
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     imageVector = Icons.Filled.DeleteOutline,
-                    contentDescription = "Elimina ${item.name}",
+                    contentDescription = stringResource(R.string.action_delete_item, item.name),
                 )
             }
         }

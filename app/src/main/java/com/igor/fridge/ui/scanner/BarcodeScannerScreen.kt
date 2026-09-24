@@ -35,11 +35,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.igor.fridge.R
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
@@ -88,10 +90,10 @@ fun BarcodeScannerScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Scansiona il codice") },
+                title = { Text(stringResource(R.string.scanner_title)) },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
             )
@@ -149,18 +151,17 @@ fun BarcodeScannerScreen(
                 ) {
                     Text(
                         text = if (permissionRequested) {
-                            "Senza accesso alla fotocamera non e' possibile leggere i codici a barre. " +
-                                "Puoi concederlo dalle impostazioni di sistema."
+                            stringResource(R.string.scanner_permission_denied)
                         } else {
-                            "Serve il permesso di usare la fotocamera."
+                            stringResource(R.string.scanner_permission_needed)
                         },
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                     )
                     Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                        Text("Consenti")
+                        Text(stringResource(R.string.scanner_allow))
                     }
-                    Button(onClick = onClose) { Text("Torna indietro") }
+                    Button(onClick = onClose) { Text(stringResource(R.string.action_back)) }
                 }
             }
         }

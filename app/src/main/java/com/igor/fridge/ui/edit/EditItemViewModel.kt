@@ -30,8 +30,8 @@ data class EditItemUiState(
     val expiryDate: LocalDate? = null,
     val notes: String = "",
     val addedAt: LocalDate = LocalDate.now(),
-    val nameError: String? = null,
-    val quantityError: String? = null,
+    val nameError: Boolean = false,
+    val quantityError: Boolean = false,
     val message: String? = null,
     val isSaved: Boolean = false,
 ) {
@@ -70,14 +70,14 @@ class EditItemViewModel(
         }
     }
 
-    fun onNameChange(value: String) = _uiState.update { it.copy(name = value, nameError = null) }
+    fun onNameChange(value: String) = _uiState.update { it.copy(name = value, nameError = false) }
 
     fun onCategoryChange(value: FoodCategory) = _uiState.update { it.copy(category = value) }
 
     fun onLocationChange(value: StorageLocation) = _uiState.update { it.copy(location = value) }
 
     fun onQuantityChange(value: String) =
-        _uiState.update { it.copy(quantityText = value, quantityError = null) }
+        _uiState.update { it.copy(quantityText = value, quantityError = false) }
 
     fun onUnitChange(value: QuantityUnit) = _uiState.update { it.copy(unit = value) }
 
@@ -119,12 +119,8 @@ class EditItemViewModel(
         if (name.isEmpty() || quantity == null || quantity <= 0.0) {
             _uiState.update {
                 it.copy(
-                    nameError = if (name.isEmpty()) "Il nome e' obbligatorio" else null,
-                    quantityError = if (quantity == null || quantity <= 0.0) {
-                        "Inserisci una quantita' maggiore di zero"
-                    } else {
-                        null
-                    },
+                    nameError = name.isEmpty(),
+                    quantityError = quantity == null || quantity <= 0.0,
                 )
             }
             return

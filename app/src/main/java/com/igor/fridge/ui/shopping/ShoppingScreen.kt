@@ -31,10 +31,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.igor.fridge.R
 import com.igor.fridge.ui.formatQuantity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,16 +53,16 @@ fun ShoppingScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Lista della spesa") },
+                title = { Text(stringResource(R.string.shopping_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 actions = {
                     if (state.checkedCount > 0) {
                         TextButton(onClick = { viewModel.clearChecked() }) {
-                            Text("Rimuovi presi (${state.checkedCount})")
+                            Text(stringResource(R.string.shopping_clear_checked, state.checkedCount))
                         }
                     }
                 },
@@ -82,7 +84,7 @@ fun ShoppingScreen(
                 OutlinedTextField(
                     value = newItem,
                     onValueChange = { newItem = it },
-                    label = { Text("Aggiungi alla lista") },
+                    label = { Text(stringResource(R.string.shopping_add)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
@@ -93,7 +95,7 @@ fun ShoppingScreen(
                     },
                     enabled = newItem.isNotBlank(),
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Aggiungi")
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shopping_add))
                 }
             }
 
@@ -108,7 +110,7 @@ fun ShoppingScreen(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        text = "La lista e' vuota.",
+                        text = stringResource(R.string.shopping_empty),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -148,7 +150,7 @@ fun ShoppingScreen(
                             IconButton(onClick = { viewModel.delete(item) }) {
                                 Icon(
                                     imageVector = Icons.Filled.DeleteOutline,
-                                    contentDescription = "Elimina ${item.name}",
+                                    contentDescription = stringResource(R.string.action_delete_item, item.name),
                                 )
                             }
                         }

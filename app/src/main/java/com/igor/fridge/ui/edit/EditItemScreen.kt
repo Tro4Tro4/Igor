@@ -39,11 +39,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.igor.fridge.R
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.StorageLocation
@@ -92,16 +94,27 @@ fun EditItemScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(if (state.isNew) "Nuovo alimento" else "Modifica alimento") },
+                title = {
+                    Text(
+                        if (state.isNew) {
+                            stringResource(R.string.edit_title_new)
+                        } else {
+                            stringResource(R.string.edit_title_existing)
+                        },
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onDone) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 actions = {
                     if (!state.isNew) {
                         IconButton(onClick = { viewModel.delete() }) {
-                            Icon(Icons.Filled.DeleteOutline, contentDescription = "Elimina")
+                            Icon(
+                                Icons.Filled.DeleteOutline,
+                                contentDescription = stringResource(R.string.action_delete_item, state.name),
+                            )
                         }
                     }
                 },
@@ -119,10 +132,14 @@ fun EditItemScreen(
             OutlinedTextField(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
-                label = { Text("Nome *") },
+                label = { Text(stringResource(R.string.edit_name)) },
                 singleLine = true,
-                isError = state.nameError != null,
-                supportingText = state.nameError?.let { { Text(it) } },
+                isError = state.nameError,
+                supportingText = if (state.nameError) {
+                    { Text(stringResource(R.string.error_name_required)) }
+                } else {
+                    null
+                },
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -135,12 +152,12 @@ fun EditItemScreen(
                     value = state.barcode.orEmpty(),
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Codice a barre") },
+                    label = { Text(stringResource(R.string.edit_barcode)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = onOpenScanner) {
-                    Icon(Icons.Filled.QrCodeScanner, contentDescription = "Scansiona il codice a barre")
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = stringResource(R.string.action_scan))
                 }
             }
 
@@ -151,15 +168,19 @@ fun EditItemScreen(
                 OutlinedTextField(
                     value = state.quantityText,
                     onValueChange = viewModel::onQuantityChange,
-                    label = { Text("Quantita'") },
+                    label = { Text(stringResource(R.string.edit_quantity)) },
                     singleLine = true,
-                    isError = state.quantityError != null,
-                    supportingText = state.quantityError?.let { { Text(it) } },
+                    isError = state.quantityError,
+                    supportingText = if (state.quantityError) {
+                        { Text(stringResource(R.string.error_quantity_invalid)) }
+                    } else {
+                        null
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1f),
                 )
                 EnumDropdown(
-                    label = "Unita'",
+                    label = stringResource(R.string.edit_unit),
                     value = state.unit,
                     options = QuantityUnit.entries,
                     optionLabel = { it.label() },
@@ -169,7 +190,7 @@ fun EditItemScreen(
             }
 
             EnumDropdown(
-                label = "Categoria",
+                label = stringResource(R.string.edit_category),
                 value = state.category,
                 options = FoodCategory.entries,
                 optionLabel = { it.label() },
@@ -178,7 +199,7 @@ fun EditItemScreen(
             )
 
             EnumDropdown(
-                label = "Conservazione",
+                label = stringResource(R.string.edit_location),
                 value = state.location,
                 options = StorageLocation.entries,
                 optionLabel = { it.label() },
@@ -190,18 +211,24 @@ fun EditItemScreen(
                 value = state.expiryDate?.formatShort().orEmpty(),
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Scadenza") },
-                placeholder = { Text("Nessuna data") },
+                label = { Text(stringResource(R.string.edit_expiry)) },
+                placeholder = { Text(stringResource(R.string.edit_expiry_none)) },
                 modifier = Modifier.fillMaxWidth(),
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { showDatePicker = true }) {
-                    Text(if (state.expiryDate == null) "Imposta data" else "Cambia data")
+                    Text(
+                        if (state.expiryDate == null) {
+                            stringResource(R.string.edit_expiry_set)
+                        } else {
+                            stringResource(R.string.edit_expiry_change)
+                        },
+                    )
                 }
                 if (state.expiryDate != null) {
                     TextButton(onClick = { viewModel.onExpiryDateChange(null) }) {
-                        Text("Rimuovi data")
+                        Text(stringResource(R.string.edit_expiry_clear))
                     }
                 }
             }
@@ -209,7 +236,7 @@ fun EditItemScreen(
             OutlinedTextField(
                 value = state.notes,
                 onValueChange = viewModel::onNotesChange,
-                label = { Text("Note") },
+                label = { Text(stringResource(R.string.edit_notes)) },
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -218,7 +245,7 @@ fun EditItemScreen(
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Salva")
+                Text(stringResource(R.string.edit_save))
             }
         }
     }
@@ -261,11 +288,11 @@ private fun ExpiryDatePickerDialog(
                     }
                 },
             ) {
-                Text("OK")
+                Text(stringResource(R.string.action_ok))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Annulla") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     ) {
         DatePicker(state = state)

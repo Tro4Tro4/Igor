@@ -68,18 +68,18 @@ fun InventoryScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Igor · Frigorifero") },
+                title = { Text(stringResource(R.string.inventory_title)) },
                 actions = {
                     IconButton(onClick = { viewModel.addExpiringToShoppingList() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
-                            contentDescription = "Aggiungi i prodotti in scadenza alla lista della spesa",
+                            contentDescription = stringResource(R.string.action_add_expiring),
                         )
                     }
                     IconButton(onClick = onOpenShoppingList) {
                         Icon(
                             imageVector = Icons.Filled.ShoppingCart,
-                            contentDescription = "Apri la lista della spesa",
+                            contentDescription = stringResource(R.string.action_open_shopping),
                         )
                     }
                     IconButton(onClick = onOpenSettings) {
@@ -93,7 +93,7 @@ fun InventoryScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddItem) {
-                Icon(Icons.Filled.Add, contentDescription = "Aggiungi un alimento")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add_item))
             }
         },
     ) { padding ->
@@ -105,7 +105,7 @@ fun InventoryScreen(
             OutlinedTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChange,
-                label = { Text("Cerca") },
+                label = { Text(stringResource(R.string.inventory_search)) },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -160,27 +160,27 @@ private fun FilterRow(
         FilterChip(
             selected = state.filter == InventoryFilter.TUTTI,
             onClick = { onFilterChange(InventoryFilter.TUTTI) },
-            label = { Text("Tutti (${state.totalCount})") },
+            label = { Text(stringResource(R.string.filter_all, state.totalCount)) },
         )
         FilterChip(
             selected = state.filter == InventoryFilter.IN_SCADENZA,
             onClick = { onFilterChange(InventoryFilter.IN_SCADENZA) },
-            label = { Text("In scadenza (${state.expiringCount})") },
+            label = { Text(stringResource(R.string.filter_expiring, state.expiringCount)) },
         )
         FilterChip(
             selected = state.filter == InventoryFilter.SCADUTI,
             onClick = { onFilterChange(InventoryFilter.SCADUTI) },
-            label = { Text("Scaduti (${state.expiredCount})") },
+            label = { Text(stringResource(R.string.filter_expired, state.expiredCount)) },
         )
         FilterChip(
             selected = state.filter == InventoryFilter.SENZA_DATA,
             onClick = { onFilterChange(InventoryFilter.SENZA_DATA) },
-            label = { Text("Senza data (${state.noDateCount})") },
+            label = { Text(stringResource(R.string.filter_no_date, state.noDateCount)) },
         )
         FilterChip(
             selected = state.location == null,
             onClick = { onLocationChange(null) },
-            label = { Text("Ovunque") },
+            label = { Text(stringResource(R.string.filter_anywhere)) },
         )
         StorageLocation.entries.forEach { location ->
             FilterChip(
@@ -203,9 +203,9 @@ private fun EmptyState(hasItems: Boolean) {
     ) {
         Text(
             text = if (hasItems) {
-                "Nessun prodotto corrisponde ai filtri"
+                stringResource(R.string.inventory_empty_filtered)
             } else {
-                "Il frigo e' vuoto.\nTocca + per aggiungere il primo alimento."
+                stringResource(R.string.inventory_empty)
             },
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
