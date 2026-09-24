@@ -161,7 +161,7 @@ fun BarcodeScannerScreen(
                     Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
                         Text(stringResource(R.string.scanner_allow))
                     }
-                    Button(onClick = onClose) { Text(stringResource(R.string.action_back)) }
+                    Button(onClick = onClose) { Text(stringResource(R.string.scanner_back)) }
                 }
             }
         }

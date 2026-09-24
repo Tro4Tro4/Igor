@@ -53,4 +53,7 @@
     <string name="action_scan">Scansiona il codice a barre</string>
     <string name="action_ok">OK</string>
     <string name="action_cancel">Annulla</string>
+    <string name="scanner_back">Torna indietro</string>
+    <string name="action_add">Aggiungi</string>
+    <string name="action_delete">Elimina</string>
 </resources>

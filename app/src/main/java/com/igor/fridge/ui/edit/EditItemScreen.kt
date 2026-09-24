@@ -113,7 +113,7 @@ fun EditItemScreen(
                         IconButton(onClick = { viewModel.delete() }) {
                             Icon(
                                 Icons.Filled.DeleteOutline,
-                                contentDescription = stringResource(R.string.action_delete_item, state.name),
+                                contentDescription = stringResource(R.string.action_delete),
                             )
                         }
                     }

@@ -95,7 +95,7 @@ fun ShoppingScreen(
                     },
                     enabled = newItem.isNotBlank(),
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shopping_add))
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add))
                 }
             }
 
