@@ -13,6 +13,7 @@ import com.igor.fridge.ui.shopping.ShoppingViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -54,6 +55,7 @@ class ShoppingViewModelTest {
         shoppingRepository.setChecked(shoppingDao.items.first { it.name == "Latte" }, checked = true)
 
         val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
         vm.uiState.first { !it.isLoading }
         vm.moveCheckedToInventory()
         dispatcher.scheduler.advanceUntilIdle()
@@ -81,12 +83,14 @@ class ShoppingViewModelTest {
         shoppingRepository.setChecked(shoppingDao.items.single(), checked = true)
 
         val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
         vm.uiState.first { !it.isLoading }
         vm.moveCheckedToInventory()
         dispatcher.scheduler.advanceUntilIdle()
 
         val created = foodDao.items.single { it.removedAt == null }
         assertEquals(FoodCategory.LATTICINI, created.category)
+        assertEquals(StorageLocation.FRIGO, created.location)
     }
 
     @Test
@@ -94,6 +98,7 @@ class ShoppingViewModelTest {
         shoppingRepository.addIfAbsent("Pane")
 
         val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
         vm.uiState.first { !it.isLoading }
         vm.moveCheckedToInventory()
         dispatcher.scheduler.advanceUntilIdle()
@@ -110,6 +115,7 @@ class ShoppingViewModelTest {
         shoppingRepository.setChecked(original, checked = true)
 
         val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
         vm.uiState.first { !it.isLoading }
         vm.moveCheckedToInventory()
         dispatcher.scheduler.advanceUntilIdle()
@@ -130,6 +136,7 @@ class ShoppingViewModelTest {
         shoppingRepository.setChecked(shoppingDao.items.single(), checked = true)
 
         val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
         vm.uiState.first { !it.isLoading }
         vm.moveCheckedToInventory()
         dispatcher.scheduler.advanceUntilIdle()
@@ -142,5 +149,41 @@ class ShoppingViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(1, shoppingDao.items.size)
+    }
+
+    @Test
+    fun `due pressioni ravvicinate creano un solo articolo`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte")
+        shoppingRepository.setChecked(shoppingDao.items.single(), checked = true)
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+
+        // Due tocchi prima che la lista riemetta senza "Latte": senza la guardia, il
+        // secondo rilegge la stessa voce ancora spuntata e crea un secondo articolo.
+        vm.moveCheckedToInventory()
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, foodDao.items.count { it.removedAt == null })
+    }
+
+    @Test
+    fun `mettere in frigo con piu' voci spuntate le sposta tutte e usa il messaggio al plurale`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte")
+        shoppingRepository.addIfAbsent("Pane")
+        shoppingRepository.setChecked(shoppingDao.items.first { it.name == "Latte" }, checked = true)
+        shoppingRepository.setChecked(shoppingDao.items.first { it.name == "Pane" }, checked = true)
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(shoppingDao.items.isEmpty())
+        assertEquals(2, foodDao.items.count { it.removedAt == null })
+        assertEquals("2 prodotti messi in frigo", vm.uiState.value.message)
     }
 }

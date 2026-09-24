@@ -101,7 +101,7 @@ Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi 
 corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
 "3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-I test coprono 68 casi su 13 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
+I test coprono 70 casi su 13 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
 **Attenzione:** lo schema di `FoodItem` e `ShoppingItem` è cambiato ma la versione del

@@ -47,9 +47,10 @@ class ShoppingViewModel(
 
     private data class Feedback(val message: String? = null, val canUndo: Boolean = false)
 
-    // Lazily e non WhileSubscribed: moveCheckedToInventory legge uiState.value direttamente,
-    // non tramite un collector. Un timeout che ferma la condivisione fra una spunta e la
-    // pressione del pulsante lascerebbe .value non aggiornato con l'ultimo messaggio/canUndo.
+    // Impedisce a una seconda pressione, prima che la lista riemetta senza le voci spuntate,
+    // di rileggere le stesse voci e creare un secondo articolo per lo stesso acquisto.
+    private var moveInProgress = false
+
     val uiState: StateFlow<ShoppingUiState> =
         combine(shoppingRepository.observeAll(), feedback) { items, feedback ->
             ShoppingUiState(
@@ -60,7 +61,7 @@ class ShoppingViewModel(
             )
         }.stateIn(
             scope = viewModelScope,
-            started = SharingStarted.Lazily,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
             initialValue = ShoppingUiState(),
         )
 
@@ -84,25 +85,31 @@ class ShoppingViewModel(
      * ogni tocco creerebbe record fantasma.
      */
     fun moveCheckedToInventory() {
+        if (moveInProgress) return
+        moveInProgress = true
         viewModelScope.launch {
-            val checked = uiState.value.items.filter { it.isChecked }
-            if (checked.isEmpty()) {
-                feedback.update { it.copy(message = "Nessun prodotto spuntato", canUndo = false) }
-                return@launch
-            }
+            try {
+                val checked = uiState.value.items.filter { it.isChecked }
+                if (checked.isEmpty()) {
+                    feedback.update { it.copy(message = "Nessun prodotto spuntato", canUndo = false) }
+                    return@launch
+                }
 
-            val created = checked.map { item ->
-                foodRepository.addFromShopping(item.name, item.quantity, item.unit)
-            }
-            checked.forEach { shoppingRepository.delete(it) }
+                val created = checked.map { item ->
+                    foodRepository.addFromShopping(item.name, item.quantity, item.unit)
+                }
+                checked.forEach { shoppingRepository.delete(it) }
 
-            lastMove = LastMove(shoppingItems = checked, createdFood = created)
-            val text = if (checked.size == 1) {
-                "${checked.single().name} messo in frigo"
-            } else {
-                "${checked.size} prodotti messi in frigo"
+                lastMove = LastMove(shoppingItems = checked, createdFood = created)
+                val text = if (checked.size == 1) {
+                    "Aggiunto in frigo: ${checked.single().name}"
+                } else {
+                    "${checked.size} prodotti messi in frigo"
+                }
+                feedback.update { it.copy(message = text, canUndo = true) }
+            } finally {
+                moveInProgress = false
             }
-            feedback.update { it.copy(message = text, canUndo = true) }
         }
     }
 
@@ -122,6 +129,8 @@ class ShoppingViewModel(
     }
 
     companion object {
+        private const val STOP_TIMEOUT_MS = 5_000L
+
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val container = igorApplication().container
