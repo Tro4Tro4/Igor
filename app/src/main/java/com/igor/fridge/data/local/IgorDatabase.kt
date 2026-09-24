@@ -21,11 +21,22 @@ abstract class IgorDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "igor-database"
 
+        /**
+         * DA RIMUOVERE non appena esistano dati reali da proteggere.
+         *
+         * Lo schema e' cambiato mentre la versione restava 1: una build precedente gia'
+         * installata morirebbe all'apertura del database ("Room cannot verify the data
+         * integrity"). Oggi nessun dispositivo contiene dati che valga la pena salvare,
+         * quindi ricreare il database e' accettabile; da quando ce ne saranno, questa riga
+         * cancellerebbe l'inventario dell'utente senza dire niente e va sostituita da una
+         * migrazione vera.
+         */
         fun build(context: Context): IgorDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 IgorDatabase::class.java,
                 DATABASE_NAME,
-            ).build()
+            ).fallbackToDestructiveMigration()
+                .build()
     }
 }

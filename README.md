@@ -69,9 +69,16 @@ Il progetto compila: `assembleDebug` e la suite di test JVM passano.
 `FoodItem` e `ShoppingItem` usano come chiave primaria un UUID `String` generato sul
 dispositivo, non un id autoincrementale di SQLite che collide fra dispositivi diversi, e
 portano un campo `updatedAt`. `FoodItem` non viene mai cancellato fisicamente: la rimozione
-è logica, tramite `removedAt` e `removalReason` (`CONSUMATO`, `BUTTATO`, `ERRORE`). È una
-base per un’eventuale sincronizzazione futura senza dover rifare lo schema, e rende
-possibili delle statistiche sugli sprechi.
+è logica, tramite `removedAt` e `removalReason` (`CONSUMATO`, `BUTTATO`, `ERRORE`). Per
+l’inventario alimentare questa è già una base sufficiente per un’eventuale sincronizzazione
+futura senza dover rifare lo schema. La lista della spesa no: le voci vengono ancora
+cancellate fisicamente, e prima di poter essere sincronizzata le servirà la stessa
+cancellazione logica. Arriverà nella Fase 2, insieme alla riscrittura di "Rimuovi presi" in
+"Metti in frigo", che tocca comunque quel codice.
+
+La colonna `removalReason` rende *possibili* delle statistiche sugli sprechi, ma non le
+abilita: l’interfaccia offre solo "consumato" ed "eliminato", quindi `BUTTATO` non è oggi
+raggiungibile e le statistiche non avrebbero ancora dati da cui partire.
 
 Le impostazioni (giorni di preavviso, ora della notifica, notifiche attive o disattivate)
 sono passate da SharedPreferences a DataStore, sono osservabili tramite `Flow`, e hanno
@@ -84,16 +91,20 @@ preavviso sia al cambio di giorno.
 `ShoppingRepository.addIfAbsent` ripristina una voce già spuntata invece di ignorarla: un
 prodotto ricomprato torna davvero nella lista della spesa.
 
-Le stringhe dell’interfaccia sono in `strings.xml`, con accenti e apostrofi tipografici
-corretti.
+Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi tipografici
+corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
+"3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-I test coprono 50 casi su 11 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
+I test coprono 58 casi su 12 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
 **Attenzione:** lo schema di `FoodItem` e `ShoppingItem` è cambiato ma la versione del
-database Room è rimasta `1`. È legittimo solo perché nessun database Igor esiste ancora
-su alcun dispositivo: chi avesse installato una build precedente deve disinstallarla prima
-di installare questa, altrimenti Room non riesce ad aprire il database.
+database Room è rimasta `1`. È legittimo solo perché nessun database Igor esiste ancora su
+alcun dispositivo con dati da salvare. Perché una build precedente già installata non muoia
+all’apertura del database, `IgorDatabase.build` usa `fallbackToDestructiveMigration()`: il
+database viene ricreato da zero. Quella riga va tolta — e sostituita da una migrazione vera
+— non appena esistano dati reali, altrimenti cancellerebbe l’inventario dell’utente senza
+dire niente.
 
 ## Prossimi passi
 
