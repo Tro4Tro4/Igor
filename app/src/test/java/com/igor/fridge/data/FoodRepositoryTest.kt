@@ -1,7 +1,10 @@
 package com.igor.fridge.data
 
+import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.FoodItem
+import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.RemovalReason
+import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.data.repository.FoodRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -78,5 +81,70 @@ class FoodRepositoryTest {
         val found = repository.findExpiring(today, withinDays = 3)
 
         assertEquals(listOf("Scaduto", "Sul limite"), found.map { it.name }.sorted())
+    }
+
+    @Test
+    fun `un prodotto dalla spesa eredita categoria e posizione dall'ultimo omonimo`() = runTest {
+        repository.save(
+            FoodItem(
+                uuid = "",
+                name = "Latte",
+                category = FoodCategory.LATTICINI,
+                location = StorageLocation.FRIGO,
+                expiryDate = today,
+            ),
+        )
+
+        val created = repository.addFromShopping("Latte", quantity = 2.0, unit = QuantityUnit.L)
+
+        assertEquals(FoodCategory.LATTICINI, created.category)
+        assertEquals(StorageLocation.FRIGO, created.location)
+        assertEquals(2.0, created.quantity, 0.001)
+        assertEquals(QuantityUnit.L, created.unit)
+    }
+
+    @Test
+    fun `l'eredita' attraversa anche gli articoli gia' consumati`() = runTest {
+        val saved = repository.save(
+            FoodItem(uuid = "", name = "Yogurt", category = FoodCategory.LATTICINI),
+        )
+        repository.remove(saved, RemovalReason.CONSUMATO)
+
+        val created = repository.addFromShopping("Yogurt", quantity = 1.0, unit = QuantityUnit.PZ)
+
+        assertEquals(FoodCategory.LATTICINI, created.category)
+        assertNull(created.removedAt)
+    }
+
+    @Test
+    fun `un prodotto mai visto prima riceve i valori di default`() = runTest {
+        val created = repository.addFromShopping("Cavolo", quantity = 1.0, unit = QuantityUnit.PZ)
+
+        assertEquals(FoodCategory.ALTRO, created.category)
+        assertEquals(StorageLocation.FRIGO, created.location)
+    }
+
+    @Test
+    fun `un prodotto dalla spesa entra senza scadenza e senza codice a barre`() = runTest {
+        repository.save(
+            FoodItem(
+                uuid = "",
+                name = "Latte",
+                barcode = "8001234567890",
+                expiryDate = today.plusDays(5),
+            ),
+        )
+
+        val created = repository.addFromShopping("Latte", quantity = 1.0, unit = QuantityUnit.L)
+
+        assertNull(created.expiryDate)
+        assertNull(created.barcode)
+    }
+
+    @Test
+    fun `il nome viene ripulito dagli spazi`() = runTest {
+        val created = repository.addFromShopping("  Pane  ", quantity = 1.0, unit = QuantityUnit.PZ)
+
+        assertEquals("Pane", created.name)
     }
 }

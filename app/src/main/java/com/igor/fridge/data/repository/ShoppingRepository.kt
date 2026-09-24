@@ -68,6 +68,14 @@ class ShoppingRepository(
         dao.upsert(item.copy(isChecked = checked, updatedAt = clock()))
     }
 
+    /**
+     * Rimette in lista una voce rimossa, con il suo identificatore originale: serve
+     * ad annullare uno spostamento in frigo senza che la voce cambi identita'.
+     */
+    suspend fun restore(item: ShoppingItem) {
+        dao.upsert(item.copy(updatedAt = clock()))
+    }
+
     suspend fun delete(item: ShoppingItem) = dao.delete(item)
 
     suspend fun deleteChecked() = dao.deleteChecked()
