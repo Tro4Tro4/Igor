@@ -21,10 +21,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +52,19 @@ fun ShoppingScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var newItem by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val undoLabel = stringResource(R.string.action_undo)
+
+    LaunchedEffect(state.message) {
+        val message = state.message ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = message,
+            actionLabel = if (state.canUndo) undoLabel else null,
+            withDismissAction = false,
+        )
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoLastMove()
+        viewModel.onMessageShown()
+    }
 
     Scaffold(
         modifier = modifier,
@@ -61,13 +78,14 @@ fun ShoppingScreen(
                 },
                 actions = {
                     if (state.checkedCount > 0) {
-                        TextButton(onClick = { viewModel.clearChecked() }) {
-                            Text(stringResource(R.string.shopping_clear_checked, state.checkedCount))
+                        TextButton(onClick = { viewModel.moveCheckedToInventory() }) {
+                            Text(stringResource(R.string.shopping_move_to_fridge, state.checkedCount))
                         }
                     }
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
             modifier = Modifier

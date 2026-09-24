@@ -14,7 +14,8 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
 - **Codice a barre**: lettura EAN/UPC/Code-128 con fotocamera (CameraX + ML Kit). Se il codice
   è già stato registrato in passato, nome, categoria e unità vengono precompilati.
 - **Lista della spesa**: voci aggiunte a mano, oppure generate dai prodotti consumati o in
-  scadenza; spunta e rimozione in blocco degli articoli presi.
+  scadenza; spunta e "Metti in frigo" per far tornare gli articoli presi nell’inventario,
+  con la possibilità di annullare lo spostamento finché lo snackbar è visibile.
 
 ## Stack tecnico
 
@@ -73,8 +74,13 @@ portano un campo `updatedAt`. `FoodItem` non viene mai cancellato fisicamente: l
 l’inventario alimentare questa è già una base sufficiente per un’eventuale sincronizzazione
 futura senza dover rifare lo schema. La lista della spesa no: le voci vengono ancora
 cancellate fisicamente, e prima di poter essere sincronizzata le servirà la stessa
-cancellazione logica. Arriverà nella Fase 2, insieme alla riscrittura di "Rimuovi presi" in
-"Metti in frigo", che tocca comunque quel codice.
+cancellazione logica.
+
+Il ciclo fra spesa e inventario ora si chiude: il pulsante "Metti in frigo" fa entrare le
+voci spuntate nell’inventario ed escono dalla lista, ereditando categoria e posizione
+dall’ultima volta che quel nome è stato in casa (anche se quell’articolo era già stato
+consumato), senza scadenza. Lo spostamento si può annullare finché lo snackbar che lo
+conferma resta visibile: un secondo annullamento non fa nulla.
 
 La colonna `removalReason` rende *possibili* delle statistiche sugli sprechi, ma non le
 abilita: l’interfaccia offre solo "consumato" ed "eliminato", quindi `BUTTATO` non è oggi
@@ -95,7 +101,7 @@ Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi 
 corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
 "3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-I test coprono 58 casi su 12 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
+I test coprono 68 casi su 13 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
 **Attenzione:** lo schema di `FoodItem` e `ShoppingItem` è cambiato ma la versione del
@@ -106,15 +112,19 @@ database viene ricreato da zero. Quella riga va tolta — e sostituita da una mi
 — non appena esistano dati reali, altrimenti cancellerebbe l’inventario dell’utente senza
 dire niente.
 
+### Difetti noti
+
+**L’elenco si aggiorna con qualche secondo di ritardo.** Dopo aver aggiunto o spostato un
+prodotto, la lista può impiegare qualche istante a mostrarlo: il dato è salvato
+correttamente e compare da solo, senza bisogno di riaprire l’app. La causa non è ancora
+stata isolata; il sospetto è il momento in cui le schermate riprendono a osservare il
+database dopo essere tornate in primo piano.
+
 ## Prossimi passi
 
 Le fasi successive sono descritte in
 `docs/superpowers/specs/2026-09-23-inventario-vocale-design.md`.
 
-- **Ciclo chiuso della lista della spesa**: il pulsante "Rimuovi presi" diventa "Metti in
-  frigo" e le voci spuntate entrano in inventario in un’unica operazione, ereditando
-  categoria e posizione dall’ultimo omonimo ma senza scadenza, da completare a mano (è
-  per questo che esiste il filtro "Senza data").
 - **Inserimento vocale**: un pulsante microfono in `InventoryScreen` avvia il
   riconoscimento vocale di Android e apre `EditItemScreen` con i campi precompilati da un
   parser testuale (`domain/voice/`); la conferma manuale resta obbligatoria prima di

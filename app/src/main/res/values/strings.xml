@@ -28,7 +28,8 @@
     <string name="shopping_title">Lista della spesa</string>
     <string name="shopping_add">Aggiungi alla lista</string>
     <string name="shopping_empty">La lista è vuota.</string>
-    <string name="shopping_clear_checked">Rimuovi presi (%1$d)</string>
+    <string name="shopping_move_to_fridge">Metti in frigo (%1$d)</string>
+    <string name="action_undo">Annulla</string>
     <string name="edit_title_new">Nuovo alimento</string>
     <string name="edit_title_existing">Modifica alimento</string>
     <string name="edit_name">Nome *</string>
