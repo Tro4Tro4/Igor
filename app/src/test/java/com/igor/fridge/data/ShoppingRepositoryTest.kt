@@ -1,40 +1,13 @@
 package com.igor.fridge.data
 
 import com.igor.fridge.data.local.QuantityUnit
-import com.igor.fridge.data.local.ShoppingItem
-import com.igor.fridge.data.local.ShoppingItemDao
 import com.igor.fridge.data.repository.ShoppingRepository
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
-
-/** DAO in memoria: la logica anti-duplicati sta nel repository, non nel database. */
-private class FakeShoppingItemDao : ShoppingItemDao {
-    val items = mutableListOf<ShoppingItem>()
-
-    override fun observeAll(): Flow<List<ShoppingItem>> = flowOf(items.toList())
-
-    override suspend fun findByName(name: String): ShoppingItem? =
-        items.firstOrNull { it.name.equals(name, ignoreCase = true) }
-
-    override suspend fun upsert(item: ShoppingItem) {
-        items.removeAll { it.uuid == item.uuid }
-        items += item
-    }
-
-    override suspend fun delete(item: ShoppingItem) {
-        items.removeAll { it.uuid == item.uuid }
-    }
-
-    override suspend fun deleteChecked() {
-        items.removeAll { it.isChecked }
-    }
-}
 
 class ShoppingRepositoryTest {
 

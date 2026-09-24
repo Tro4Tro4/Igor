@@ -1,7 +1,6 @@
 package com.igor.fridge.data.local
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
@@ -56,9 +55,11 @@ interface FoodItemDao {
     )
     suspend fun findExpiringOnOrBefore(limitDate: LocalDate): List<FoodItem>
 
+    /**
+     * Non esiste un @Delete: un alimento non viene mai cancellato fisicamente, esce
+     * dall'inventario valorizzando removedAt. Aggiungerlo qui basterebbe a far rientrare
+     * dalla finestra la cancellazione fisica che la cancellazione logica esclude.
+     */
     @Upsert
     suspend fun upsert(item: FoodItem)
-
-    @Delete
-    suspend fun delete(item: FoodItem)
 }

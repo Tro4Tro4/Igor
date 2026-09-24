@@ -1,9 +1,9 @@
 package com.igor.fridge.ui
 
 import com.igor.fridge.data.FakeFoodItemDao
+import com.igor.fridge.data.FakeShoppingItemDao
 import com.igor.fridge.data.local.FoodItem
-import com.igor.fridge.data.local.ShoppingItem
-import com.igor.fridge.data.local.ShoppingItemDao
+import com.igor.fridge.data.local.RemovalReason
 import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.ShoppingRepository
@@ -11,7 +11,6 @@ import com.igor.fridge.ui.inventory.InventoryFilter
 import com.igor.fridge.ui.inventory.InventoryViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -21,23 +20,12 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Instant
 import java.time.LocalDate
-
-private class FakeShoppingDao : ShoppingItemDao {
-    val items = mutableListOf<ShoppingItem>()
-    override fun observeAll(): Flow<List<ShoppingItem>> = flowOf(items.toList())
-    override suspend fun findByName(name: String): ShoppingItem? =
-        items.firstOrNull { it.name.equals(name, ignoreCase = true) }
-    override suspend fun upsert(item: ShoppingItem) {
-        items.removeAll { it.uuid == item.uuid }
-        items += item
-    }
-    override suspend fun delete(item: ShoppingItem) { items.removeAll { it.uuid == item.uuid } }
-    override suspend fun deleteChecked() { items.removeAll { it.isChecked } }
-}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InventoryViewModelTest {
@@ -47,7 +35,7 @@ class InventoryViewModelTest {
     private val now = Instant.ofEpochMilli(1_774_000_000_000)
 
     private val foodDao = FakeFoodItemDao()
-    private val shoppingDao = FakeShoppingDao()
+    private val shoppingDao = FakeShoppingItemDao()
     private var counter = 0
 
     private val foodRepository = FoodRepository(foodDao, { now }, { "uuid-${++counter}" })
@@ -139,6 +127,25 @@ class InventoryViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(listOf("Fresco"), shoppingDao.items.map { it.name })
+        assertEquals(3, vm.uiState.first { it.totalCount == 3 }.totalCount)
+    }
+
+    @Test
+    fun `eliminare conserva la riga con il motivo ERRORE`() = runTest(dispatcher) {
+        seed()
+        val vm = viewModel()
+        val item = vm.uiState.first { !it.isLoading }.items.first { it.name == "Fresco" }
+
+        vm.delete(item)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        // La riga resta in database: e' la rimozione a essere logica, e il motivo deve
+        // distinguere un errore di inserimento da un consumo, altrimenti le statistiche
+        // sugli sprechi contano come consumato cio' che non e' mai stato mangiato.
+        val stored = foodDao.items.single { it.uuid == item.uuid }
+        assertNotNull(stored.removedAt)
+        assertEquals(RemovalReason.ERRORE, stored.removalReason)
+        assertTrue(shoppingDao.items.isEmpty())
         assertEquals(3, vm.uiState.first { it.totalCount == 3 }.totalCount)
     }
 }
