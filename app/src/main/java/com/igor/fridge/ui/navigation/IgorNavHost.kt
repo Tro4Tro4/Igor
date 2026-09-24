@@ -24,6 +24,7 @@ import com.igor.fridge.ui.edit.EditItemScreen
 import com.igor.fridge.ui.edit.NEW_ITEM_UUID
 import com.igor.fridge.ui.inventory.InventoryScreen
 import com.igor.fridge.ui.scanner.BarcodeScannerScreen
+import com.igor.fridge.ui.settings.SettingsScreen
 import com.igor.fridge.ui.shopping.ShoppingScreen
 
 object Routes {
@@ -31,6 +32,7 @@ object Routes {
     const val EDIT = "edit/{uuid}"
     const val SCANNER = "scanner"
     const val SHOPPING = "shopping"
+    const val SETTINGS = "settings"
 
     fun edit(uuid: String): String = "edit/$uuid"
 }
@@ -56,6 +58,7 @@ fun IgorApp(
                 onAddItem = { navController.navigate(Routes.edit(NEW_ITEM_UUID)) },
                 onEditItem = { uuid -> navController.navigate(Routes.edit(uuid)) },
                 onOpenShoppingList = { navController.navigate(Routes.SHOPPING) },
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
             )
         }
 
@@ -90,6 +93,10 @@ fun IgorApp(
 
         composable(Routes.SHOPPING) {
             ShoppingScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -33,10 +34,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.igor.fridge.R
 import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.ui.components.FoodItemCard
 import com.igor.fridge.ui.label
@@ -47,6 +50,7 @@ fun InventoryScreen(
     onAddItem: () -> Unit,
     onEditItem: (String) -> Unit,
     onOpenShoppingList: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: InventoryViewModel = viewModel(factory = InventoryViewModel.Factory),
 ) {
@@ -76,6 +80,12 @@ fun InventoryScreen(
                         Icon(
                             imageVector = Icons.Filled.ShoppingCart,
                             contentDescription = "Apri la lista della spesa",
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = stringResource(R.string.action_settings),
                         )
                     }
                 },

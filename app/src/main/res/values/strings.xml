@@ -3,4 +3,12 @@
     <string name="app_name">Igor</string>
     <string name="expiry_notification_channel_name">Scadenze</string>
     <string name="expiry_notification_channel_description">Avvisi sugli alimenti in scadenza o scaduti</string>
+    <string name="settings_title">Impostazioni</string>
+    <string name="settings_warning_days">Preavviso: %1$d giorni</string>
+    <string name="settings_warning_days_help">Un prodotto è considerato in scadenza entro questo numero di giorni.</string>
+    <string name="settings_notifications">Notifiche</string>
+    <string name="settings_hour">Ora del controllo: %1$d</string>
+    <string name="settings_hour_help">L’orario è indicativo: il sistema può rimandare il controllo di qualche ora per risparmiare batteria.</string>
+    <string name="action_back">Indietro</string>
+    <string name="action_settings">Impostazioni</string>
 </resources>
