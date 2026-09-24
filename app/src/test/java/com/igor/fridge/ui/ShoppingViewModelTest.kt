@@ -66,6 +66,8 @@ class ShoppingViewModelTest {
         assertEquals(2.0, inFridge.quantity, 0.001)
         assertEquals(QuantityUnit.L, inFridge.unit)
         assertNull(inFridge.expiryDate)
+        assertEquals("Aggiunto in frigo: Latte", vm.uiState.value.message)
+        assertTrue(vm.uiState.value.canUndo)
     }
 
     @Test
@@ -185,5 +187,49 @@ class ShoppingViewModelTest {
         assertTrue(shoppingDao.items.isEmpty())
         assertEquals(2, foodDao.items.count { it.removedAt == null })
         assertEquals("2 prodotti messi in frigo", vm.uiState.value.message)
+    }
+
+    @Test
+    fun `annullare lo annuncia e chiude la porta`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte")
+        shoppingRepository.setChecked(shoppingDao.items.single(), checked = true)
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.undoLastMove()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Spostamento annullato", vm.uiState.value.message)
+        assertFalse(vm.uiState.value.canUndo)
+    }
+
+    @Test
+    fun `quando il messaggio e' stato mostrato scade anche l'annullamento`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte")
+        shoppingRepository.setChecked(shoppingDao.items.single(), checked = true)
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.canUndo)
+
+        vm.onMessageShown()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(vm.uiState.value.message)
+        assertFalse(vm.uiState.value.canUndo)
+
+        // Lo snackbar e' sparito: l'annullamento e' scaduto con lui e non tocca piu' nulla.
+        vm.undoLastMove()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(shoppingDao.items.isEmpty())
+        assertEquals(1, foodDao.items.count { it.removedAt == null })
     }
 }

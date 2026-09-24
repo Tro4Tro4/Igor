@@ -64,8 +64,14 @@ fun ShoppingScreen(
             withDismissAction = false,
             duration = SnackbarDuration.Long,
         )
-        if (result == SnackbarResult.ActionPerformed) viewModel.undoLastMove()
-        viewModel.onMessageShown()
+        // Una sola chiamata per ramo: undoLastMove() consuma gia' il messaggio, e chiamare
+        // anche onMessageShown() dopo di lui renderebbe il risultato dipendente dal fatto
+        // che l'annullamento sospenda prima di annunciarsi.
+        if (result == SnackbarResult.ActionPerformed) {
+            viewModel.undoLastMove()
+        } else {
+            viewModel.onMessageShown()
+        }
     }
 
     Scaffold(

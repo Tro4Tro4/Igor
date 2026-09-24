@@ -62,15 +62,4 @@ class ShoppingRepositoryTest {
         assertFalse(repository.addIfAbsent("   "))
         assertEquals(0, dao.items.size)
     }
-
-    @Test
-    fun `rimuove solo le voci spuntate`() = runTest {
-        repository.addIfAbsent("Latte")
-        repository.addIfAbsent("Pane")
-        repository.setChecked(dao.items.first { it.name == "Latte" }, checked = true)
-
-        repository.deleteChecked()
-
-        assertEquals(listOf("Pane"), dao.items.map { it.name })
-    }
 }

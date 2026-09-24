@@ -77,6 +77,4 @@ class ShoppingRepository(
     }
 
     suspend fun delete(item: ShoppingItem) = dao.delete(item)
-
-    suspend fun deleteChecked() = dao.deleteChecked()
 }

@@ -37,10 +37,6 @@ class FakeShoppingItemDao : ShoppingItemDao {
         state.update { list -> list.filterNot { it.uuid == item.uuid } }
     }
 
-    override suspend fun deleteChecked() {
-        state.update { list -> list.filterNot { it.isChecked } }
-    }
-
     private companion object {
         /** ORDER BY isChecked ASC, createdAt DESC, name COLLATE NOCASE ASC */
         val SHOPPING_ORDER: Comparator<ShoppingItem> = compareBy<ShoppingItem> { it.isChecked }

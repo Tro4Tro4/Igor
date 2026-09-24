@@ -76,8 +76,8 @@ futura senza dover rifare lo schema. La lista della spesa no: le voci vengono an
 cancellate fisicamente, e prima di poter essere sincronizzata le servirà la stessa
 cancellazione logica.
 
-Il ciclo fra spesa e inventario ora si chiude: il pulsante "Metti in frigo" fa entrare le
-voci spuntate nell’inventario ed escono dalla lista, ereditando categoria e posizione
+Il ciclo fra spesa e inventario ora si chiude: con "Metti in frigo" le voci spuntate
+entrano nell’inventario ed escono dalla lista, ereditando categoria e posizione
 dall’ultima volta che quel nome è stato in casa (anche se quell’articolo era già stato
 consumato), senza scadenza. Lo spostamento si può annullare finché lo snackbar che lo
 conferma resta visibile: un secondo annullamento non fa nulla.
