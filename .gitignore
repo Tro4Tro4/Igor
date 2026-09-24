@@ -21,3 +21,6 @@ captures/
 
 # Kotlin
 .kotlin/
+
+# Superpowers SDD scratch
+.superpowers/
