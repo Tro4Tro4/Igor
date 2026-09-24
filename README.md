@@ -1,18 +1,18 @@
 # Igor — monitoraggio del frigorifero
 
-App Android per tenere sotto controllo cosa c'e' in frigo, cosa sta per scadere e
+App Android per tenere sotto controllo cosa c’è in frigo, cosa sta per scadere e
 cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun server.
 
-## Funzionalita' (MVP)
+## Funzionalità (MVP)
 
-- **Inventario**: aggiunta, modifica ed eliminazione di alimenti con quantita', unita' di
+- **Inventario**: aggiunta, modifica ed eliminazione di alimenti con quantità, unità di
   misura, categoria, luogo di conservazione (frigo / freezer / dispensa) e note.
-- **Scadenze**: la lista e' ordinata per urgenza; ogni articolo mostra lo stato
+- **Scadenze**: la lista è ordinata per urgenza; ogni articolo mostra lo stato
   (scaduto, in scadenza, fresco) con il numero di giorni residui. Filtri rapidi e ricerca per nome.
 - **Notifiche**: un controllo giornaliero (WorkManager) invia una notifica riepilogativa
   dei prodotti scaduti o in scadenza entro la soglia di preavviso (3 giorni di default).
 - **Codice a barre**: lettura EAN/UPC/Code-128 con fotocamera (CameraX + ML Kit). Se il codice
-  e' gia' stato registrato in passato, nome, categoria e unita' vengono precompilati.
+  è già stato registrato in passato, nome, categoria e unità vengono precompilati.
 - **Lista della spesa**: voci aggiunte a mano, oppure generate dai prodotti consumati o in
   scadenza; spunta e rimozione in blocco degli articoli presi.
 
@@ -24,6 +24,7 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
 | UI | Jetpack Compose + Material 3 |
 | Navigazione | Navigation Compose |
 | Persistenza | Room (SQLite) |
+| Preferenze | DataStore (Preferences), osservabili tramite `Flow` |
 | Background | WorkManager |
 | Fotocamera | CameraX + ML Kit Barcode Scanning |
 | DI | container manuale (`AppContainer`), senza annotation processor |
@@ -36,8 +37,8 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
 ```
 app/src/main/java/com/igor/fridge/
 ├── data/
-│   ├── local/        # entita' Room, DAO, database, type converter
-│   ├── prefs/        # preferenze utente (SharedPreferences)
+│   ├── local/        # entità Room (UUID, cancellazione logica), DAO, database, type converter
+│   ├── prefs/        # preferenze utente (DataStore, osservabili)
 │   └── repository/   # FoodRepository, ShoppingRepository
 ├── di/               # AppContainer
 ├── domain/           # logica di scadenza, indipendente da Android
@@ -46,6 +47,7 @@ app/src/main/java/com/igor/fridge/
     ├── inventory/    # elenco, filtri, ricerca
     ├── edit/         # inserimento e modifica
     ├── scanner/      # lettura codice a barre
+    ├── settings/     # impostazioni: soglia, ora della notifica, attivazione
     └── shopping/     # lista della spesa
 ```
 
@@ -57,19 +59,52 @@ app/src/main/java/com/igor/fridge/
 ./gradlew installDebug       # installa su un dispositivo collegato
 ```
 
-Serve JDK 17+ e l'Android SDK con `platform-35` e i build-tools corrispondenti
+Serve JDK 17+ e l’Android SDK con `platform-35` e i build-tools corrispondenti
 (Android Studio li installa automaticamente aprendo il progetto).
 
 ## Stato
 
-Prima iterazione: il codice non e' ancora stato compilato in CI perche' l'ambiente di
-sviluppo remoto non ha accesso all'Android SDK. Il primo `./gradlew assembleDebug` su una
-macchina con SDK e' il passo di verifica mancante.
+Il progetto compila: `assembleDebug` e la suite di test JVM passano.
+
+`FoodItem` e `ShoppingItem` usano come chiave primaria un UUID `String` generato sul
+dispositivo, non un id autoincrementale di SQLite che collide fra dispositivi diversi, e
+portano un campo `updatedAt`. `FoodItem` non viene mai cancellato fisicamente: la rimozione
+è logica, tramite `removedAt` e `removalReason` (`CONSUMATO`, `BUTTATO`, `ERRORE`). È una
+base per un’eventuale sincronizzazione futura senza dover rifare lo schema, e rende
+possibili delle statistiche sugli sprechi.
+
+Le impostazioni (giorni di preavviso, ora della notifica, notifiche attive o disattivate)
+sono passate da SharedPreferences a DataStore, sono osservabili tramite `Flow`, e hanno
+finalmente una schermata dedicata (**Impostazioni**) che ripianifica il worker delle
+notifiche quando cambiano.
+
+L’inventario ha un quarto filtro, "Senza data", e si aggiorna sia al cambio della soglia di
+preavviso sia al cambio di giorno.
+
+`ShoppingRepository.addIfAbsent` ripristina una voce già spuntata invece di ignorarla: un
+prodotto ricomprato torna davvero nella lista della spesa.
+
+Le stringhe dell’interfaccia sono in `strings.xml`, con accenti e apostrofi tipografici
+corretti.
+
+I test coprono 50 casi su 11 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
+esiste ancora un source set `androidTest`.
+
+**Attenzione:** lo schema di `FoodItem` e `ShoppingItem` è cambiato ma la versione del
+database Room è rimasta `1`. È legittimo solo perché nessun database Igor esiste ancora
+su alcun dispositivo: chi avesse installato una build precedente deve disinstallarla prima
+di installare questa, altrimenti Room non riesce ad aprire il database.
 
 ## Prossimi passi
 
-- Ricerca del prodotto da codice a barre su Open Food Facts (con cache locale).
-- Schermata impostazioni: giorni di preavviso, ora della notifica, attivazione notifiche
-  (i valori sono gia' persistiti da `SettingsStore`, manca la UI).
-- Statistiche sugli sprechi (quanto viene buttato per scadenza).
-- Backup/ripristino dell'inventario ed eventuale sincronizzazione fra dispositivi.
+Le fasi successive sono descritte in
+`docs/superpowers/specs/2026-09-23-inventario-vocale-design.md`.
+
+- **Ciclo chiuso della lista della spesa**: il pulsante "Rimuovi presi" diventa "Metti in
+  frigo" e le voci spuntate entrano in inventario in un’unica operazione, ereditando
+  categoria e posizione dall’ultimo omonimo ma senza scadenza, da completare a mano (è
+  per questo che esiste il filtro "Senza data").
+- **Inserimento vocale**: un pulsante microfono in `InventoryScreen` avvia il
+  riconoscimento vocale di Android e apre `EditItemScreen` con i campi precompilati da un
+  parser testuale (`domain/voice/`); la conferma manuale resta obbligatoria prima di
+  salvare, perché il parser è la parte incerta del sistema.
