@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.igor.fridge.IgorApplication
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 
 /**
@@ -17,7 +18,9 @@ class ExpiryCheckWorker(
 
     override suspend fun doWork(): Result {
         val container = (applicationContext as IgorApplication).container
-        val settings = container.settingsStore.snapshot()
+        // doWork() e' gia' una funzione sospesa: le preferenze si leggono sospendendo,
+        // senza bloccare il thread del pool su cui gira il worker.
+        val settings = container.settingsStore.settings.first()
         if (!settings.notificationsEnabled) return Result.success()
 
         val warningDays = settings.warningDays

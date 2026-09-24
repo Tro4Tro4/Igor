@@ -8,11 +8,15 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "igor_settings")
+/**
+ * L'unica istanza di DataStore del processo. Vive qui e non dentro [SettingsStore] perche'
+ * il delegato non e' istanziabile due volte sullo stesso file: AppContainer la passa al
+ * costruttore, e un test puo' costruirne una propria su un file temporaneo.
+ */
+internal val Context.settingsDataStore: DataStore<Preferences> by
+    preferencesDataStore(name = "igor_settings")
 
 /** Valori delle impostazioni in un istante dato. */
 data class Settings(
@@ -27,23 +31,29 @@ data class Settings(
  * DataStore invece di SharedPreferences perche' i valori devono essere osservabili: un
  * cambio di soglia deve raggiungere la lista dell'inventario senza ricrearne il ViewModel.
  */
-class SettingsStore(context: Context) {
+class SettingsStore(private val store: DataStore<Preferences>) {
 
-    private val store = context.applicationContext.dataStore
+    /**
+     * Tutte le impostazioni insieme. I default si applicano qui e in nessun altro posto:
+     * i flussi singoli derivano da questo, cosi' non esistono due copie della stessa
+     * regola che possono divergere.
+     */
+    val settings: Flow<Settings> = store.data.map { preferences ->
+        Settings(
+            warningDays = preferences[KEY_WARNING_DAYS] ?: DEFAULT_WARNING_DAYS,
+            notificationHour = preferences[KEY_NOTIFICATION_HOUR] ?: DEFAULT_NOTIFICATION_HOUR,
+            notificationsEnabled = preferences[KEY_NOTIFICATIONS_ENABLED]
+                ?: DEFAULT_NOTIFICATIONS_ENABLED,
+        )
+    }
 
     /** Giorni di preavviso prima della scadenza. */
-    val warningDays: Flow<Int> = store.data.map {
-        it[KEY_WARNING_DAYS] ?: DEFAULT_WARNING_DAYS
-    }
+    val warningDays: Flow<Int> = settings.map { it.warningDays }
 
     /** Ora del giorno (0-23) in cui viene eseguito il controllo scadenze. */
-    val notificationHour: Flow<Int> = store.data.map {
-        it[KEY_NOTIFICATION_HOUR] ?: DEFAULT_NOTIFICATION_HOUR
-    }
+    val notificationHour: Flow<Int> = settings.map { it.notificationHour }
 
-    val notificationsEnabled: Flow<Boolean> = store.data.map {
-        it[KEY_NOTIFICATIONS_ENABLED] ?: true
-    }
+    val notificationsEnabled: Flow<Boolean> = settings.map { it.notificationsEnabled }
 
     suspend fun setWarningDays(value: Int) {
         store.edit { it[KEY_WARNING_DAYS] = value.coerceIn(0, 30) }
@@ -57,23 +67,10 @@ class SettingsStore(context: Context) {
         store.edit { it[KEY_NOTIFICATIONS_ENABLED] = value }
     }
 
-    /**
-     * Lettura bloccante, per il worker delle notifiche e per l'avvio dell'Application:
-     * girano fuori da una coroutine e hanno bisogno del valore subito. E' l'unico punto
-     * del progetto in cui e' lecito bloccare su DataStore.
-     */
-    fun snapshot(): Settings = runBlocking {
-        val preferences = store.data.first()
-        Settings(
-            warningDays = preferences[KEY_WARNING_DAYS] ?: DEFAULT_WARNING_DAYS,
-            notificationHour = preferences[KEY_NOTIFICATION_HOUR] ?: DEFAULT_NOTIFICATION_HOUR,
-            notificationsEnabled = preferences[KEY_NOTIFICATIONS_ENABLED] ?: true,
-        )
-    }
-
     companion object {
         const val DEFAULT_WARNING_DAYS = 3
         const val DEFAULT_NOTIFICATION_HOUR = 9
+        const val DEFAULT_NOTIFICATIONS_ENABLED = true
 
         private val KEY_WARNING_DAYS = intPreferencesKey("warning_days")
         private val KEY_NOTIFICATION_HOUR = intPreferencesKey("notification_hour")

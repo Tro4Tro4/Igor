@@ -20,6 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -27,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.igor.fridge.R
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +40,18 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Posizione del cursore durante il trascinamento. onValueChange scatta a ogni frame:
+    // scriverla subito significherebbe una riscrittura di DataStore e una riprogrammazione
+    // del worker per ogni frame, e il pollice tornerebbe indietro perche' Slider rileggerebbe
+    // un valore ancora vecchio. Si salva solo a trascinamento finito; la chiave di remember
+    // risincronizza la posizione se il valore memorizzato cambia da un'altra parte.
+    var warningDaysPosition by remember(state.warningDays) {
+        mutableFloatStateOf(state.warningDays.toFloat())
+    }
+    var hourPosition by remember(state.notificationHour) {
+        mutableFloatStateOf(state.notificationHour.toFloat())
+    }
 
     Scaffold(
         modifier = modifier,
@@ -61,7 +77,10 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = stringResource(R.string.settings_warning_days, state.warningDays),
+                text = stringResource(
+                    R.string.settings_warning_days,
+                    warningDaysPosition.roundToInt(),
+                ),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
@@ -70,8 +89,11 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Slider(
-                value = state.warningDays.toFloat(),
-                onValueChange = { viewModel.onWarningDaysChange(it.toInt()) },
+                value = warningDaysPosition,
+                onValueChange = { warningDaysPosition = it },
+                onValueChangeFinished = {
+                    viewModel.onWarningDaysChange(warningDaysPosition.roundToInt())
+                },
                 valueRange = 0f..14f,
                 steps = 13,
                 modifier = Modifier.fillMaxWidth(),
@@ -95,12 +117,13 @@ fun SettingsScreen(
             }
 
             Text(
-                text = stringResource(R.string.settings_hour, state.notificationHour),
+                text = stringResource(R.string.settings_hour, hourPosition.roundToInt()),
                 style = MaterialTheme.typography.titleMedium,
             )
             Slider(
-                value = state.notificationHour.toFloat(),
-                onValueChange = { viewModel.onHourChange(it.toInt()) },
+                value = hourPosition,
+                onValueChange = { hourPosition = it },
+                onValueChangeFinished = { viewModel.onHourChange(hourPosition.roundToInt()) },
                 valueRange = 0f..23f,
                 steps = 22,
                 enabled = state.notificationsEnabled,

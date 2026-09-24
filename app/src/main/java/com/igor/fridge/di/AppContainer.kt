@@ -3,6 +3,7 @@ package com.igor.fridge.di
 import android.content.Context
 import com.igor.fridge.data.local.IgorDatabase
 import com.igor.fridge.data.prefs.SettingsStore
+import com.igor.fridge.data.prefs.settingsDataStore
 import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.ShoppingRepository
 
@@ -23,5 +24,5 @@ class AppContainer(context: Context) {
         ShoppingRepository(database.shoppingItemDao())
     }
 
-    val settingsStore: SettingsStore by lazy { SettingsStore(appContext) }
+    val settingsStore: SettingsStore by lazy { SettingsStore(appContext.settingsDataStore) }
 }

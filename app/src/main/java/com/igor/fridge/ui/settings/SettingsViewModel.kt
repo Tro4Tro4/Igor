@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
     val warningDays: Int = SettingsStore.DEFAULT_WARNING_DAYS,
     val notificationHour: Int = SettingsStore.DEFAULT_NOTIFICATION_HOUR,
-    val notificationsEnabled: Boolean = true,
+    val notificationsEnabled: Boolean = SettingsStore.DEFAULT_NOTIFICATIONS_ENABLED,
 )
 
 class SettingsViewModel(
