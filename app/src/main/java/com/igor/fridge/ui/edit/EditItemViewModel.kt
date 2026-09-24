@@ -127,9 +127,18 @@ class EditItemViewModel(
         }
 
         viewModelScope.launch {
+            // Si parte dalla riga in database e se ne copiano i campi modificati, invece di
+            // ricostruire un FoodItem da zero: cio' che non passa dallo stato della schermata
+            // (removedAt, removalReason, e ogni colonna che verra' aggiunta in futuro)
+            // altrimenti tornerebbe al proprio default a ogni salvataggio, riportando in
+            // inventario un articolo rimosso nel frattempo e cancellandone la storia.
+            val base = if (state.isNew) {
+                FoodItem(uuid = "", name = name)
+            } else {
+                repository.findByUuid(state.uuid) ?: FoodItem(uuid = state.uuid, name = name)
+            }
             repository.save(
-                FoodItem(
-                    uuid = if (state.isNew) "" else state.uuid,
+                base.copy(
                     name = name,
                     barcode = state.barcode,
                     category = state.category,
