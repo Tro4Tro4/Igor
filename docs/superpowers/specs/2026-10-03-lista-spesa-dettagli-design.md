@@ -90,8 +90,8 @@ possibile installare l’Android SDK né eseguire `./gradlew`. È stato verifica
 **Da verificare con `./gradlew assembleDebug testDebugUnitTest`:** le schermate Compose,
 `FilePhotoStore`, l’elaborazione KSP di Room e i test Robolectric (`SavedListDaoTest`,
 `MigrationTest`, `ShoppingItemEditViewModelTest`, `ReceiptViewModelTest`,
-`SettingsStoreTest`, `PriceRecordDaoTest`), il grafico dei prezzi e il riconoscimento ML Kit su scontrini veri. La prima build genera
-`app/schemas/com.igor.fridge.data.local.IgorDatabase/4.json`, che va committato.
+`SettingsStoreTest`, `PriceRecordDaoTest`, `ReceiptContributorTest`), il client Open Prices contro il server vero, il grafico dei prezzi e il riconoscimento ML Kit su scontrini veri. La prima build genera
+`app/schemas/com.igor.fridge.data.local.IgorDatabase/5.json`, che va committato.
 
 ## Seconda tornata: i sei suggerimenti e lo scontrino
 
@@ -199,6 +199,70 @@ a fine scontrino) mostra:
 - Lo stesso prodotto scritto in modi diversi dalla cassa ("LATTE PS GRANAROLO" e "LATTE
   GRANAROLO PS") resta su due righe finché non lo si rinomina nella revisione.
 - La spesa mensile conta solo gli scontrini caricati.
+
+## Quarta tornata: confronto fra supermercati e Open Prices
+
+### Fattibilità (riassunto)
+
+Nessuna catena (Tigros, Esselunga, Unes, Eurospin, Lidl, Aldi, Il Gigante) offre un'API
+pubblica di prodotti e prezzi; alcune non hanno nemmeno un catalogo online. Lo scraping dei
+loro siti è stato escluso: fragile (anti-bot, prezzi per punto vendita) e a rischio legale
+(condizioni d'uso, diritto *sui generis* sulle banche dati). Sono state realizzate le due
+strade legittime.
+
+### Passo 1 — Confronta, senza rete
+
+- **Confronta i supermercati** (menu ⋮ della lista): per ogni negozio, quanto costerebbe la
+  lista ai prezzi che hai pagato, con quante voci copre; "comprando ogni voce dove costa
+  meno"; voce per voce, il prezzo in ogni negozio dal più conveniente.
+- I negozi si raggruppano per **catena**, riconosciuta nel nome dello scontrino
+  ("ESSELUNGA S.P.A. - VIA ROMA" → Esselunga): `domain/prices/Chains.kt`.
+- **Cerca su…**: apre nel browser la ricerca del prodotto sul sito della catena, tramite
+  motore di ricerca limitato al sito (`site:esselunga.it latte`). Così non dipende da come
+  ogni catena organizza la propria ricerca, e l'app non legge quelle pagine.
+- Nella **scheda prezzi** di un prodotto: ultimo prezzo pagato in ogni negozio e "Cerca su…".
+
+La stima di una voce: prezzo unitario × quantità se le unità sono confrontabili (2 kg di
+mele a 1,99 €/kg); altrimenti l'ultimo formato comprato × i pezzi in lista. I negozi si
+ordinano per voci coperte e poi per totale: un totale basso su metà lista non è un affare.
+
+### Passo 2 — Open Prices (facoltativo)
+
+[Open Prices](https://prices.openfoodfacts.org) è il database aperto di prezzi di Open Food
+Facts (licenza ODbL). Il client (`data/openprices/`) è stato scritto sul codice sorgente del
+server (serializer, filtri, validatori), perché la documentazione online non era
+raggiungibile dall'ambiente di sviluppo.
+
+- **Spento di default.** È l'unica funzione che usa Internet (permesso `INTERNET` aggiunto
+  al manifest). Si attiva da Impostazioni → Open Prices.
+- **Leggere** non richiede account: `GET /api/v1/prices?product_code=…&order_by=-date`. Si
+  tengono i prezzi in Italia, in euro, dell'ultimo anno, in un negozio riconoscibile.
+- **Codice a barre**: lo scontrino non lo stampa, quindi si associa una volta al prodotto
+  (scheda prezzi → Scansiona o Scrivi; viene controllata la cifra di controllo) oppure lo si
+  riprende dall'inventario. Vale per tutti gli acquisti successivi (tabella `product_codes`,
+  migrazione 4→5).
+- **Confronto con la comunità**: in "Confronta" e nella scheda prezzi, su richiesta
+  ("Scarica i prezzi della comunità"), per le voci con codice a barre.
+- **Condividere i propri scontrini** (serve un account Open Food Facts): a fine scontrino,
+  "Condividi su Open Prices". Il server richiede una prova, quindi si carica prima la foto
+  ridotta (`POST /proofs/upload`, tipo RECEIPT) e poi un prezzo per prodotto
+  (`POST /prices`) con negozio e data uguali a quelli della prova. Il prezzo è per pezzo, con
+  `receipt_quantity`. Il negozio si sceglie fra quelli già noti a Open Prices (ricerca per
+  nome e città).
+- **Privacy**: la password va solo al server e non si salva; si conserva il token, nel file
+  delle preferenze escluso dal backup. Prezzi e foto dello scontrino diventano pubblici col
+  nome utente (verificato sul codice: le prove sono leggibili da chiunque). L'app lo dice
+  prima di ogni invio e invita a rifotografare coprendo carta fedeltà e dati di pagamento.
+
+### Limiti
+
+- Solo i prodotti con codice a barre si confrontano con la comunità e si condividono; frutta
+  e verdura sfuse (prezzi per categoria in Open Prices) non sono gestite.
+- La copertura italiana di Open Prices è parziale, e non è stato possibile misurarla
+  dall'ambiente di sviluppo.
+- Un negozio assente da Open Prices va aggiunto sul sito di Open Prices prima di poterci
+  condividere prezzi.
+- "Cerca su…" passa da Google; i siti di Aldi, Lidl ed Eurospin mostrano soprattutto offerte.
 
 ## Suggerimenti per i passi successivi
 

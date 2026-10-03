@@ -2,6 +2,7 @@
 
 App Android per tenere sotto controllo cosa c’è in frigo, cosa sta per scadere e
 cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun server.
+L’unica eccezione è Open Prices, facoltativo e spento finché l’utente non lo attiva.
 
 ## Funzionalità (MVP)
 
@@ -33,6 +34,11 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
   negozio e data. Per ogni prodotto: ultimo prezzo al kg/litro/pezzo, variazione, minimo,
   massimo, media e grafico dell'andamento; per ogni mese, la spesa totale. L'ultimo prezzo
   pagato viene proposto nella lista della spesa.
+- **Confronta i supermercati**: quanto costerebbe la lista in ogni negozio ai prezzi pagati,
+  voce per voce, con "Cerca su Esselunga, Tigros, Lidl…" che apre la ricerca sul sito della
+  catena. Facoltativo e spento di default: **Open Prices**, il database aperto di Open Food
+  Facts, per aggiungere al confronto i prezzi della comunità (prodotti con codice a barre) e
+  condividere i propri scontrini.
 
 ## Stack tecnico
 
@@ -46,6 +52,7 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
 | Background | WorkManager |
 | Fotocamera | CameraX + ML Kit Barcode Scanning |
 | Scontrini | ML Kit Text Recognition (modello incluso, offline) |
+| Prezzi della comunità | Open Prices (facoltativo; `HttpURLConnection` + kotlinx-serialization-json) |
 | DI | container manuale (`AppContainer`), senza annotation processor |
 | minSdk / targetSdk | 26 / 35 |
 
@@ -56,6 +63,7 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
 ```
 app/src/main/java/com/igor/fridge/
 ├── data/
+│   ├── openprices/   # client di Open Prices (facoltativo, unico accesso a Internet)
 │   ├── local/        # entità Room (UUID, cancellazione logica), DAO, database, migrazioni
 │   ├── photos/       # foto delle voci della spesa (file privati dell’app)
 │   ├── prefs/        # preferenze utente (DataStore, osservabili)
@@ -68,6 +76,7 @@ app/src/main/java/com/igor/fridge/
     ├── inventory/    # elenco, filtri, ricerca
     ├── edit/         # inserimento e modifica
     ├── scanner/      # lettura codice a barre
+    ├── compare/      # la lista nei vari supermercati
     ├── prices/       # storico e andamento dei prezzi
     ├── receipt/      # dallo scontrino all'inventario
     ├── settings/     # impostazioni: soglia, ora della notifica, ordine delle corsie
@@ -127,16 +136,16 @@ Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi 
 corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
 "3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-I test coprono 194 casi su 32 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
+I test coprono 230 casi su 39 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
-**Database: versione 4.** Ogni cambio di schema alza la versione e porta la sua migrazione
-(`MIGRATION_1_2`, `MIGRATION_2_3`, `MIGRATION_3_4`): a versione invariata Room rifiuterebbe di aprire il
+**Database: versione 5.** Ogni cambio di schema alza la versione e porta la sua migrazione
+(da `MIGRATION_1_2` a `MIGRATION_4_5`): a versione invariata Room rifiuterebbe di aprire il
 database. La migrazione è
 provata da `MigrationTest`, che apre con `IgorDatabase.build` un database della versione 1
 scritto a mano. `fallbackToDestructiveMigration()` è ancora presente e copre solo un salto
 di versione senza migrazione, cancellando i dati: va tolto quando si decide come gestire
-quel caso. Lo schema esportato della versione 4 (`app/schemas/.../4.json`) viene generato
+quel caso. Lo schema esportato della versione 5 (`app/schemas/.../5.json`) viene generato
 dalla prima build e va committato.
 
 ### Difetti noti

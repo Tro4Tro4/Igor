@@ -1,6 +1,7 @@
 package com.igor.fridge.ui
 
 import com.igor.fridge.data.FakePriceRecordDao
+import com.igor.fridge.data.FakeProductCodeDao
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.repository.PriceRepository
 import com.igor.fridge.data.repository.Purchase
@@ -29,7 +30,12 @@ class PricesViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val dao = FakePriceRecordDao()
     private var counter = 0
-    private val repository = PriceRepository(dao, { Instant.ofEpochMilli(1_774_000_000_000) }, { "p-${++counter}" })
+    private val repository = PriceRepository(
+        dao,
+        FakeProductCodeDao(),
+        { Instant.ofEpochMilli(1_774_000_000_000) },
+        { "p-${++counter}" },
+    )
 
     @Before
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -84,5 +90,59 @@ class PricesViewModelTest {
         val after = vm.uiState.value
         assertEquals(119L, after.summary?.lastCents)
         assertNull(after.summary?.previousCents)
+    }
+
+    @Test
+    fun `la scheda mostra i negozi dal piu' conveniente e gestisce il codice a barre`() = runTest(dispatcher) {
+        repository.record(listOf(Purchase("Pane", 1.0, QuantityUnit.PZ, 220)), "TIGROS SPA", LocalDate.of(2026, 9, 1))
+        repository.record(listOf(Purchase("Pane", 1.0, QuantityUnit.PZ, 180)), "Lidl", LocalDate.of(2026, 9, 2))
+        val vm = PriceHistoryViewModel("pane", repository)
+        backgroundScope.launch { vm.uiState.collect {} }
+
+        val state = vm.uiState.first { !it.isLoading }
+        assertEquals(listOf("Lidl", "Tigros"), state.byStore.map { it.store })
+
+        vm.setBarcode("123")
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("Codice a barre non valido", vm.uiState.value.message)
+
+        vm.setBarcode("4006381333931")
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("4006381333931", vm.uiState.value.barcode)
+        assertEquals("4006381333931", repository.barcodeOf("pane"))
+    }
+
+    @Test
+    fun `i prezzi della comunita' si scaricano per il codice a barre`() = runTest(dispatcher) {
+        repository.record(listOf(Purchase("Pane", 1.0, QuantityUnit.PZ, 220)), "Tigros", LocalDate.of(2026, 9, 1))
+        repository.setBarcode("pane", "4006381333931")
+        val asked = mutableListOf<String>()
+        val vm = PriceHistoryViewModel(
+            productKey = "pane",
+            priceRepository = repository,
+            openPrices = kotlinx.coroutines.flow.flowOf(com.igor.fridge.data.prefs.OpenPricesSettings(enabled = true)),
+            fetchCommunity = { code ->
+                asked += code
+                listOf(
+                    com.igor.fridge.data.openprices.CommunityPrice(
+                        priceCents = 199,
+                        currency = "EUR",
+                        date = LocalDate.of(2026, 9, 20),
+                        isDiscounted = false,
+                        location = com.igor.fridge.data.openprices.CommunityLocation(1, "NODE", "Esselunga", countryCode = "IT"),
+                        productName = "Pane",
+                    ),
+                )
+            },
+            today = { LocalDate.of(2026, 10, 3) },
+        )
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { it.barcode != null }
+
+        vm.loadCommunityPrices()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("4006381333931"), asked)
+        assertEquals(listOf(199L), vm.uiState.value.community?.map { it.priceCents })
     }
 }

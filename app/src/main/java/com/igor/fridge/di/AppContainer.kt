@@ -2,6 +2,8 @@ package com.igor.fridge.di
 
 import android.content.Context
 import com.igor.fridge.data.local.IgorDatabase
+import com.igor.fridge.data.openprices.OpenPricesClient
+import com.igor.fridge.data.openprices.UrlConnectionTransport
 import com.igor.fridge.data.photos.FilePhotoStore
 import com.igor.fridge.data.photos.PhotoStore
 import com.igor.fridge.data.prefs.SettingsStore
@@ -34,7 +36,11 @@ class AppContainer(context: Context) {
         SavedListRepository(database.savedListDao())
     }
 
-    val priceRepository: PriceRepository by lazy { PriceRepository(database.priceRecordDao()) }
+    val priceRepository: PriceRepository by lazy {
+        PriceRepository(database.priceRecordDao(), database.productCodeDao())
+    }
+
+    val openPricesClient: OpenPricesClient by lazy { OpenPricesClient(UrlConnectionTransport()) }
 
     val photoStore: PhotoStore by lazy { FilePhotoStore(appContext) }
 

@@ -2,7 +2,10 @@ package com.igor.fridge.data.repository
 
 import com.igor.fridge.data.local.PriceRecord
 import com.igor.fridge.data.local.PriceRecordDao
+import com.igor.fridge.data.local.ProductCode
+import com.igor.fridge.data.local.ProductCodeDao
 import com.igor.fridge.data.local.QuantityUnit
+import com.igor.fridge.domain.prices.normalizeGtin
 import com.igor.fridge.domain.prices.productKey
 import com.igor.fridge.domain.prices.toReference
 import com.igor.fridge.domain.prices.unitPriceCents
@@ -22,6 +25,7 @@ data class Purchase(
 /** Lo storico dei prezzi pagati. */
 class PriceRepository(
     private val dao: PriceRecordDao,
+    private val codes: ProductCodeDao,
     private val clock: () -> Instant = Instant::now,
     private val newUuid: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -68,4 +72,26 @@ class PriceRepository(
         productKey(name).takeIf { it.isNotEmpty() }?.let { dao.findLatest(it) }
 
     suspend fun delete(record: PriceRecord) = dao.delete(record)
+
+    /** Il codice a barre associato al prodotto, se c'e'. */
+    suspend fun barcodeOf(productKey: String): String? = codes.find(productKey)?.barcode
+
+    suspend fun barcodeForName(name: String): String? =
+        productKey(name).takeIf { it.isNotEmpty() }?.let { barcodeOf(it) }
+
+    /**
+     * Associa un codice a barre al prodotto. Il codice si controlla (cifre, lunghezza,
+     * cifra di controllo) prima di salvarlo.
+     * @return il codice salvato, oppure null se non e' valido.
+     */
+    suspend fun setBarcode(productKey: String, barcode: String): String? {
+        val normalized = normalizeGtin(barcode) ?: return null
+        codes.upsert(ProductCode(productKey = productKey, barcode = normalized, updatedAt = clock()))
+        return normalized
+    }
+
+    suspend fun clearBarcode(productKey: String) = codes.delete(productKey)
+
+    /** Tutti i codici associati, per chiave del prodotto. */
+    suspend fun allBarcodes(): Map<String, String> = codes.all().associate { it.productKey to it.barcode }
 }

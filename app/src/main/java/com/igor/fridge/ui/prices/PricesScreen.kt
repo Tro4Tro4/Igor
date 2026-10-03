@@ -9,31 +9,45 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.igor.fridge.R
 import com.igor.fridge.data.local.PriceRecord
 import com.igor.fridge.domain.prices.ProductPriceSummary
+import com.igor.fridge.ui.compare.SearchOnChains
 import com.igor.fridge.ui.formatChange
 import com.igor.fridge.ui.formatEuro
 import com.igor.fridge.ui.formatMonth
@@ -169,12 +183,19 @@ private fun ChangeLabel(percent: Double) {
     )
 }
 
-/** La storia di un prodotto: riepilogo, grafico e ogni acquisto. */
+/**
+ * La scheda di un prodotto: riepilogo, grafico, prezzi nei negozi (tuoi e della comunita'),
+ * ricerca sui siti delle catene, codice a barre e ogni acquisto.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PriceHistoryScreen(
     productKey: String,
     onBack: () -> Unit,
+    onScanBarcode: () -> Unit,
+    scannedBarcode: String?,
+    onBarcodeConsumed: () -> Unit,
+    onOpenOpenPrices: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PriceHistoryViewModel = viewModel(
         key = "prices-$productKey",
@@ -183,9 +204,24 @@ fun PriceHistoryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val summary = state.summary
+    val snackbarHostState = remember { SnackbarHostState() }
+    var typingBarcode by remember { mutableStateOf(false) }
+
+    LaunchedEffect(scannedBarcode) {
+        val code = scannedBarcode ?: return@LaunchedEffect
+        viewModel.setBarcode(code)
+        onBarcodeConsumed()
+    }
+
+    LaunchedEffect(state.message) {
+        val message = state.message ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.onMessageShown()
+    }
 
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(summary?.productName ?: stringResource(R.string.prices_title)) },
@@ -246,12 +282,161 @@ fun PriceHistoryScreen(
                     )
                 }
             }
+            if (state.byStore.isNotEmpty()) {
+                item { Text(stringResource(R.string.prices_by_store), style = MaterialTheme.typography.titleSmall) }
+                items(items = state.byStore, key = { "store-${it.store}" }) { observation ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(observation.store, modifier = Modifier.weight(1f))
+                        Text(
+                            text = observation.date.formatShort(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(end = 12.dp),
+                        )
+                        Text(formatUnitPrice(observation.unitPriceCents, observation.referenceUnit))
+                    }
+                }
+            }
+            item {
+                Text(stringResource(R.string.prices_search_online), style = MaterialTheme.typography.titleSmall)
+                SearchOnChains(product = summary.productName, modifier = Modifier.padding(top = 4.dp))
+            }
+            item {
+                BarcodeSection(
+                    barcode = state.barcode,
+                    onScan = onScanBarcode,
+                    onType = { typingBarcode = true },
+                    onClear = viewModel::clearBarcode,
+                )
+            }
+            item {
+                CommunitySection(
+                    state = state,
+                    onLoad = viewModel::loadCommunityPrices,
+                    onOpenSettings = onOpenOpenPrices,
+                )
+            }
             item { Text(stringResource(R.string.prices_purchases), style = MaterialTheme.typography.titleSmall) }
             items(items = state.records, key = { it.uuid }) { record ->
                 PurchaseRow(record = record, onDelete = { viewModel.delete(record) })
             }
         }
     }
+
+    if (typingBarcode) {
+        BarcodeDialog(
+            onDismiss = { typingBarcode = false },
+            onConfirm = { code ->
+                typingBarcode = false
+                viewModel.setBarcode(code)
+            },
+        )
+    }
+}
+
+@Composable
+private fun BarcodeSection(
+    barcode: String?,
+    onScan: () -> Unit,
+    onType: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(R.string.prices_barcode), style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = barcode ?: stringResource(R.string.prices_barcode_none),
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (barcode == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onScan) { Text(stringResource(R.string.prices_barcode_scan)) }
+            TextButton(onClick = onType) { Text(stringResource(R.string.prices_barcode_type)) }
+            if (barcode != null) {
+                TextButton(onClick = onClear) { Text(stringResource(R.string.prices_barcode_remove)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommunitySection(
+    state: PriceHistoryUiState,
+    onLoad: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.compare_community_title), style = MaterialTheme.typography.titleSmall)
+            when {
+                !state.communityEnabled -> {
+                    Text(stringResource(R.string.compare_community_off), style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_prices_title)) }
+                }
+                state.barcode == null -> Text(
+                    text = stringResource(R.string.prices_community_needs_barcode),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                state.isLoadingCommunity -> CircularProgressIndicator()
+                state.community == null -> OutlinedButton(onClick = onLoad) {
+                    Text(stringResource(R.string.compare_community_load))
+                }
+                state.community.isEmpty() -> Text(
+                    text = stringResource(R.string.prices_community_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                else -> state.community.take(COMMUNITY_SHOWN).forEach { price ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = price.location?.label.orEmpty(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = price.date.formatShort(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(end = 12.dp),
+                        )
+                        Text(formatEuro(price.priceCents))
+                    }
+                }
+            }
+            Text(
+                text = stringResource(R.string.open_prices_attribution),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** I prezzi della comunita' piu' recenti bastano a farsi un'idea. */
+private const val COMMUNITY_SHOWN = 15
+
+@Composable
+private fun BarcodeDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var code by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.prices_barcode_type)) },
+        text = {
+            OutlinedTextField(
+                value = code,
+                onValueChange = { text -> code = text.filter { it.isDigit() } },
+                label = { Text(stringResource(R.string.prices_barcode)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(code) }, enabled = code.isNotEmpty()) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
 }
 
 @Composable

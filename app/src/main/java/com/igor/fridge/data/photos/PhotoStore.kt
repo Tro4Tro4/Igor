@@ -15,6 +15,13 @@ interface PhotoStore {
      */
     suspend fun import(source: Uri): String?
 
+    /**
+     * L'immagine ridotta e raddrizzata come JPEG in memoria, senza salvarla: serve a
+     * caricare la foto di uno scontrino come prova su Open Prices.
+     * @return null se l'immagine non e' leggibile.
+     */
+    suspend fun compressForUpload(source: Uri): ByteArray?
+
     /** Il file corrispondente a un nome restituito da [import]. */
     fun fileOf(name: String): File
 

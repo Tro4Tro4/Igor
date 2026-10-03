@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.igor.fridge.data.FakeFoodItemDao
 import com.igor.fridge.data.FakePriceRecordDao
+import com.igor.fridge.data.FakeProductCodeDao
 import com.igor.fridge.data.FakePhotoStore
 import com.igor.fridge.data.FakeReceiptReader
 import com.igor.fridge.data.FakeShoppingItemDao
@@ -51,7 +52,8 @@ class ReceiptViewModelTest {
     private val foodRepository = FoodRepository(foodDao, { now }, { "f-${++counter}" })
     private val shoppingRepository = ShoppingRepository(shoppingDao, { now }, { "s-${++counter}" })
     private val priceDao = FakePriceRecordDao()
-    private val priceRepository = PriceRepository(priceDao, { now }, { "p-${++counter}" })
+    private val codeDao = FakeProductCodeDao()
+    private val priceRepository = PriceRepository(priceDao, codeDao, { now }, { "p-${++counter}" })
     private val today = LocalDate.of(2026, 10, 3)
 
     private val photo = Uri.parse("content://scontrino/1")
@@ -63,7 +65,7 @@ class ReceiptViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun viewModel() =
-        ReceiptViewModel(reader, FakePhotoStore(), foodRepository, shoppingRepository, priceRepository) { today }
+        ReceiptViewModel(reader, FakePhotoStore(), foodRepository, shoppingRepository, priceRepository, today = { today })
 
     private fun ReceiptViewModel.read(vararg lines: String) {
         reader.lines = lines.toList()
@@ -296,5 +298,90 @@ class ReceiptViewModelTest {
 
         assertEquals(1, foodDao.items.size)
         assertTrue(priceDao.records.isEmpty())
+    }
+
+    @Test
+    fun `il prezzo da condividere e' per pezzo, con il numero di pezzi`() {
+        val draft = com.igor.fridge.ui.receipt.ReceiptDraft(
+            id = 1,
+            include = true,
+            name = "Yogurt",
+            category = FoodCategory.LATTICINI,
+            quantityText = "4",
+            unit = QuantityUnit.PZ,
+            priceText = "1,80",
+        )
+
+        val item = ReceiptViewModel.contributionItem(draft, "4006381333931")!!
+        assertEquals(45L, item.unitPriceCents)
+        assertEquals(4, item.quantity)
+
+        val pasta = draft.copy(name = "Pasta", quantityText = "500", unit = QuantityUnit.G, priceText = "0,95")
+        assertEquals(1, ReceiptViewModel.contributionItem(pasta, "4006381333931")!!.quantity)
+        assertEquals(null, ReceiptViewModel.contributionItem(draft, "123"))
+        assertEquals(null, ReceiptViewModel.contributionItem(draft.copy(priceText = ""), "4006381333931"))
+    }
+
+    @Test
+    fun `dopo la conferma si condividono su Open Prices i prezzi con codice a barre`() = runTest(dispatcher) {
+        val transport = com.igor.fridge.data.openprices.FakeTransport().apply {
+            respond(
+                "GET",
+                "/locations",
+                com.igor.fridge.data.openprices.HttpResponse(
+                    200,
+                    """{"items":[{"osm_id":42,"osm_type":"NODE","osm_name":"Esselunga","osm_address_city":"Milano"}]}""",
+                ),
+            )
+            respond("POST", "/proofs/upload", com.igor.fridge.data.openprices.HttpResponse(201, """{"id":5}"""))
+            respond("POST", "/prices", com.igor.fridge.data.openprices.HttpResponse(201, """{"id":6}"""))
+        }
+        priceRepository.setBarcode("latte", "4006381333931")
+        val vm = ReceiptViewModel(
+            reader,
+            FakePhotoStore(),
+            foodRepository,
+            shoppingRepository,
+            priceRepository,
+            today = { today },
+            openPrices = kotlinx.coroutines.flow.flowOf(
+                com.igor.fridge.data.prefs.OpenPricesSettings(enabled = true, userId = "mario", token = "tok"),
+            ),
+            openPricesClient = com.igor.fridge.data.openprices.OpenPricesClient(transport, boundary = { "B" }),
+        )
+        vm.read("ESSELUNGA SPA", "LATTE  1,29", "RISO  2,00", "TOTALE  3,29", "01/10/2026")
+        vm.confirm(skipExpiryCheck = true)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val done = vm.uiState.value
+        assertTrue(done.canContribute)
+        assertEquals(listOf("Latte"), done.contributable.map { it.name })
+
+        vm.openContribution()
+        assertEquals("Esselunga", vm.uiState.value.contribution?.query)
+        vm.searchStores()
+        dispatcher.scheduler.advanceUntilIdle()
+        // Un solo negozio trovato: e' gia' scelto.
+        assertEquals(42L, vm.uiState.value.contribution?.location?.osmId)
+
+        vm.sendContribution()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("1 prezzo condiviso su Open Prices. Grazie!", vm.uiState.value.contribution?.result)
+        val price = transport.requests.last()
+        assertTrue(price.bodyText!!.contains("\"date\":\"2026-10-01\""))
+        assertTrue(price.bodyText!!.contains("\"location_osm_id\":42"))
+    }
+
+    @Test
+    fun `senza account Open Prices non si propone di condividere`() = runTest(dispatcher) {
+        priceRepository.setBarcode("latte", "4006381333931")
+        val vm = viewModel()
+        vm.read("LATTE  1,29")
+        vm.confirm(skipExpiryCheck = true)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, vm.uiState.value.contributable.size)
+        assertFalse(vm.uiState.value.canContribute)
     }
 }

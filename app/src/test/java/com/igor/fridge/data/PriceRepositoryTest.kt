@@ -14,7 +14,12 @@ class PriceRepositoryTest {
 
     private val dao = FakePriceRecordDao()
     private var counter = 0
-    private val repository = PriceRepository(dao, { Instant.ofEpochMilli(1_774_000_000_000) }, { "p-${++counter}" })
+    private val repository = PriceRepository(
+        dao,
+        FakeProductCodeDao(),
+        { Instant.ofEpochMilli(1_774_000_000_000) },
+        { "p-${++counter}" },
+    )
     private val day = LocalDate.of(2026, 10, 3)
 
     @Test
@@ -46,5 +51,17 @@ class PriceRepositoryTest {
 
         assertEquals(379L, repository.latest("caffe")?.unitPriceCents)
         assertNull(repository.latest("tè"))
+    }
+
+    @Test
+    fun `un codice a barre si associa solo se valido e si ritrova per nome`() = runTest {
+        assertNull(repository.setBarcode("latte", "123"))
+
+        assertEquals("4006381333931", repository.setBarcode("latte", "4006381333931"))
+        assertEquals("4006381333931", repository.barcodeForName("LATTE"))
+        assertEquals(mapOf("latte" to "4006381333931"), repository.allBarcodes())
+
+        repository.clearBarcode("latte")
+        assertNull(repository.barcodeOf("latte"))
     }
 }

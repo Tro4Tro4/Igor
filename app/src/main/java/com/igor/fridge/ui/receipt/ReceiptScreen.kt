@@ -12,10 +12,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -32,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -59,8 +64,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.igor.fridge.R
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
+import com.igor.fridge.data.openprices.CommunityLocation
 import com.igor.fridge.ui.components.EnumDropdown
 import com.igor.fridge.ui.components.ExpiryDatePickerDialog
+import com.igor.fridge.ui.formatEuro
 import com.igor.fridge.ui.formatShort
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
@@ -225,6 +232,17 @@ fun ReceiptScreen(
                 )
                 Button(onClick = onDone) { Text(stringResource(R.string.receipt_done)) }
                 OutlinedButton(onClick = onOpenPrices) { Text(stringResource(R.string.prices_open)) }
+                if (state.canContribute) {
+                    OutlinedButton(onClick = viewModel::openContribution) {
+                        Text(stringResource(R.string.contribute_open, state.contributable.size))
+                    }
+                } else if (state.contributable.isNotEmpty() && state.openPrices.enabled) {
+                    Text(
+                        text = stringResource(R.string.contribute_needs_login),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 OutlinedButton(onClick = viewModel::restart) { Text(stringResource(R.string.receipt_another)) }
             }
         }
@@ -249,6 +267,19 @@ fun ReceiptScreen(
                 viewModel.onDateChange(date)
                 pickingDate = false
             },
+        )
+    }
+
+    state.contribution?.let { contribution ->
+        ContributionDialog(
+            state = contribution,
+            onQuery = viewModel::onContributionQuery,
+            onCity = viewModel::onContributionCity,
+            onSearch = viewModel::searchStores,
+            onSelectLocation = viewModel::selectLocation,
+            onToggleItem = viewModel::toggleContributionItem,
+            onSend = viewModel::sendContribution,
+            onClose = viewModel::closeContribution,
         )
     }
 
@@ -429,4 +460,112 @@ private fun DraftCard(
             }
         }
     }
+}
+
+/**
+ * Condividere i prezzi su Open Prices: avviso su cosa si pubblica, scelta del negozio fra
+ * quelli noti alla comunita', scelta dei prodotti, invio.
+ */
+@Composable
+private fun ContributionDialog(
+    state: ContributionUiState,
+    onQuery: (String) -> Unit,
+    onCity: (String) -> Unit,
+    onSearch: () -> Unit,
+    onSelectLocation: (CommunityLocation) -> Unit,
+    onToggleItem: (String) -> Unit,
+    onSend: () -> Unit,
+    onClose: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!state.isSending) onClose() },
+        title = { Text(stringResource(R.string.contribute_title)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val result = state.result
+                if (result != null) {
+                    Text(result, style = MaterialTheme.typography.bodyLarge)
+                    state.error?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                    return@Column
+                }
+                Text(
+                    text = stringResource(R.string.contribute_privacy),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(stringResource(R.string.contribute_store), style = MaterialTheme.typography.titleSmall)
+                OutlinedTextField(
+                    value = state.query,
+                    onValueChange = onQuery,
+                    label = { Text(stringResource(R.string.shopping_store)) },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = state.city,
+                    onValueChange = onCity,
+                    label = { Text(stringResource(R.string.contribute_city)) },
+                    singleLine = true,
+                )
+                OutlinedButton(onClick = onSearch, enabled = !state.isSearching && state.query.isNotBlank()) {
+                    Text(stringResource(R.string.contribute_search))
+                }
+                if (state.isSearching) CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                if (state.searched && state.results.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.contribute_no_store),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                state.results.forEach { location ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = location == state.location,
+                            onClick = { onSelectLocation(location) },
+                        )
+                        Text(location.label, modifier = Modifier.weight(1f))
+                    }
+                }
+                Text(stringResource(R.string.contribute_items), style = MaterialTheme.typography.titleSmall)
+                state.items.forEach { item ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = item.barcode in state.selected,
+                            onCheckedChange = { onToggleItem(item.barcode) },
+                        )
+                        Text(
+                            text = "${item.name} · ${item.quantity} × ${formatEuro(item.unitPriceCents)}",
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                state.error?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+                if (state.isSending) CircularProgressIndicator(modifier = Modifier.size(24.dp))
+            }
+        },
+        confirmButton = {
+            if (state.result == null) {
+                TextButton(onClick = onSend, enabled = state.canSend) {
+                    Text(stringResource(R.string.contribute_send))
+                }
+            } else {
+                TextButton(onClick = onClose) { Text(stringResource(R.string.receipt_done)) }
+            }
+        },
+        dismissButton = {
+            if (state.result == null) {
+                TextButton(onClick = onClose, enabled = !state.isSending) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        },
+    )
 }

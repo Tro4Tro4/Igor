@@ -15,8 +15,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SavedList::class,
         SavedListItem::class,
         PriceRecord::class,
+        ProductCode::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -29,6 +30,8 @@ abstract class IgorDatabase : RoomDatabase() {
     abstract fun savedListDao(): SavedListDao
 
     abstract fun priceRecordDao(): PriceRecordDao
+
+    abstract fun productCodeDao(): ProductCodeDao
 
     companion object {
         const val DATABASE_NAME = "igor-database"
@@ -109,6 +112,18 @@ abstract class IgorDatabase : RoomDatabase() {
                 "ON `price_records` (`purchasedOn`)",
         )
 
+        /** I codici a barre associati ai prodotti dello storico dei prezzi. */
+        val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_4_5_SQL.forEach(db::execSQL)
+            }
+        }
+
+        internal val MIGRATION_4_5_SQL: List<String> = listOf(
+            "CREATE TABLE IF NOT EXISTS `product_codes` (`productKey` TEXT NOT NULL, " +
+                "`barcode` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`productKey`))",
+        )
+
         /**
          * DA RIMUOVERE il fallback distruttivo: ora che esiste una migrazione serve solo a
          * non far morire l'app su un salto di versione per cui manchi la migrazione, ma
@@ -124,7 +139,7 @@ abstract class IgorDatabase : RoomDatabase() {
                 context.applicationContext,
                 IgorDatabase::class.java,
                 name,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .build()
     }

@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -21,6 +22,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.igor.fridge.ui.compare.CompareScreen
 import com.igor.fridge.ui.edit.EditItemScreen
 import com.igor.fridge.ui.edit.NEW_ITEM_UUID
 import com.igor.fridge.ui.inventory.InventoryScreen
@@ -29,6 +31,7 @@ import com.igor.fridge.ui.prices.PricesScreen
 import com.igor.fridge.ui.receipt.ReceiptScreen
 import com.igor.fridge.ui.scanner.BarcodeScannerScreen
 import com.igor.fridge.ui.settings.AisleOrderScreen
+import com.igor.fridge.ui.settings.OpenPricesScreen
 import com.igor.fridge.ui.settings.SettingsScreen
 import com.igor.fridge.ui.shopping.SavedListsScreen
 import com.igor.fridge.ui.shopping.ShoppingItemEditScreen
@@ -46,6 +49,11 @@ object Routes {
     const val PRICES = "prices"
     const val PRICE_HISTORY = "prices/{key}"
     const val SETTINGS = "settings"
+    const val COMPARE = "compare"
+    const val OPEN_PRICES = "settings/open-prices"
+
+    /** Chiave con cui lo scanner restituisce il codice alla scheda prezzi che l'ha chiesto. */
+    const val SCANNED_BARCODE = "scanned_barcode"
 
     fun edit(uuid: String): String = "edit/$uuid"
 
@@ -103,7 +111,14 @@ fun IgorApp(
         composable(Routes.SCANNER) {
             BarcodeScannerScreen(
                 onBarcodeDetected = { barcode ->
-                    scannedBarcode = barcode
+                    // Lo scanner serve due schermate: la scheda prezzi riceve il codice nel
+                    // proprio SavedStateHandle, la modifica dell'inventario come prima.
+                    val previous = navController.previousBackStackEntry
+                    if (previous?.destination?.route == Routes.PRICE_HISTORY) {
+                        previous.savedStateHandle[Routes.SCANNED_BARCODE] = barcode
+                    } else {
+                        scannedBarcode = barcode
+                    }
                     navController.popBackStack()
                 },
                 onClose = { navController.popBackStack() },
@@ -118,6 +133,7 @@ fun IgorApp(
                 onOpenAisleOrder = { navController.navigate(Routes.AISLE_ORDER) },
                 onOpenReceipt = { navController.navigate(Routes.RECEIPT) },
                 onOpenPrices = { navController.navigate(Routes.PRICES) },
+                onOpenCompare = { navController.navigate(Routes.COMPARE) },
             )
         }
 
@@ -161,9 +177,16 @@ fun IgorApp(
             route = Routes.PRICE_HISTORY,
             arguments = listOf(navArgument("key") { type = NavType.StringType }),
         ) { backStackEntry ->
+            val scanned by backStackEntry.savedStateHandle
+                .getStateFlow<String?>(Routes.SCANNED_BARCODE, null)
+                .collectAsState()
             PriceHistoryScreen(
                 productKey = backStackEntry.arguments?.getString("key").orEmpty(),
                 onBack = { navController.popBackStack() },
+                onScanBarcode = { navController.navigate(Routes.SCANNER) },
+                scannedBarcode = scanned,
+                onBarcodeConsumed = { backStackEntry.savedStateHandle[Routes.SCANNED_BARCODE] = null },
+                onOpenOpenPrices = { navController.navigate(Routes.OPEN_PRICES) },
             )
         }
 
@@ -171,6 +194,18 @@ fun IgorApp(
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenAisleOrder = { navController.navigate(Routes.AISLE_ORDER) },
+                onOpenOpenPrices = { navController.navigate(Routes.OPEN_PRICES) },
+            )
+        }
+
+        composable(Routes.OPEN_PRICES) {
+            OpenPricesScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.COMPARE) {
+            CompareScreen(
+                onBack = { navController.popBackStack() },
+                onOpenOpenPrices = { navController.navigate(Routes.OPEN_PRICES) },
             )
         }
     }

@@ -18,6 +18,11 @@ class FakePhotoStore : PhotoStore {
         return nextImportName
     }
 
+    /** null simula una foto illeggibile al momento di caricarla come prova. */
+    var uploadBytes: ByteArray? = byteArrayOf(1, 2, 3)
+
+    override suspend fun compressForUpload(source: Uri): ByteArray? = uploadBytes
+
     override fun fileOf(name: String): File = File("/foto", name)
 
     override fun newCaptureUri(): Uri = throw UnsupportedOperationException("non serve nei test")

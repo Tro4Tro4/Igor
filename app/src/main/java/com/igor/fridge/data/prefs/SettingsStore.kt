@@ -29,6 +29,15 @@ data class Settings(
     val notificationsEnabled: Boolean,
 )
 
+/** Stato di Open Prices: attivo o no, e con quale account (null se non si e' entrati). */
+data class OpenPricesSettings(
+    val enabled: Boolean = false,
+    val userId: String? = null,
+    val token: String? = null,
+) {
+    val isLoggedIn: Boolean get() = userId != null && token != null
+}
+
 /**
  * Preferenze dell'utente.
  *
@@ -70,6 +79,38 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         store.edit { it[KEY_CATEGORY_ORDER] = order.toStoredOrder() }
     }
 
+    /**
+     * Open Prices: prezzi della comunita' e invio dei propri scontrini. Spento finche'
+     * l'utente non lo attiva, perche' e' l'unica funzione che usa Internet.
+     */
+    val openPrices: Flow<OpenPricesSettings> = store.data.map {
+        OpenPricesSettings(
+            enabled = it[KEY_OPEN_PRICES_ENABLED] ?: false,
+            userId = it[KEY_OPEN_PRICES_USER],
+            token = it[KEY_OPEN_PRICES_TOKEN],
+        )
+    }
+
+    suspend fun setOpenPricesEnabled(enabled: Boolean) {
+        store.edit { it[KEY_OPEN_PRICES_ENABLED] = enabled }
+    }
+
+    /**
+     * Ricorda l'accesso a Open Prices. Si salva il token restituito dal server, mai la
+     * password; il file delle preferenze resta fuori dal backup.
+     */
+    suspend fun setOpenPricesSession(userId: String?, token: String?) {
+        store.edit {
+            if (userId == null || token == null) {
+                it.remove(KEY_OPEN_PRICES_USER)
+                it.remove(KEY_OPEN_PRICES_TOKEN)
+            } else {
+                it[KEY_OPEN_PRICES_USER] = userId
+                it[KEY_OPEN_PRICES_TOKEN] = token
+            }
+        }
+    }
+
     suspend fun setWarningDays(value: Int) {
         store.edit { it[KEY_WARNING_DAYS] = value.coerceIn(0, 30) }
     }
@@ -91,5 +132,8 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         private val KEY_NOTIFICATION_HOUR = intPreferencesKey("notification_hour")
         private val KEY_NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         private val KEY_CATEGORY_ORDER = stringPreferencesKey("category_order")
+        private val KEY_OPEN_PRICES_ENABLED = booleanPreferencesKey("open_prices_enabled")
+        private val KEY_OPEN_PRICES_USER = stringPreferencesKey("open_prices_user")
+        private val KEY_OPEN_PRICES_TOKEN = stringPreferencesKey("open_prices_token")
     }
 }

@@ -75,4 +75,17 @@ class PriceRecordDaoTest {
 
         assertEquals(listOf("b"), dao.observeAll().first().map { it.uuid })
     }
+
+    @Test
+    fun `il codice a barre di un prodotto si salva, si sostituisce e si toglie`() = runTest {
+        val codes = db.productCodeDao()
+        codes.upsert(com.igor.fridge.data.local.ProductCode("latte", "4006381333931"))
+        codes.upsert(com.igor.fridge.data.local.ProductCode("latte", "8001234567890"))
+
+        assertEquals("8001234567890", codes.find("latte")?.barcode)
+        assertEquals(1, codes.all().size)
+
+        codes.delete("latte")
+        assertEquals(null, codes.find("latte"))
+    }
 }

@@ -9,6 +9,7 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -43,6 +44,21 @@ class FilePhotoStore(context: Context) : PhotoStore {
             if (source.authority == authority()) {
                 File(captureDir, source.lastPathSegment.orEmpty()).delete()
             }
+        }
+    }
+
+    override suspend fun compressForUpload(source: Uri): ByteArray? = withContext(Dispatchers.IO) {
+        try {
+            val bitmap = decodeScaled(source) ?: return@withContext null
+            val upright = rotateUpright(bitmap, readRotation(source))
+            ByteArrayOutputStream().use { out ->
+                upright.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
+                out.toByteArray()
+            }
+        } catch (e: IOException) {
+            null
+        } catch (e: SecurityException) {
+            null
         }
     }
 
