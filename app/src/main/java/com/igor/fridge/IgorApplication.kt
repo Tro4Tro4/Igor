@@ -30,5 +30,9 @@ class IgorApplication : Application() {
                 ExpiryWorkScheduler.schedule(this@IgorApplication, settings.notificationHour)
             }
         }
+
+        // Fare spazio e' un di piu': se fallisce, le foto aspettano il prossimo avvio
+        // invece di portarsi dietro l'app.
+        CoroutineScope(Dispatchers.IO).launch { runCatching { container.deleteOrphanPhotos() } }
     }
 }

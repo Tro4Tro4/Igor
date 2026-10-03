@@ -5,7 +5,6 @@ import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.FoodItemDao
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.RemovalReason
-import com.igor.fridge.data.local.StorageLocation
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import java.time.LocalDate
@@ -46,23 +45,34 @@ class FoodRepository(
     /**
      * Crea un articolo a partire da una voce della lista della spesa.
      *
-     * Categoria e posizione sono ereditate dall'ultima volta che quel nome e' stato in
-     * casa — anche se quell'articolo e' gia' stato consumato — cosi' chi spunta "Latte"
-     * non deve ricatalogarlo ogni volta. Nome, quantita' e unita' arrivano invece dalla
-     * lista: sono dati che l'utente ha inserito, e prevalgono.
+     * Nome, quantita', unita' e categoria arrivano dalla lista: sono dati che l'utente ha
+     * inserito, e prevalgono. Solo una categoria [FoodCategory.ALTRO], cioe' non scelta,
+     * cede a quella dell'ultima volta che quel nome e' stato in casa — anche se
+     * quell'articolo e' gia' stato consumato. La posizione si eredita allo stesso modo, e
+     * per un prodotto mai visto prima dipende dalla categoria (un surgelato va in freezer).
      *
      * La scadenza resta assente perche' la lista della spesa non puo' conoscerla, e il
      * codice a barre non si eredita perche' identifica una confezione, non un prodotto.
      */
-    suspend fun addFromShopping(name: String, quantity: Double, unit: QuantityUnit): FoodItem {
+    suspend fun addFromShopping(
+        name: String,
+        quantity: Double,
+        unit: QuantityUnit,
+        category: FoodCategory = FoodCategory.ALTRO,
+    ): FoodItem {
         val trimmed = name.trim()
         val previous = dao.findLastByName(trimmed)
+        val resolvedCategory = if (category != FoodCategory.ALTRO) {
+            category
+        } else {
+            previous?.category ?: FoodCategory.ALTRO
+        }
         return save(
             FoodItem(
                 uuid = "",
                 name = trimmed,
-                category = previous?.category ?: FoodCategory.ALTRO,
-                location = previous?.location ?: StorageLocation.FRIGO,
+                category = resolvedCategory,
+                location = previous?.location ?: resolvedCategory.defaultLocation,
                 quantity = quantity,
                 unit = unit,
             ),

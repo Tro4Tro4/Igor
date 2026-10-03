@@ -1,11 +1,13 @@
 package com.igor.fridge.ui
 
 import com.igor.fridge.data.FakeFoodItemDao
+import com.igor.fridge.data.FakePhotoStore
 import com.igor.fridge.data.FakeShoppingItemDao
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.RemovalReason
+import com.igor.fridge.data.local.ShoppingItem
 import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.ShoppingRepository
@@ -46,7 +48,7 @@ class ShoppingViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = ShoppingViewModel(shoppingRepository, foodRepository)
+    private fun viewModel() = ShoppingViewModel(shoppingRepository, foodRepository, FakePhotoStore())
 
     @Test
     fun `mettere in frigo sposta le voci spuntate e lascia le altre`() = runTest(dispatcher) {
@@ -231,5 +233,143 @@ class ShoppingViewModelTest {
 
         assertTrue(shoppingDao.items.isEmpty())
         assertEquals(1, foodDao.items.count { it.removedAt == null })
+    }
+
+    @Test
+    fun `entra in frigo la quantita' presa e il resto rimane in lista`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Uova", quantity = 12.0)
+        val original = shoppingDao.items.single()
+        shoppingRepository.update(original.copy(isChecked = true, purchasedQuantity = 6.0))
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(6.0, foodDao.items.single().quantity, 0.001)
+        val left = shoppingDao.items.single()
+        assertEquals(original.uuid, left.uuid)
+        assertEquals(6.0, left.quantity, 0.001)
+        assertFalse(left.isChecked)
+        assertEquals(
+            "Aggiunto in frigo: Uova; 1 resta in lista per la parte mancante",
+            vm.uiState.value.message,
+        )
+    }
+
+    @Test
+    fun `annullare un acquisto parziale rimette la voce com'era`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Uova", quantity = 12.0)
+        shoppingRepository.update(
+            shoppingDao.items.single().copy(isChecked = true, purchasedQuantity = 6.0),
+        )
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+        vm.undoLastMove()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val restored = shoppingDao.items.single()
+        assertEquals(12.0, restored.quantity, 0.001)
+        assertEquals(6.0, restored.purchasedQuantity!!, 0.001)
+        assertTrue(restored.isChecked)
+        assertTrue(foodDao.items.none { it.removedAt == null })
+    }
+
+    @Test
+    fun `cio' che non e' un alimento esce dalla lista ma non entra in frigo`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Detersivo")
+        shoppingRepository.addIfAbsent("Latte")
+        shoppingDao.items.forEach { shoppingRepository.setChecked(it, checked = true) }
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(shoppingDao.items.isEmpty())
+        assertEquals(listOf("Latte"), foodDao.items.map { it.name })
+        assertEquals("1 prodotto messo in frigo, 1 tolto dalla lista", vm.uiState.value.message)
+
+        vm.undoLastMove()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(setOf("Detersivo", "Latte"), shoppingDao.items.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `la categoria della voce arriva in frigo`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Piselli", category = FoodCategory.SURGELATI)
+        shoppingRepository.setChecked(shoppingDao.items.single(), checked = true)
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val created = foodDao.items.single()
+        assertEquals(FoodCategory.SURGELATI, created.category)
+        assertEquals(StorageLocation.FREEZER, created.location)
+    }
+
+    @Test
+    fun `aggiungere un prodotto gia' passato dal frigo ne riprende la categoria`() = runTest(dispatcher) {
+        val previous = foodRepository.save(
+            FoodItem(uuid = "", name = "Tofu", category = FoodCategory.LATTICINI),
+        )
+        foodRepository.remove(previous, RemovalReason.CONSUMATO)
+
+        val vm = viewModel()
+        vm.add("tofu")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(FoodCategory.LATTICINI, shoppingDao.items.single().category)
+    }
+
+    @Test
+    fun `le voci da comprare sono raggruppate nell'ordine delle corsie`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte")
+        shoppingRepository.addIfAbsent("Mele")
+        shoppingRepository.addIfAbsent("Yogurt")
+        shoppingRepository.addIfAbsent("Pane")
+        shoppingRepository.setChecked(shoppingDao.items.first { it.name == "Pane" }, checked = true)
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        val state = vm.uiState.first { !it.isLoading }
+
+        assertEquals(
+            listOf(FoodCategory.FRUTTA, FoodCategory.LATTICINI),
+            state.toBuy.map { it.category },
+        )
+        assertEquals(
+            setOf("Latte", "Yogurt"),
+            state.toBuy.single { it.category == FoodCategory.LATTICINI }.items.map { it.name }.toSet(),
+        )
+        assertEquals(listOf("Pane"), state.inCart.map { it.name })
+    }
+
+    @Test
+    fun `il messaggio dello spostamento distingue frigo, lista e resti`() {
+        val latte = ShoppingItem(uuid = "1", name = "Latte")
+        val pane = ShoppingItem(uuid = "2", name = "Pane")
+        val sapone = ShoppingItem(uuid = "3", name = "Sapone")
+        val spugne = ShoppingItem(uuid = "4", name = "Spugne")
+
+        assertEquals("Tolto dalla lista: Sapone", ShoppingViewModel.moveMessage(emptyList(), listOf(sapone), 0))
+        assertEquals(
+            "2 prodotti tolti dalla lista",
+            ShoppingViewModel.moveMessage(emptyList(), listOf(sapone, spugne), 0),
+        )
+        assertEquals(
+            "2 prodotti messi in frigo, 2 tolti dalla lista; 2 restano in lista per la parte mancante",
+            ShoppingViewModel.moveMessage(listOf(latte, pane), listOf(sapone, spugne), 2),
+        )
     }
 }

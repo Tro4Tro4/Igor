@@ -147,4 +147,30 @@ class FoodRepositoryTest {
 
         assertEquals("Pane", created.name)
     }
+
+    @Test
+    fun `la categoria scelta nella lista prevale su quella ereditata`() = runTest {
+        repository.save(FoodItem(uuid = "", name = "Mais", category = FoodCategory.VERDURA))
+
+        val created = repository.addFromShopping(
+            "Mais",
+            quantity = 1.0,
+            unit = QuantityUnit.CONF,
+            category = FoodCategory.DISPENSA,
+        )
+
+        assertEquals(FoodCategory.DISPENSA, created.category)
+    }
+
+    @Test
+    fun `un prodotto mai visto va dove lo porta la sua categoria`() = runTest {
+        val created = repository.addFromShopping(
+            "Piselli",
+            quantity = 1.0,
+            unit = QuantityUnit.CONF,
+            category = FoodCategory.SURGELATI,
+        )
+
+        assertEquals(StorageLocation.FREEZER, created.location)
+    }
 }

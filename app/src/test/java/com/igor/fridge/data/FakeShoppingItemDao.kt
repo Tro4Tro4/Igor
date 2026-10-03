@@ -26,8 +26,13 @@ class FakeShoppingItemDao : ShoppingItemDao {
     override fun observeAll(): Flow<List<ShoppingItem>> =
         state.map { list -> list.sortedWith(SHOPPING_ORDER) }
 
+    override suspend fun findByUuid(uuid: String): ShoppingItem? =
+        items.firstOrNull { it.uuid == uuid }
+
     override suspend fun findByName(name: String): ShoppingItem? =
         items.firstOrNull { it.name.equals(name, ignoreCase = true) }
+
+    override suspend fun photoPaths(): List<String> = items.mapNotNull { it.photoPath }
 
     override suspend fun upsert(item: ShoppingItem) {
         state.update { list -> list.filterNot { it.uuid == item.uuid } + item }

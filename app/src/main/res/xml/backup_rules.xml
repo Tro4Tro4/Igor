@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <include domain="database" path="igor-database" />
+    <include domain="file" path="shopping_photos/" />
     <include domain="sharedpref" path="igor_settings.xml" />
 </full-backup-content>

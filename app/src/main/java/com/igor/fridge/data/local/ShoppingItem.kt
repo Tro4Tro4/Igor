@@ -5,7 +5,16 @@ import androidx.room.PrimaryKey
 import java.time.Instant
 import java.time.LocalDate
 
-/** Una voce della lista della spesa. */
+/**
+ * Una voce della lista della spesa.
+ *
+ * [quantity] e' quanto si vuole comprare, [purchasedQuantity] quanto e' stato preso
+ * davvero: null finche' l'utente non lo indica, e in quel caso vale [quantity]. Se e'
+ * minore, mettendo in frigo la differenza resta in lista.
+ *
+ * [photoPath] e' il nome di un file nella cartella delle foto dell'app, non un percorso
+ * assoluto: la cartella cambia fra installazioni e dopo un ripristino da backup.
+ */
 @Entity(tableName = "shopping_items")
 data class ShoppingItem(
     @PrimaryKey
@@ -16,4 +25,23 @@ data class ShoppingItem(
     val isChecked: Boolean = false,
     val createdAt: LocalDate = LocalDate.now(),
     val updatedAt: Instant = Instant.now(),
+    val category: FoodCategory = FoodCategory.ALTRO,
+    val brand: String? = null,
+    val notes: String? = null,
+    val photoPath: String? = null,
+    val purchasedQuantity: Double? = null,
 )
+
+/** Le quantita' sono Double: 0.3 - 0.1 - 0.2 non fa esattamente zero. */
+private const val QUANTITY_EPSILON = 1e-9
+
+/**
+ * Quanto resta da comprare dopo l'acquisto, oppure null se non resta niente. E' fuori
+ * dall'entita' perche' Room non provi a farne una colonna.
+ */
+val ShoppingItem.remainingAfterPurchase: Double?
+    get() {
+        val purchased = purchasedQuantity ?: return null
+        val remaining = quantity - purchased
+        return remaining.takeIf { it > QUANTITY_EPSILON }
+    }

@@ -1,9 +1,13 @@
 package com.igor.fridge.data.repository
 
+import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
+import com.igor.fridge.data.local.SavedListItem
 import com.igor.fridge.data.local.ShoppingItem
 import com.igor.fridge.data.local.ShoppingItemDao
+import com.igor.fridge.domain.guessCategory
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.time.Instant
 import java.util.UUID
 
@@ -16,6 +20,11 @@ class ShoppingRepository(
 
     fun observeAll(): Flow<List<ShoppingItem>> = dao.observeAll()
 
+    /** La lista com'e' adesso, nell'ordine in cui la mostra la schermata. */
+    suspend fun currentItems(): List<ShoppingItem> = dao.observeAll().first()
+
+    suspend fun findByUuid(uuid: String): ShoppingItem? = dao.findByUuid(uuid)
+
     /**
      * Mette il prodotto fra le cose da comprare.
      *
@@ -23,12 +32,20 @@ class ShoppingRepository(
      * comprare invece di essere ignorata: altrimenti un prodotto consumato una seconda
      * volta sparirebbe dall'inventario senza ricomparire in lista.
      *
+     * [category] null significa "non la so": una voce nuova la riceve da [guessCategory],
+     * una voce ripristinata tiene la sua. Allo stesso modo marca, note e foto sostituiscono
+     * quelle di una voce ripristinata solo se indicate.
+     *
      * @return true se la lista e' cambiata.
      */
     suspend fun addIfAbsent(
         name: String,
         quantity: Double = 1.0,
         unit: QuantityUnit = QuantityUnit.PZ,
+        category: FoodCategory? = null,
+        brand: String? = null,
+        notes: String? = null,
+        photoPath: String? = null,
     ): Boolean {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return false
@@ -42,6 +59,10 @@ class ShoppingRepository(
                         name = trimmed,
                         quantity = quantity,
                         unit = unit,
+                        category = category ?: guessCategory(trimmed),
+                        brand = brand,
+                        notes = notes,
+                        photoPath = photoPath,
                         updatedAt = clock(),
                     ),
                 )
@@ -52,8 +73,13 @@ class ShoppingRepository(
                 dao.upsert(
                     existing.copy(
                         isChecked = false,
+                        purchasedQuantity = null,
                         quantity = quantity,
                         unit = unit,
+                        category = category ?: existing.category,
+                        brand = brand ?: existing.brand,
+                        notes = notes ?: existing.notes,
+                        photoPath = photoPath ?: existing.photoPath,
                         updatedAt = clock(),
                     ),
                 )
@@ -64,8 +90,55 @@ class ShoppingRepository(
         }
     }
 
+    /**
+     * Copia nella lista le voci di una lista salvata, con le stesse regole di
+     * [addIfAbsent]: cio' che e' gia' da comprare non si raddoppia.
+     *
+     * @return quante voci hanno cambiato la lista.
+     */
+    suspend fun addAll(items: List<SavedListItem>): Int = items.count { item ->
+        addIfAbsent(
+            name = item.name,
+            quantity = item.quantity,
+            unit = item.unit,
+            category = item.category,
+            brand = item.brand,
+            notes = item.notes,
+            photoPath = item.photoPath,
+        )
+    }
+
+    /** Salva le modifiche fatte a una voce. @return la voce come e' stata salvata. */
+    suspend fun update(item: ShoppingItem): ShoppingItem {
+        val stamped = item.copy(updatedAt = clock())
+        dao.upsert(stamped)
+        return stamped
+    }
+
+    /**
+     * Togliere la spunta dimentica anche la quantita' presa: il prodotto e' tornato sullo
+     * scaffale, e una quantita' rimasta indietro verrebbe usata al prossimo "Metti in frigo".
+     */
     suspend fun setChecked(item: ShoppingItem, checked: Boolean) {
-        dao.upsert(item.copy(isChecked = checked, updatedAt = clock()))
+        dao.upsert(
+            item.copy(
+                isChecked = checked,
+                purchasedQuantity = if (checked) item.purchasedQuantity else null,
+                updatedAt = clock(),
+            ),
+        )
+    }
+
+    /** Dopo un acquisto parziale la voce resta in lista per [remaining], da comprare. */
+    suspend fun keepRemainder(item: ShoppingItem, remaining: Double) {
+        dao.upsert(
+            item.copy(
+                quantity = remaining,
+                purchasedQuantity = null,
+                isChecked = false,
+                updatedAt = clock(),
+            ),
+        )
     }
 
     /**
@@ -77,4 +150,7 @@ class ShoppingRepository(
     }
 
     suspend fun delete(item: ShoppingItem) = dao.delete(item)
+
+    /** Le foto a cui la lista tiene ancora: le altre si possono cancellare. */
+    suspend fun photoNames(): Set<String> = dao.photoPaths().toSet()
 }

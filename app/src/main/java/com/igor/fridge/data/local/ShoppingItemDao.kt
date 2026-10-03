@@ -17,8 +17,14 @@ interface ShoppingItemDao {
     )
     fun observeAll(): Flow<List<ShoppingItem>>
 
+    @Query("SELECT * FROM shopping_items WHERE uuid = :uuid")
+    suspend fun findByUuid(uuid: String): ShoppingItem?
+
     @Query("SELECT * FROM shopping_items WHERE name = :name COLLATE NOCASE LIMIT 1")
     suspend fun findByName(name: String): ShoppingItem?
+
+    @Query("SELECT photoPath FROM shopping_items WHERE photoPath IS NOT NULL")
+    suspend fun photoPaths(): List<String>
 
     @Upsert
     suspend fun upsert(item: ShoppingItem)

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.RemovalReason
 import com.igor.fridge.data.local.StorageLocation
@@ -117,7 +118,7 @@ class InventoryViewModel(
     fun consume(item: FoodItem) {
         viewModelScope.launch {
             foodRepository.remove(item, RemovalReason.CONSUMATO)
-            shoppingRepository.addIfAbsent(item.name, item.quantity, item.unit)
+            shoppingRepository.addIfAbsent(item.name, item.quantity, item.unit, item.knownCategory())
             criteria.update { it.copy(message = "${item.name} spostato nella lista della spesa") }
         }
     }
@@ -127,7 +128,9 @@ class InventoryViewModel(
         viewModelScope.launch {
             val state = uiState.value
             val candidates = foodRepository.findExpiring(state.today, state.warningDays)
-            val added = candidates.count { shoppingRepository.addIfAbsent(it.name, it.quantity, it.unit) }
+            val added = candidates.count {
+                shoppingRepository.addIfAbsent(it.name, it.quantity, it.unit, it.knownCategory())
+            }
             val text = when {
                 candidates.isEmpty() -> "Nessun prodotto in scadenza"
                 added == 0 -> "Già presenti nella lista della spesa"
@@ -154,3 +157,6 @@ class InventoryViewModel(
         }
     }
 }
+
+/** "Altro" vuol dire che la categoria non e' stata scelta: la lista provi a indovinarla. */
+private fun FoodItem.knownCategory(): FoodCategory? = category.takeIf { it != FoodCategory.ALTRO }

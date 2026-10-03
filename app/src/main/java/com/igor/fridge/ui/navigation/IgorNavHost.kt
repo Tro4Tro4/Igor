@@ -25,6 +25,8 @@ import com.igor.fridge.ui.edit.NEW_ITEM_UUID
 import com.igor.fridge.ui.inventory.InventoryScreen
 import com.igor.fridge.ui.scanner.BarcodeScannerScreen
 import com.igor.fridge.ui.settings.SettingsScreen
+import com.igor.fridge.ui.shopping.SavedListsScreen
+import com.igor.fridge.ui.shopping.ShoppingItemEditScreen
 import com.igor.fridge.ui.shopping.ShoppingScreen
 
 object Routes {
@@ -32,9 +34,13 @@ object Routes {
     const val EDIT = "edit/{uuid}"
     const val SCANNER = "scanner"
     const val SHOPPING = "shopping"
+    const val SHOPPING_ITEM = "shopping/item/{uuid}"
+    const val SAVED_LISTS = "shopping/saved"
     const val SETTINGS = "settings"
 
     fun edit(uuid: String): String = "edit/$uuid"
+
+    fun shoppingItem(uuid: String): String = "shopping/item/$uuid"
 }
 
 @Composable
@@ -92,7 +98,25 @@ fun IgorApp(
         }
 
         composable(Routes.SHOPPING) {
-            ShoppingScreen(onBack = { navController.popBackStack() })
+            ShoppingScreen(
+                onBack = { navController.popBackStack() },
+                onOpenItem = { uuid -> navController.navigate(Routes.shoppingItem(uuid)) },
+                onOpenSavedLists = { navController.navigate(Routes.SAVED_LISTS) },
+            )
+        }
+
+        composable(
+            route = Routes.SHOPPING_ITEM,
+            arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            ShoppingItemEditScreen(
+                uuid = backStackEntry.arguments?.getString("uuid").orEmpty(),
+                onDone = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.SAVED_LISTS) {
+            SavedListsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.SETTINGS) {

@@ -5,9 +5,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.RemovalReason
 import com.igor.fridge.data.local.ShoppingItem
+import com.igor.fridge.data.local.remainingAfterPurchase
+import com.igor.fridge.data.photos.PhotoStore
 import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.ShoppingRepository
 import com.igor.fridge.ui.igorApplication
@@ -20,6 +23,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+
+/** Le voci ancora da comprare di una categoria, cioe' di una corsia del negozio. */
+data class ShoppingSection(
+    val category: FoodCategory,
+    val items: List<ShoppingItem>,
+)
 
 data class ShoppingUiState(
     val items: List<ShoppingItem> = emptyList(),
@@ -28,6 +38,23 @@ data class ShoppingUiState(
     val canUndo: Boolean = false,
 ) {
     val checkedCount: Int get() = items.count { it.isChecked }
+
+    /** Da comprare, raggruppate per categoria nell'ordine delle corsie. */
+    val toBuy: List<ShoppingSection> = items.filterNot { it.isChecked }.groupedByCategory()
+
+    /** Gia' nel carrello, nell'ordine della lista. */
+    val inCart: List<ShoppingItem> = items.filter { it.isChecked }
+}
+
+/**
+ * Raggruppa per categoria nell'ordine di [FoodCategory], che e' quello delle corsie;
+ * dentro ogni gruppo resta l'ordine della lista. Le categorie vuote non compaiono.
+ */
+fun List<ShoppingItem>.groupedByCategory(): List<ShoppingSection> {
+    val byCategory = groupBy { it.category }
+    return FoodCategory.entries.mapNotNull { category ->
+        byCategory[category]?.let { ShoppingSection(category, it) }
+    }
 }
 
 /** Cosa serve per annullare l'ultimo spostamento in frigo. */
@@ -39,6 +66,7 @@ private data class LastMove(
 class ShoppingViewModel(
     private val shoppingRepository: ShoppingRepository,
     private val foodRepository: FoodRepository,
+    private val photoStore: PhotoStore,
 ) : ViewModel() {
 
     // Vive in memoria quanto lo snackbar: un annullamento che sopravvive alla schermata
@@ -67,9 +95,21 @@ class ShoppingViewModel(
             initialValue = ShoppingUiState(),
         )
 
+    /**
+     * Aggiunge una voce col solo nome. La categoria e' quella che il prodotto ha avuto per
+     * ultimo in inventario, se c'e' passato e non era "Altro"; altrimenti la propone il
+     * repository a partire dal nome.
+     */
     fun add(name: String) {
-        viewModelScope.launch { shoppingRepository.addIfAbsent(name) }
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            val known = foodRepository.findLastByName(name)?.category
+                ?.takeIf { it != FoodCategory.ALTRO }
+            shoppingRepository.addIfAbsent(name, category = known)
+        }
     }
+
+    fun photoFile(name: String): File = photoStore.fileOf(name)
 
     fun setChecked(item: ShoppingItem, checked: Boolean) {
         viewModelScope.launch { shoppingRepository.setChecked(item, checked) }
@@ -103,18 +143,32 @@ class ShoppingViewModel(
                 // sequenza a termine anche se la schermata se ne e' gia' andata.
                 withContext(NonCancellable) {
                     // Prima il frigo, poi la lista: interrompendosi qui la spesa resta in
-                    // entrambi i posti, mai in nessuno dei due.
-                    val created = checked.map { item ->
-                        foodRepository.addFromShopping(item.name, item.quantity, item.unit)
+                    // entrambi i posti, mai in nessuno dei due. Entra in frigo quanto e'
+                    // stato preso; cio' che non e' un alimento esce soltanto dalla lista.
+                    val (food, nonFood) = checked.partition { it.category.isFood }
+                    val created = food.map { item ->
+                        foodRepository.addFromShopping(
+                            name = item.name,
+                            quantity = item.purchasedQuantity ?: item.quantity,
+                            unit = item.unit,
+                            category = item.category,
+                        )
                     }
-                    checked.forEach { shoppingRepository.delete(it) }
+                    // Dopo un acquisto parziale la voce resta, per la parte mancante.
+                    // L'annullamento la rimette com'era con restore(), che sovrascrive.
+                    var remainders = 0
+                    checked.forEach { item ->
+                        val remaining = item.remainingAfterPurchase
+                        if (remaining != null) {
+                            shoppingRepository.keepRemainder(item, remaining)
+                            remainders++
+                        } else {
+                            shoppingRepository.delete(item)
+                        }
+                    }
 
                     lastMove = LastMove(shoppingItems = checked, createdFood = created)
-                    val text = if (checked.size == 1) {
-                        "Aggiunto in frigo: ${checked.single().name}"
-                    } else {
-                        "${checked.size} prodotti messi in frigo"
-                    }
+                    val text = moveMessage(food = food, nonFood = nonFood, remainders = remainders)
                     feedback.update { it.copy(message = text, canUndo = true) }
                 }
             } finally {
@@ -159,12 +213,45 @@ class ShoppingViewModel(
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
 
+        /** "Aggiunto in frigo: Latte", "2 prodotti messi in frigo, 1 tolto dalla lista"... */
+        internal fun moveMessage(
+            food: List<ShoppingItem>,
+            nonFood: List<ShoppingItem>,
+            remainders: Int,
+        ): String {
+            val main = when {
+                nonFood.isEmpty() && food.size == 1 -> "Aggiunto in frigo: ${food.single().name}"
+                nonFood.isEmpty() -> "${food.size} prodotti messi in frigo"
+                food.isEmpty() && nonFood.size == 1 -> "Tolto dalla lista: ${nonFood.single().name}"
+                food.isEmpty() -> "${nonFood.size} prodotti tolti dalla lista"
+                else -> {
+                    val inFridge = if (food.size == 1) {
+                        "1 prodotto messo in frigo"
+                    } else {
+                        "${food.size} prodotti messi in frigo"
+                    }
+                    val removed = if (nonFood.size == 1) {
+                        "1 tolto dalla lista"
+                    } else {
+                        "${nonFood.size} tolti dalla lista"
+                    }
+                    "$inFridge, $removed"
+                }
+            }
+            return when (remainders) {
+                0 -> main
+                1 -> "$main; 1 resta in lista per la parte mancante"
+                else -> "$main; $remainders restano in lista per la parte mancante"
+            }
+        }
+
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val container = igorApplication().container
                 ShoppingViewModel(
                     shoppingRepository = container.shoppingRepository,
                     foodRepository = container.foodRepository,
+                    photoStore = container.photoStore,
                 )
             }
         }

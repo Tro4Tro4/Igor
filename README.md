@@ -14,8 +14,14 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
 - **Codice a barre**: lettura EAN/UPC/Code-128 con fotocamera (CameraX + ML Kit). Se il codice
   è già stato registrato in passato, nome, categoria e unità vengono precompilati.
 - **Lista della spesa**: voci aggiunte a mano, oppure generate dai prodotti consumati o in
-  scadenza; spunta e "Metti in frigo" per far tornare gli articoli presi nell’inventario,
-  con la possibilità di annullare lo spostamento finché lo snackbar è visibile.
+  scadenza, raggruppate per categoria (ognuna con la sua icona) nell’ordine delle corsie.
+  Per ogni voce: quantità e unità, marca, note, foto, quantità effettivamente presa. Spunta
+  e "Metti in frigo" per far tornare gli articoli presi nell’inventario, con la possibilità
+  di annullare lo spostamento finché lo snackbar è visibile; dopo un acquisto parziale il
+  resto rimane in lista, e ciò che non si mangia (casa, igiene) esce dalla lista senza
+  entrare in frigo.
+- **Liste salvate**: la lista attuale si salva con un nome ("Spesa settimanale") e si
+  ricarica quando serve, aggiungendo solo ciò che manca.
 
 ## Stack tecnico
 
@@ -38,18 +44,19 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
 ```
 app/src/main/java/com/igor/fridge/
 ├── data/
-│   ├── local/        # entità Room (UUID, cancellazione logica), DAO, database, type converter
+│   ├── local/        # entità Room (UUID, cancellazione logica), DAO, database, migrazioni
+│   ├── photos/       # foto delle voci della spesa (file privati dell’app)
 │   ├── prefs/        # preferenze utente (DataStore, osservabili)
-│   └── repository/   # FoodRepository, ShoppingRepository
+│   └── repository/   # FoodRepository, ShoppingRepository, SavedListRepository
 ├── di/               # AppContainer
-├── domain/           # logica di scadenza, indipendente da Android
+├── domain/           # scadenze e proposta di categoria, indipendenti da Android
 ├── notification/     # notifica riepilogativa, worker e pianificazione
 └── ui/               # tema, navigazione e schermate Compose
     ├── inventory/    # elenco, filtri, ricerca
     ├── edit/         # inserimento e modifica
     ├── scanner/      # lettura codice a barre
     ├── settings/     # impostazioni: soglia, ora della notifica, attivazione
-    └── shopping/     # lista della spesa
+    └── shopping/     # lista della spesa, dettagli della voce, liste salvate
 ```
 
 ## Build
@@ -65,7 +72,11 @@ Serve JDK 17+ e l’Android SDK con `platform-35` e i build-tools corrispondenti
 
 ## Stato
 
-Il progetto compila: `assembleDebug` e la suite di test JVM passano.
+Fino alla Fase 2 il progetto compilava e la suite di test JVM passava. Le modifiche alla
+lista della spesa (dettagli, categorie, foto, liste salvate; vedi
+`docs/superpowers/specs/2026-10-03-lista-spesa-dettagli-design.md`) sono state scritte
+senza poter eseguire `./gradlew`: la logica è stata compilata e provata sulla JVM, ma
+schermate Compose, KSP di Room e test Robolectric attendono la prima build.
 
 `FoodItem` e `ShoppingItem` usano come chiave primaria un UUID `String` generato sul
 dispositivo, non un id autoincrementale di SQLite che collide fra dispositivi diversi, e
@@ -101,16 +112,17 @@ Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi 
 corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
 "3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-I test coprono 70 casi su 13 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
+I test coprono 117 casi su 19 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
-**Attenzione:** lo schema di `FoodItem` e `ShoppingItem` è cambiato ma la versione del
-database Room è rimasta `1`. È legittimo solo perché nessun database Igor esiste ancora su
-alcun dispositivo con dati da salvare. Perché una build precedente già installata non muoia
-all’apertura del database, `IgorDatabase.build` usa `fallbackToDestructiveMigration()`: il
-database viene ricreato da zero. Quella riga va tolta — e sostituita da una migrazione vera
-— non appena esistano dati reali, altrimenti cancellerebbe l’inventario dell’utente senza
-dire niente.
+**Database: versione 2.** La lista della spesa ha cambiato schema, e da qui in poi ogni
+cambio di schema alza la versione e porta la sua migrazione (`IgorDatabase.MIGRATION_1_2`
+è la prima): a versione invariata Room rifiuterebbe di aprire il database. La migrazione è
+provata da `MigrationTest`, che apre con `IgorDatabase.build` un database della versione 1
+scritto a mano. `fallbackToDestructiveMigration()` è ancora presente e copre solo un salto
+di versione senza migrazione, cancellando i dati: va tolto quando si decide come gestire
+quel caso. Lo schema esportato della versione 2 (`app/schemas/.../2.json`) viene generato
+dalla prima build e va committato.
 
 ### Difetti noti
 

@@ -2,9 +2,12 @@ package com.igor.fridge.di
 
 import android.content.Context
 import com.igor.fridge.data.local.IgorDatabase
+import com.igor.fridge.data.photos.FilePhotoStore
+import com.igor.fridge.data.photos.PhotoStore
 import com.igor.fridge.data.prefs.SettingsStore
 import com.igor.fridge.data.prefs.settingsDataStore
 import com.igor.fridge.data.repository.FoodRepository
+import com.igor.fridge.data.repository.SavedListRepository
 import com.igor.fridge.data.repository.ShoppingRepository
 
 /**
@@ -24,5 +27,25 @@ class AppContainer(context: Context) {
         ShoppingRepository(database.shoppingItemDao())
     }
 
+    val savedListRepository: SavedListRepository by lazy {
+        SavedListRepository(database.savedListDao())
+    }
+
+    val photoStore: PhotoStore by lazy { FilePhotoStore(appContext) }
+
     val settingsStore: SettingsStore by lazy { SettingsStore(appContext.settingsDataStore) }
+
+    /**
+     * Le foto restano su disco quando una voce esce dalla lista o cambia foto, perche'
+     * l'annullamento di "Metti in frigo" e le liste salvate possono ancora volerle.
+     * All'avvio nessun annullamento e' in sospeso: si cancella cio' che nessuno usa piu'.
+     */
+    suspend fun deleteOrphanPhotos() {
+        val keep = shoppingRepository.photoNames() + savedListRepository.photoNames()
+        photoStore.deleteAllExcept(keep, graceMillis = PHOTO_GRACE_MILLIS)
+    }
+
+    private companion object {
+        const val PHOTO_GRACE_MILLIS = 60 * 60 * 1000L
+    }
 }

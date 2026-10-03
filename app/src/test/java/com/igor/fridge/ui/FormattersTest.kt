@@ -1,7 +1,9 @@
 package com.igor.fridge.ui
 
+import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.LocalDate
 
@@ -32,5 +34,26 @@ class FormattersTest {
         assertEquals("Scade oggi", expiryLabel(0))
         assertEquals("Scade domani", expiryLabel(1))
         assertEquals("Scade fra 5 giorni", expiryLabel(5))
+    }
+
+    @Test
+    fun `una quantita' scritta dall'utente accetta virgola e punto`() {
+        assertEquals(1.5, parseQuantity(" 1,5 ")!!, 0.001)
+        assertEquals(2.25, parseQuantity("2.25")!!, 0.001)
+    }
+
+    @Test
+    fun `una quantita' nulla, negativa o non numerica non vale`() {
+        assertNull(parseQuantity(""))
+        assertNull(parseQuantity("0"))
+        assertNull(parseQuantity("-1"))
+        assertNull(parseQuantity("due"))
+        assertNull(parseQuantity("NaN"))
+    }
+
+    @Test
+    fun `ogni categoria ha un'icona sua`() {
+        val icons = FoodCategory.entries.map { it.icon() }
+        assertEquals(icons.size, icons.toSet().size)
     }
 }
