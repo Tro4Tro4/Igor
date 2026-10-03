@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import java.time.Instant
 
 /**
  * DAO in memoria per la lista della spesa: la logica anti-duplicati sta nel repository,
@@ -32,8 +33,10 @@ class FakeShoppingItemDao : ShoppingItemDao {
     override suspend fun findByUuid(uuid: String): ShoppingItem? =
         items.firstOrNull { it.uuid == uuid }
 
-    override suspend fun findByName(name: String): ShoppingItem? =
-        items.firstOrNull { it.name.equals(name, ignoreCase = true) }
+    override suspend fun findByNameKey(nameKey: String): ShoppingItem? =
+        items.filter { it.nameKey == nameKey }
+            .sortedWith(compareBy<ShoppingItem> { it.isChecked }.thenByDescending { it.updatedAt })
+            .firstOrNull()
 
     override suspend fun photoPaths(): List<String> = items.mapNotNull { it.photoPath }
 
@@ -43,6 +46,19 @@ class FakeShoppingItemDao : ShoppingItemDao {
 
     override suspend fun delete(item: ShoppingItem) {
         state.update { list -> list.filterNot { it.uuid == item.uuid } }
+    }
+
+    override suspend fun setChecked(uuid: String, checked: Boolean, at: Instant) {
+        state.update { list ->
+            list.map {
+                if (it.uuid != uuid) return@map it
+                it.copy(
+                    isChecked = checked,
+                    purchasedQuantity = if (checked) it.purchasedQuantity else null,
+                    updatedAt = at,
+                )
+            }
+        }
     }
 
     private companion object {

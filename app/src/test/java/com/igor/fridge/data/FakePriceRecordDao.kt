@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import java.time.LocalDate
 
 /** Storico dei prezzi in memoria, ordinato come la query vera. */
 class FakePriceRecordDao : PriceRecordDao {
@@ -20,6 +21,9 @@ class FakePriceRecordDao : PriceRecordDao {
 
     override suspend fun findLatest(productKey: String): PriceRecord? =
         records.filter { it.productKey == productKey }.sortedWith(ORDER).firstOrNull()
+
+    override suspend fun onDate(date: LocalDate): List<PriceRecord> =
+        records.filter { it.purchasedOn == date }
 
     override suspend fun insertAll(records: List<PriceRecord>) {
         state.update { it + records }

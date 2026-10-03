@@ -10,6 +10,7 @@ import com.igor.fridge.data.local.IgorDatabase
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.RemovalReason
 import com.igor.fridge.data.local.StorageLocation
+import com.igor.fridge.data.local.nameKeyOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -82,7 +83,7 @@ class FoodItemDaoTest {
     }
 
     @Test
-    fun `findLastByName trova anche fra gli articoli usciti dal frigo`() = runTest {
+    fun `findLastByNameKey trova anche fra gli articoli usciti dal frigo`() = runTest {
         dao.upsert(
             item(
                 uuid = "vecchio",
@@ -94,13 +95,36 @@ class FoodItemDaoTest {
             ),
         )
 
-        val found = dao.findLastByName("latte")
+        val found = dao.findLastByNameKey(nameKeyOf("latte"))
 
         assertEquals(FoodCategory.LATTICINI, found?.category)
     }
 
     @Test
-    fun `findLastByName preferisce la versione piu recente`() = runTest {
+    fun `il nome si trova anche con lettere accentate in maiuscolo`() = runTest {
+        dao.upsert(item("c", "Caffè", category = FoodCategory.DISPENSA, updatedAt = now))
+
+        // COLLATE NOCASE non avrebbe trovato "Caffè" cercando "CAFFÈ".
+        assertEquals("c", dao.findLastByNameKey(nameKeyOf("  CAFFÈ "))?.uuid)
+    }
+
+    @Test
+    fun `uscita e rientro non riscrivono le altre colonne`() = runTest {
+        dao.upsert(item("a", "Yogurt", updatedAt = now))
+        // Modifica fatta dopo che la UI ha letto la riga.
+        dao.upsert(item("a", "Yogurt", expiry = LocalDate.of(2026, 5, 1), updatedAt = now))
+
+        dao.markRemoved("a", RemovalReason.CONSUMATO, now.plusSeconds(1))
+        assertEquals(LocalDate.of(2026, 5, 1), dao.findByUuid("a")?.expiryDate)
+        assertEquals(RemovalReason.CONSUMATO, dao.findByUuid("a")?.removalReason)
+
+        dao.markRestored("a", now.plusSeconds(2))
+        assertNull(dao.findByUuid("a")?.removedAt)
+        assertEquals(LocalDate.of(2026, 5, 1), dao.findByUuid("a")?.expiryDate)
+    }
+
+    @Test
+    fun `findLastByNameKey preferisce la versione piu recente`() = runTest {
         dao.upsert(item("vecchio", "Latte", category = FoodCategory.ALTRO, updatedAt = now))
         dao.upsert(
             item(
@@ -111,7 +135,7 @@ class FoodItemDaoTest {
             ),
         )
 
-        assertEquals(FoodCategory.LATTICINI, dao.findLastByName("Latte")?.category)
+        assertEquals(FoodCategory.LATTICINI, dao.findLastByNameKey(nameKeyOf("Latte"))?.category)
     }
 
     @Test

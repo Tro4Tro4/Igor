@@ -13,14 +13,17 @@ import java.time.Instant
  * e' quella con cui inventario e "Metti in frigo" dialogano. Caricare una lista salvata
  * ne copia le voci in quella attiva; le voci salvate non cambiano mai stato.
  */
-@Entity(tableName = "saved_lists")
+@Entity(tableName = "saved_lists", indices = [Index("nameKey")])
 data class SavedList(
     @PrimaryKey
     val uuid: String,
     val name: String,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
-)
+) {
+    /** Il nome in forma di ricerca, ricalcolato a ogni `copy` (vedi [FoodItem.nameKey]). */
+    var nameKey: String = nameKeyOf(name)
+}
 
 /**
  * Una voce di una lista salvata: i dati di [ShoppingItem] che descrivono *cosa* comprare,

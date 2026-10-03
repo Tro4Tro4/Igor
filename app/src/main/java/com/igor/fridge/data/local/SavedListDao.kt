@@ -24,8 +24,8 @@ abstract class SavedListDao {
     )
     abstract fun observeSummaries(): Flow<List<SavedListSummary>>
 
-    @Query("SELECT * FROM saved_lists WHERE name = :name COLLATE NOCASE LIMIT 1")
-    abstract suspend fun findByName(name: String): SavedList?
+    @Query("SELECT * FROM saved_lists WHERE nameKey = :nameKey ORDER BY updatedAt DESC LIMIT 1")
+    abstract suspend fun findByNameKey(nameKey: String): SavedList?
 
     @Query("SELECT * FROM saved_list_items WHERE listUuid = :listUuid ORDER BY position ASC")
     abstract suspend fun itemsOf(listUuid: String): List<SavedListItem>

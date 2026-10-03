@@ -38,12 +38,44 @@ class PriceRepository(
      * Registra gli acquisti di uno scontrino. Si scartano quelli senza nome, senza importo
      * o con una quantita' che non permette di calcolare un prezzo unitario.
      *
+     * Uno scontrino gia' registrato ([isAlreadyRecorded]) non si registra una seconda
+     * volta: rileggerlo raddoppierebbe la spesa del mese e falserebbe medie e minimi.
+     *
      * @return quanti prezzi sono stati registrati.
      */
     suspend fun record(purchases: List<Purchase>, store: String?, date: LocalDate): Int {
+        val records = toRecords(purchases, store, date)
+        if (records.isEmpty() || containsAll(records, date)) return 0
+        dao.insertAll(records)
+        return records.size
+    }
+
+    /**
+     * Vero se ogni prezzo di questo scontrino e' gia' nello storico: stesso giorno, stesso
+     * negozio, stesso prodotto e stesso importo, contando i doppioni (due latti da 1,29
+     * chiedono due righe da 1,29). Uno scontrino che aggiunge anche un solo prezzo nuovo
+     * e' un altro scontrino, e si registra per intero.
+     */
+    suspend fun isAlreadyRecorded(purchases: List<Purchase>, store: String?, date: LocalDate): Boolean {
+        val records = toRecords(purchases, store, date)
+        return records.isNotEmpty() && containsAll(records, date)
+    }
+
+    private suspend fun containsAll(records: List<PriceRecord>, date: LocalDate): Boolean {
+        val existing = dao.onDate(date).groupingBy { it.identity() }.eachCount().toMutableMap()
+        return records.all { record ->
+            val left = existing[record.identity()] ?: 0
+            existing[record.identity()] = left - 1
+            left > 0
+        }
+    }
+
+    private fun PriceRecord.identity() = Triple(productKey, totalCents, store?.lowercase())
+
+    private fun toRecords(purchases: List<Purchase>, store: String?, date: LocalDate): List<PriceRecord> {
         val now = clock()
         val cleanStore = store?.trim()?.takeIf { it.isNotEmpty() }
-        val records = purchases.mapNotNull { purchase ->
+        return purchases.mapNotNull { purchase ->
             val name = purchase.name.trim()
             val key = productKey(name)
             if (key.isEmpty() || purchase.totalCents <= 0) return@mapNotNull null
@@ -63,8 +95,6 @@ class PriceRepository(
                 createdAt = now,
             )
         }
-        if (records.isNotEmpty()) dao.insertAll(records)
-        return records.size
     }
 
     /** L'ultimo prezzo pagato per questo prodotto, da proporre nella lista della spesa. */

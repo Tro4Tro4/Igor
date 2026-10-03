@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.IgorDatabase
 import com.igor.fridge.data.local.QuantityUnit
+import com.igor.fridge.data.local.nameKeyOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -22,8 +23,7 @@ import org.robolectric.annotation.Config
  * Un database della versione 1, scritto a mano con lo schema di `schemas/.../1.json`,
  * viene aperto da [IgorDatabase.build]: lo stesso percorso dell'app installata. Se la
  * migrazione lasciasse lo schema diverso da quello delle entita', Room rifiuterebbe di
- * aprirlo; se mancasse, il fallback distruttivo cancellerebbe i dati e il test fallirebbe
- * sulle righe scomparse.
+ * aprirlo; se mancasse, l'apertura fallirebbe (non c'e' fallback distruttivo).
  *
  * Il nome del file e' diverso da quello dell'app: IgorApplication, che Robolectric avvia,
  * apre il database vero in background.
@@ -74,7 +74,7 @@ class MigrationTest {
 
         val migrated = IgorDatabase.build(context, TEST_DB).also { db = it }
 
-        // Le migrazioni 1->2, 2->3, 3->4 e 4->5 si applicano in fila.
+        // Le migrazioni da 1->2 a 5->6 si applicano in fila.
         val food = migrated.foodItemDao().findByUuid("f1")
         assertEquals("Latte", food?.name)
         assertNull(food?.brand)
@@ -91,6 +91,10 @@ class MigrationTest {
         assertNull(latte.unitPriceCents)
         assertNull(latte.store)
         assertEquals(FoodCategory.ALTRO, shopping.single { it.uuid == "s2" }.category)
+
+        // La 5->6 calcola la chiave di ricerca delle righe gia' presenti.
+        assertEquals("f1", migrated.foodItemDao().findLastByNameKey(nameKeyOf("LATTE"))?.uuid)
+        assertEquals("s2", migrated.shoppingItemDao().findByNameKey(nameKeyOf("mai visto"))?.uuid)
 
         assertTrue(migrated.savedListDao().observeSummaries().first().isEmpty())
         assertTrue(migrated.priceRecordDao().observeAll().first().isEmpty())

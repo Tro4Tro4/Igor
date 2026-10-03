@@ -5,7 +5,9 @@ import com.igor.fridge.data.repository.PriceRepository
 import com.igor.fridge.data.repository.Purchase
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import java.time.LocalDate
@@ -42,6 +44,27 @@ class PriceRepositoryTest {
         assertEquals(QuantityUnit.KG, pasta.referenceUnit)
         assertEquals("Coop", pasta.store)
         assertEquals(day, pasta.purchasedOn)
+    }
+
+    @Test
+    fun `lo stesso scontrino registrato due volte non raddoppia i prezzi`() = runTest {
+        val receipt = listOf(
+            Purchase("Latte", 1.0, QuantityUnit.L, 129),
+            Purchase("Latte", 1.0, QuantityUnit.L, 129),
+            Purchase("Pane", 1.0, QuantityUnit.PZ, 220),
+        )
+        assertEquals(3, repository.record(receipt, "Coop", day))
+
+        assertTrue(repository.isAlreadyRecorded(receipt, "COOP ", day))
+        assertEquals(0, repository.record(receipt, "Coop", day))
+        assertEquals(3, dao.records.size)
+
+        // Un terzo latte nello stesso giorno e' un altro scontrino.
+        val another = receipt + Purchase("Latte", 1.0, QuantityUnit.L, 129)
+        assertFalse(repository.isAlreadyRecorded(another, "Coop", day))
+        // Un altro giorno o un altro negozio pure.
+        assertFalse(repository.isAlreadyRecorded(receipt, "Coop", day.plusDays(1)))
+        assertFalse(repository.isAlreadyRecorded(receipt, "Lidl", day))
     }
 
     @Test

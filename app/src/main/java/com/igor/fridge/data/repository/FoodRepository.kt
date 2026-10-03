@@ -5,6 +5,7 @@ import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.FoodItemDao
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.RemovalReason
+import com.igor.fridge.data.local.nameKeyOf
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import java.time.LocalDate
@@ -30,7 +31,7 @@ class FoodRepository(
 
     suspend fun findLastByBarcode(barcode: String): FoodItem? = dao.findLastByBarcode(barcode)
 
-    suspend fun findLastByName(name: String): FoodItem? = dao.findLastByName(name.trim())
+    suspend fun findLastByName(name: String): FoodItem? = dao.findLastByNameKey(nameKeyOf(name))
 
     /** @return l'articolo come e' stato salvato, con identificatore e timbro valorizzati. */
     suspend fun save(item: FoodItem): FoodItem {
@@ -64,7 +65,7 @@ class FoodRepository(
         expiryDate: LocalDate? = null,
     ): FoodItem {
         val trimmed = name.trim()
-        val previous = dao.findLastByName(trimmed)
+        val previous = findLastByName(trimmed)
         val resolvedCategory = if (category != FoodCategory.ALTRO) {
             category
         } else {
@@ -84,15 +85,18 @@ class FoodRepository(
         )
     }
 
-    /** Fa uscire l'articolo dall'inventario conservandone la storia. */
+    /**
+     * Fa uscire l'articolo dall'inventario conservandone la storia. Si scrive solo lo
+     * stato di uscita: il resto della riga puo' essere stato modificato dopo che [item]
+     * e' stato letto.
+     */
     suspend fun remove(item: FoodItem, reason: RemovalReason) {
-        val now = clock()
-        dao.upsert(item.copy(removedAt = now, removalReason = reason, updatedAt = now))
+        dao.markRemoved(item.uuid, reason, clock())
     }
 
-    /** Annulla una rimozione. */
+    /** Annulla una rimozione, con la stessa cautela di [remove]. */
     suspend fun restore(item: FoodItem) {
-        dao.upsert(item.copy(removedAt = null, removalReason = null, updatedAt = clock()))
+        dao.markRestored(item.uuid, clock())
     }
 
     /** Articoli scaduti oppure in scadenza entro [withinDays] giorni a partire da [today]. */

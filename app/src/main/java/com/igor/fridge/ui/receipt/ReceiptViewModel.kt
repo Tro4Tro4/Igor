@@ -413,7 +413,12 @@ class ReceiptViewModel(
                 _uiState.update {
                     it.copy(
                         phase = ReceiptPhase.DONE,
-                        summary = summaryOf(saved.toFridge, saved.prices, saved.fromList),
+                        summary = summaryOf(
+                            saved.toFridge,
+                            saved.prices,
+                            saved.fromList,
+                            saved.pricesAlreadyRecorded,
+                        ),
                         contributable = saved.contributable,
                         pricedLines = included.count { d -> parsePriceCents(d.priceText) != null },
                     )
@@ -436,6 +441,7 @@ class ReceiptViewModel(
         val prices: Int,
         val fromList: Int,
         val contributable: List<ContributionItem>,
+        val pricesAlreadyRecorded: Boolean,
     )
 
     private suspend fun save(state: ReceiptUiState, included: List<ReceiptDraft>): Saved {
@@ -453,19 +459,17 @@ class ReceiptViewModel(
                 ),
             )
         }
-        val prices = priceRepository.record(
-            purchases = included.mapNotNull { draft ->
-                val total = parsePriceCents(draft.priceText) ?: return@mapNotNull null
-                Purchase(
-                    name = draft.name,
-                    quantity = parseQuantity(draft.quantityText) ?: 1.0,
-                    unit = draft.unit,
-                    totalCents = total,
-                )
-            },
-            store = state.store,
-            date = state.purchaseDate,
-        )
+        val purchases = included.mapNotNull { draft ->
+            val total = parsePriceCents(draft.priceText) ?: return@mapNotNull null
+            Purchase(
+                name = draft.name,
+                quantity = parseQuantity(draft.quantityText) ?: 1.0,
+                unit = draft.unit,
+                totalCents = total,
+            )
+        }
+        val duplicate = priceRepository.isAlreadyRecorded(purchases, state.store, state.purchaseDate)
+        val prices = priceRepository.record(purchases, state.store, state.purchaseDate)
         val fromList = included.mapNotNull { it.shoppingMatch }
         fromList.forEach { shoppingRepository.delete(it) }
 
@@ -473,7 +477,7 @@ class ReceiptViewModel(
             val barcode = priceRepository.barcodeForName(draft.name) ?: draft.knownBarcode
             contributionItem(draft, barcode)
         }
-        return Saved(toFridge.size, prices, fromList.size, contributable)
+        return Saved(toFridge.size, prices, fromList.size, contributable, duplicate)
     }
 
     private fun updateDraft(id: Int, change: (ReceiptDraft) -> ReceiptDraft) = _uiState.update { state ->
@@ -511,12 +515,18 @@ class ReceiptViewModel(
             else -> "$sent prezzi condivisi, $failed non accettati"
         }
 
-        internal fun summaryOf(added: Int, prices: Int, fromList: Int): String = listOfNotNull(
+        internal fun summaryOf(
+            added: Int,
+            prices: Int,
+            fromList: Int,
+            pricesAlreadyRecorded: Boolean = false,
+        ): String = listOfNotNull(
             when (added) {
                 0 -> "Nessun prodotto in frigo"
                 1 -> "1 prodotto aggiunto in frigo"
                 else -> "$added prodotti aggiunti in frigo"
             },
+            "prezzi già registrati con questo scontrino".takeIf { pricesAlreadyRecorded },
             when (prices) {
                 0 -> null
                 1 -> "1 prezzo registrato"

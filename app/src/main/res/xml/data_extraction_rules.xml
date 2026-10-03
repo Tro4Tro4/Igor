@@ -1,13 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12 e successivi. Lo storico di acquisti e prezzi dice molto di chi lo tiene:
+  nel cloud va solo se il backup e' cifrato end-to-end (dispositivo con blocco schermo).
+  Il passaggio diretto a un telefono nuovo non passa dal cloud e copia tutto tranne il token.
+-->
 <data-extraction-rules>
-    <cloud-backup>
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
         <include domain="database" path="igor-database" />
+        <include domain="database" path="igor-database-wal" />
         <include domain="file" path="shopping_photos/" />
-        <include domain="sharedpref" path="igor_settings.xml" />
+        <include domain="file" path="datastore/igor_settings.preferences_pb" />
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="igor-database" />
+        <include domain="database" path="igor-database-wal" />
         <include domain="file" path="shopping_photos/" />
-        <include domain="sharedpref" path="igor_settings.xml" />
+        <include domain="file" path="datastore/igor_settings.preferences_pb" />
     </device-transfer>
 </data-extraction-rules>

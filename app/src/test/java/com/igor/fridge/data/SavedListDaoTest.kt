@@ -8,6 +8,7 @@ import com.igor.fridge.data.local.IgorDatabase
 import com.igor.fridge.data.local.SavedList
 import com.igor.fridge.data.local.SavedListDao
 import com.igor.fridge.data.local.SavedListItem
+import com.igor.fridge.data.local.nameKeyOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -94,6 +95,6 @@ class SavedListDaoTest {
     fun `il nome si cerca senza distinguere le maiuscole`() = runTest {
         dao.upsertList(SavedList(uuid = "l1", name = "Settimanale", createdAt = now, updatedAt = now))
 
-        assertEquals("l1", dao.findByName("SETTIMANALE")?.uuid)
+        assertEquals("l1", dao.findByNameKey(nameKeyOf("SETTIMANALE"))?.uuid)
     }
 }

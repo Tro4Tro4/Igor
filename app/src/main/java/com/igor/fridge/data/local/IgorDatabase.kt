@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PriceRecord::class,
         ProductCode::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -125,6 +125,40 @@ abstract class IgorDatabase : RoomDatabase() {
         )
 
         /**
+         * La colonna `nameKey` (vedi [nameKeyOf]) su inventario, lista e liste salvate, con
+         * il suo indice: le ricerche per nome non dipendono piu' da `COLLATE NOCASE`, che
+         * ignora le maiuscole solo per le lettere ASCII. L'indice sul nome dell'inventario
+         * non serviva a quelle ricerche e lascia il posto al nuovo.
+         *
+         * SQLite non sa calcolare la chiave (la sua `lower()` e' solo ASCII): le righe
+         * esistenti si leggono e si riscrivono da qui.
+         */
+        val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP INDEX IF EXISTS `index_food_items_name`")
+                for (table in NAME_KEY_TABLES) {
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `nameKey` TEXT NOT NULL DEFAULT ''")
+                    val rows = buildList {
+                        db.query("SELECT `uuid`, `name` FROM `$table`").use { cursor ->
+                            while (cursor.moveToNext()) add(cursor.getString(0) to cursor.getString(1))
+                        }
+                    }
+                    rows.forEach { (uuid, name) ->
+                        db.execSQL(
+                            "UPDATE `$table` SET `nameKey` = ? WHERE `uuid` = ?",
+                            arrayOf<Any>(nameKeyOf(name), uuid),
+                        )
+                    }
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_${table}_nameKey` ON `$table` (`nameKey`)",
+                    )
+                }
+            }
+        }
+
+        private val NAME_KEY_TABLES = listOf("food_items", "shopping_items", "saved_lists")
+
+        /**
          * Nessun fallback distruttivo: senza la migrazione giusta (o installando una
          * versione piu' vecchia sopra una piu' nuova) Room si rifiuta di aprire il
          * database invece di ricrearlo vuoto. Un errore visibile e' meglio di inventario,
@@ -139,7 +173,12 @@ abstract class IgorDatabase : RoomDatabase() {
                 context.applicationContext,
                 IgorDatabase::class.java,
                 name,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
-                .build()
+            ).addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+            ).build()
     }
 }

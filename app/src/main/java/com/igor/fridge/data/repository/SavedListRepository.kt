@@ -1,10 +1,12 @@
 package com.igor.fridge.data.repository
 
+import com.igor.fridge.data.Transactor
 import com.igor.fridge.data.local.SavedList
 import com.igor.fridge.data.local.SavedListDao
 import com.igor.fridge.data.local.SavedListItem
 import com.igor.fridge.data.local.SavedListSummary
 import com.igor.fridge.data.local.ShoppingItem
+import com.igor.fridge.data.local.nameKeyOf
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import java.util.UUID
@@ -14,6 +16,7 @@ class SavedListRepository(
     private val dao: SavedListDao,
     private val clock: () -> Instant = Instant::now,
     private val newUuid: () -> String = { UUID.randomUUID().toString() },
+    private val transactor: Transactor = Transactor.Direct,
 ) {
 
     /** Esito di [save]: se il nome era gia' usato, la lista e' stata sovrascritta. */
@@ -33,8 +36,14 @@ class SavedListRepository(
         val trimmed = name.trim()
         if (trimmed.isEmpty() || items.isEmpty()) return SaveResult.NOTHING_TO_SAVE
 
+        // La ricerca del nome sta nella stessa transazione della scrittura: due
+        // salvataggi con lo stesso nome non creano due liste.
+        return transactor.run { saveNamed(trimmed, items) }
+    }
+
+    private suspend fun saveNamed(trimmed: String, items: List<ShoppingItem>): SaveResult {
         val now = clock()
-        val existing = dao.findByName(trimmed)
+        val existing = dao.findByNameKey(nameKeyOf(trimmed))
         val list = existing?.copy(name = trimmed, updatedAt = now)
             ?: SavedList(uuid = newUuid(), name = trimmed, createdAt = now, updatedAt = now)
 

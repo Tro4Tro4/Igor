@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
 
 @Dao
 interface PriceRecordDao {
@@ -28,6 +29,9 @@ interface PriceRecordDao {
         """
     )
     suspend fun findLatest(productKey: String): PriceRecord?
+
+    @Query("SELECT * FROM price_records WHERE purchasedOn = :date")
+    suspend fun onDate(date: LocalDate): List<PriceRecord>
 
     @Insert
     suspend fun insertAll(records: List<PriceRecord>)

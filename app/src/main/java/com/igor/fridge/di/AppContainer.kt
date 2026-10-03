@@ -11,6 +11,7 @@ import com.igor.fridge.data.photos.PhotoStore
 import com.igor.fridge.data.prefs.SettingsStore
 import com.igor.fridge.data.receipt.MlKitReceiptReader
 import com.igor.fridge.data.receipt.ReceiptReader
+import com.igor.fridge.data.prefs.sessionDataStore
 import com.igor.fridge.data.prefs.settingsDataStore
 import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.PriceRepository
@@ -33,11 +34,11 @@ class AppContainer(context: Context) {
     val foodRepository: FoodRepository by lazy { FoodRepository(database.foodItemDao()) }
 
     val shoppingRepository: ShoppingRepository by lazy {
-        ShoppingRepository(database.shoppingItemDao())
+        ShoppingRepository(database.shoppingItemDao(), transactor = transactor)
     }
 
     val savedListRepository: SavedListRepository by lazy {
-        SavedListRepository(database.savedListDao())
+        SavedListRepository(database.savedListDao(), transactor = transactor)
     }
 
     val priceRepository: PriceRepository by lazy {
@@ -50,7 +51,9 @@ class AppContainer(context: Context) {
 
     val receiptReader: ReceiptReader by lazy { MlKitReceiptReader(appContext) }
 
-    val settingsStore: SettingsStore by lazy { SettingsStore(appContext.settingsDataStore) }
+    val settingsStore: SettingsStore by lazy {
+        SettingsStore(appContext.settingsDataStore, appContext.sessionDataStore)
+    }
 
     /**
      * Le foto restano su disco quando una voce esce dalla lista o cambia foto, perche'

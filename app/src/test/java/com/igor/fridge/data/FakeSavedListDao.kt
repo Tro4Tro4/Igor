@@ -32,8 +32,8 @@ class FakeSavedListDao : SavedListDao() {
             }
         }
 
-    override suspend fun findByName(name: String): SavedList? =
-        lists.firstOrNull { it.name.equals(name, ignoreCase = true) }
+    override suspend fun findByNameKey(nameKey: String): SavedList? =
+        lists.filter { it.nameKey == nameKey }.maxByOrNull { it.updatedAt }
 
     override suspend fun itemsOf(listUuid: String): List<SavedListItem> =
         items.filter { it.listUuid == listUuid }.sortedBy { it.position }

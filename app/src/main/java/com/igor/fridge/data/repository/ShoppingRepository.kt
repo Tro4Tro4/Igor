@@ -1,10 +1,12 @@
 package com.igor.fridge.data.repository
 
+import com.igor.fridge.data.Transactor
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.SavedListItem
 import com.igor.fridge.data.local.ShoppingItem
 import com.igor.fridge.data.local.ShoppingItemDao
+import com.igor.fridge.data.local.nameKeyOf
 import com.igor.fridge.domain.guessCategory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -16,6 +18,7 @@ class ShoppingRepository(
     private val dao: ShoppingItemDao,
     private val clock: () -> Instant = Instant::now,
     private val newUuid: () -> String = { UUID.randomUUID().toString() },
+    private val transactor: Transactor = Transactor.Direct,
 ) {
 
     fun observeAll(): Flow<List<ShoppingItem>> = dao.observeAll()
@@ -38,6 +41,9 @@ class ShoppingRepository(
      * una voce ripristinata tiene la sua. Allo stesso modo marca, note, foto, prezzo e
      * negozio sostituiscono quelli di una voce ripristinata solo se indicati.
      *
+     * Ricerca e scrittura stanno in una transazione: due aggiunte quasi simultanee dello
+     * stesso prodotto (doppio tocco, riga rapida) non creano due voci.
+     *
      * @return true se la lista e' cambiata.
      */
     suspend fun addIfAbsent(
@@ -54,7 +60,25 @@ class ShoppingRepository(
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return false
 
-        val existing = dao.findByName(trimmed)
+        return transactor.run {
+            insertOrRevive(
+                trimmed, quantity, unit, category, brand, notes, photoPath, unitPriceCents, store,
+            )
+        }
+    }
+
+    private suspend fun insertOrRevive(
+        trimmed: String,
+        quantity: Double,
+        unit: QuantityUnit,
+        category: FoodCategory?,
+        brand: String?,
+        notes: String?,
+        photoPath: String?,
+        unitPriceCents: Long?,
+        store: String?,
+    ): Boolean {
+        val existing = dao.findByNameKey(nameKeyOf(trimmed))
         return when {
             existing == null -> {
                 dao.upsert(
@@ -102,20 +126,25 @@ class ShoppingRepository(
      * Copia nella lista le voci di una lista salvata, con le stesse regole di
      * [addIfAbsent]: cio' che e' gia' da comprare non si raddoppia.
      *
+     * Tutta la lista in una transazione: una sola riemissione della lista invece di una per
+     * voce, e niente lista caricata a meta' se qualcosa va storto.
+     *
      * @return quante voci hanno cambiato la lista.
      */
-    suspend fun addAll(items: List<SavedListItem>): Int = items.count { item ->
-        addIfAbsent(
-            name = item.name,
-            quantity = item.quantity,
-            unit = item.unit,
-            category = item.category,
-            brand = item.brand,
-            notes = item.notes,
-            photoPath = item.photoPath,
-            unitPriceCents = item.unitPriceCents,
-            store = item.store,
-        )
+    suspend fun addAll(items: List<SavedListItem>): Int = transactor.run {
+        items.count { item ->
+            addIfAbsent(
+                name = item.name,
+                quantity = item.quantity,
+                unit = item.unit,
+                category = item.category,
+                brand = item.brand,
+                notes = item.notes,
+                photoPath = item.photoPath,
+                unitPriceCents = item.unitPriceCents,
+                store = item.store,
+            )
+        }
     }
 
     /** Salva le modifiche fatte a una voce. @return la voce come e' stata salvata. */
@@ -130,13 +159,7 @@ class ShoppingRepository(
      * scaffale, e una quantita' rimasta indietro verrebbe usata al prossimo "Metti in frigo".
      */
     suspend fun setChecked(item: ShoppingItem, checked: Boolean) {
-        dao.upsert(
-            item.copy(
-                isChecked = checked,
-                purchasedQuantity = if (checked) item.purchasedQuantity else null,
-                updatedAt = clock(),
-            ),
-        )
+        dao.setChecked(item.uuid, checked, clock())
     }
 
     /** Dopo un acquisto parziale la voce resta in lista per [remaining], da comprare. */

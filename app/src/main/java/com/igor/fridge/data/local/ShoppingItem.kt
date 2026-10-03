@@ -1,6 +1,7 @@
 package com.igor.fridge.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.Instant
 import java.time.LocalDate
@@ -19,7 +20,7 @@ import java.time.LocalDate
  * centesimi interi non accumulano gli errori di arrotondamento di un Double. [store] e' il
  * negozio in cui comprarlo; null vuol dire "dovunque".
  */
-@Entity(tableName = "shopping_items")
+@Entity(tableName = "shopping_items", indices = [Index("nameKey")])
 data class ShoppingItem(
     @PrimaryKey
     val uuid: String,
@@ -36,7 +37,10 @@ data class ShoppingItem(
     val purchasedQuantity: Double? = null,
     val unitPriceCents: Long? = null,
     val store: String? = null,
-)
+) {
+    /** Il nome in forma di ricerca, ricalcolato a ogni `copy` (vedi [FoodItem.nameKey]). */
+    var nameKey: String = nameKeyOf(name)
+}
 
 /** Le quantita' sono Double: 0.3 - 0.1 - 0.2 non fa esattamente zero. */
 private const val QUANTITY_EPSILON = 1e-9

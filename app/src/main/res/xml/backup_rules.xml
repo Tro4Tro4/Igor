@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 e precedenti. Il database va copiato con il file -wal: Room scrive in
+  modalita' WAL, e senza il -wal un ripristino perderebbe le ultime modifiche. La sessione
+  di Open Prices (datastore/igor_session) resta fuori perche' non e' fra gli include: il
+  token non va nel cloud.
+-->
 <full-backup-content>
     <include domain="database" path="igor-database" />
+    <include domain="database" path="igor-database-wal" />
     <include domain="file" path="shopping_photos/" />
-    <include domain="sharedpref" path="igor_settings.xml" />
+    <include domain="file" path="datastore/igor_settings.preferences_pb" />
 </full-backup-content>

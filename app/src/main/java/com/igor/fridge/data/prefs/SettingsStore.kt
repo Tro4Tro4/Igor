@@ -2,9 +2,11 @@ package com.igor.fridge.data.prefs
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -12,7 +14,10 @@ import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.domain.categoryOrderFrom
 import com.igor.fridge.domain.toStoredOrder
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 
 /**
  * L'unica istanza di DataStore del processo. Vive qui e non dentro [SettingsStore] perche'
@@ -20,7 +25,22 @@ import kotlinx.coroutines.flow.map
  * costruttore, e un test puo' costruirne una propria su un file temporaneo.
  */
 internal val Context.settingsDataStore: DataStore<Preferences> by
-    preferencesDataStore(name = "igor_settings")
+    preferencesDataStore(
+        name = "igor_settings",
+        // Un file illeggibile riparte dai default invece di far chiudere l'app a ogni avvio.
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+    )
+
+/**
+ * L'accesso a Open Prices sta in un file a parte, escluso dal backup: le impostazioni
+ * tornano con un ripristino, il token no. Un token non deve finire nel cloud, e su un
+ * altro telefono si rientra con la password.
+ */
+internal val Context.sessionDataStore: DataStore<Preferences> by
+    preferencesDataStore(
+        name = "igor_session",
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+    )
 
 /** Valori delle impostazioni in un istante dato. */
 data class Settings(
@@ -44,14 +64,21 @@ data class OpenPricesSettings(
  * DataStore invece di SharedPreferences perche' i valori devono essere osservabili: un
  * cambio di soglia deve raggiungere la lista dell'inventario senza ricrearne il ViewModel.
  */
-class SettingsStore(private val store: DataStore<Preferences>) {
+class SettingsStore(
+    private val store: DataStore<Preferences>,
+    private val session: DataStore<Preferences> = store,
+) {
+
+    /** Un errore di lettura da disco vale come "nessuna preferenza": restano i default. */
+    private val preferences: Flow<Preferences> = store.data.safe()
+    private val sessionPreferences: Flow<Preferences> = session.data.safe()
 
     /**
      * Tutte le impostazioni insieme. I default si applicano qui e in nessun altro posto:
      * i flussi singoli derivano da questo, cosi' non esistono due copie della stessa
      * regola che possono divergere.
      */
-    val settings: Flow<Settings> = store.data.map { preferences ->
+    val settings: Flow<Settings> = preferences.map { preferences ->
         Settings(
             warningDays = preferences[KEY_WARNING_DAYS] ?: DEFAULT_WARNING_DAYS,
             notificationHour = preferences[KEY_NOTIFICATION_HOUR] ?: DEFAULT_NOTIFICATION_HOUR,
@@ -73,7 +100,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
      * cio' che serve alle notifiche.
      */
     val categoryOrder: Flow<List<FoodCategory>> =
-        store.data.map { categoryOrderFrom(it[KEY_CATEGORY_ORDER]) }
+        preferences.map { categoryOrderFrom(it[KEY_CATEGORY_ORDER]) }
 
     suspend fun setCategoryOrder(order: List<FoodCategory>) {
         store.edit { it[KEY_CATEGORY_ORDER] = order.toStoredOrder() }
@@ -82,14 +109,19 @@ class SettingsStore(private val store: DataStore<Preferences>) {
     /**
      * Open Prices: prezzi della comunita' e invio dei propri scontrini. Spento finche'
      * l'utente non lo attiva, perche' e' l'unica funzione che usa Internet.
+     *
+     * Le versioni precedenti tenevano il token nel file delle impostazioni: lo si legge
+     * ancora da li', finche' il prossimo accesso o uscita non lo sposta.
      */
-    val openPrices: Flow<OpenPricesSettings> = store.data.map {
-        OpenPricesSettings(
-            enabled = it[KEY_OPEN_PRICES_ENABLED] ?: false,
-            userId = it[KEY_OPEN_PRICES_USER],
-            token = it[KEY_OPEN_PRICES_TOKEN],
-        )
-    }
+    val openPrices: Flow<OpenPricesSettings> =
+        combine(preferences, sessionPreferences) { prefs, sess ->
+            val fromSession = sess[KEY_OPEN_PRICES_TOKEN] != null
+            OpenPricesSettings(
+                enabled = prefs[KEY_OPEN_PRICES_ENABLED] ?: false,
+                userId = if (fromSession) sess[KEY_OPEN_PRICES_USER] else prefs[KEY_OPEN_PRICES_USER],
+                token = if (fromSession) sess[KEY_OPEN_PRICES_TOKEN] else prefs[KEY_OPEN_PRICES_TOKEN],
+            )
+        }
 
     suspend fun setOpenPricesEnabled(enabled: Boolean) {
         store.edit { it[KEY_OPEN_PRICES_ENABLED] = enabled }
@@ -97,10 +129,10 @@ class SettingsStore(private val store: DataStore<Preferences>) {
 
     /**
      * Ricorda l'accesso a Open Prices. Si salva il token restituito dal server, mai la
-     * password; il file delle preferenze resta fuori dal backup.
+     * password, nel file della sessione che resta fuori dal backup.
      */
     suspend fun setOpenPricesSession(userId: String?, token: String?) {
-        store.edit {
+        session.edit {
             if (userId == null || token == null) {
                 it.remove(KEY_OPEN_PRICES_USER)
                 it.remove(KEY_OPEN_PRICES_TOKEN)
@@ -109,6 +141,19 @@ class SettingsStore(private val store: DataStore<Preferences>) {
                 it[KEY_OPEN_PRICES_TOKEN] = token
             }
         }
+        // Una copia rimasta nel file delle impostazioni andrebbe nel backup.
+        if (session !== store) {
+            store.edit {
+                it.remove(KEY_OPEN_PRICES_USER)
+                it.remove(KEY_OPEN_PRICES_TOKEN)
+            }
+        }
+    }
+
+    /** Per "Elimina i miei dati": impostazioni ai valori iniziali e uscita da Open Prices. */
+    suspend fun clearAll() {
+        store.edit { it.clear() }
+        session.edit { it.clear() }
     }
 
     suspend fun setWarningDays(value: Int) {
@@ -121,6 +166,10 @@ class SettingsStore(private val store: DataStore<Preferences>) {
 
     suspend fun setNotificationsEnabled(value: Boolean) {
         store.edit { it[KEY_NOTIFICATIONS_ENABLED] = value }
+    }
+
+    private fun Flow<Preferences>.safe(): Flow<Preferences> = catch { e ->
+        if (e is IOException) emit(emptyPreferences()) else throw e
     }
 
     companion object {

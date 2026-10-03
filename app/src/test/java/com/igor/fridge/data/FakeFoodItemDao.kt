@@ -2,10 +2,12 @@ package com.igor.fridge.data
 
 import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.FoodItemDao
+import com.igor.fridge.data.local.RemovalReason
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import java.time.Instant
 import java.time.LocalDate
 
 /**
@@ -34,14 +36,26 @@ class FakeFoodItemDao : FoodItemDao {
     override suspend fun findLastByBarcode(barcode: String): FoodItem? =
         items.filter { it.barcode == barcode }.maxByOrNull { it.updatedAt }
 
-    override suspend fun findLastByName(name: String): FoodItem? =
-        items.filter { it.name.equals(name, ignoreCase = true) }.maxByOrNull { it.updatedAt }
+    override suspend fun findLastByNameKey(nameKey: String): FoodItem? =
+        items.filter { it.nameKey == nameKey }.maxByOrNull { it.updatedAt }
 
     override suspend fun findExpiringOnOrBefore(limitDate: LocalDate): List<FoodItem> =
         items.filter { it.removedAt == null && it.expiryDate?.let { d -> !d.isAfter(limitDate) } == true }
 
     override suspend fun upsert(item: FoodItem) {
         state.update { list -> list.filterNot { it.uuid == item.uuid } + item }
+    }
+
+    override suspend fun markRemoved(uuid: String, reason: RemovalReason, at: Instant) {
+        state.update { list ->
+            list.map { if (it.uuid == uuid) it.copy(removedAt = at, removalReason = reason, updatedAt = at) else it }
+        }
+    }
+
+    override suspend fun markRestored(uuid: String, at: Instant) {
+        state.update { list ->
+            list.map { if (it.uuid == uuid) it.copy(removedAt = null, removalReason = null, updatedAt = at) else it }
+        }
     }
 
     private companion object {

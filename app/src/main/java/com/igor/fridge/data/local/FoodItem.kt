@@ -16,12 +16,14 @@ import java.time.LocalDate
  * [removedAt] realizza la cancellazione logica. Una riga cancellata fisicamente sarebbe
  * invisibile a una sincronizzazione e cancellerebbe la storia di cosa e' stato consumato.
  *
+ * [nameKey] e' il nome in forma di ricerca (vedi [nameKeyOf]).
+ *
  * [expiryDate] e' nullable perche' non tutti i prodotti riportano una scadenza: gli
  * articoli senza data restano in inventario ma non generano notifiche.
  */
 @Entity(
     tableName = "food_items",
-    indices = [Index("barcode"), Index("expiryDate"), Index("name"), Index("removedAt")],
+    indices = [Index("barcode"), Index("expiryDate"), Index("nameKey"), Index("removedAt")],
 )
 data class FoodItem(
     @PrimaryKey
@@ -39,4 +41,10 @@ data class FoodItem(
     val removedAt: Instant? = null,
     val removalReason: RemovalReason? = null,
     val brand: String? = null,
-)
+) {
+    /**
+     * Sempre derivata dal nome: sta fuori dal costruttore, cosi' ogni `copy(name = ...)`
+     * la ricalcola. E' un `var` solo perche' Room possa riscriverla leggendo la riga.
+     */
+    var nameKey: String = nameKeyOf(name)
+}

@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 import java.time.LocalDate
 
 @Dao
@@ -35,16 +36,16 @@ interface FoodItemDao {
     /**
      * Ultimo articolo con questo nome, **compresi quelli usciti dal frigo**: serve a
      * ereditare categoria, unita' e posizione quando un prodotto rientra dalla lista
-     * della spesa o viene dettato col solo nome.
+     * della spesa o viene dettato col solo nome. [nameKey] viene da [nameKeyOf].
      */
     @Query(
         """
         SELECT * FROM food_items
-        WHERE name = :name COLLATE NOCASE
+        WHERE nameKey = :nameKey
         ORDER BY updatedAt DESC LIMIT 1
         """
     )
-    suspend fun findLastByName(name: String): FoodItem?
+    suspend fun findLastByNameKey(nameKey: String): FoodItem?
 
     @Query(
         """
@@ -62,4 +63,25 @@ interface FoodItemDao {
      */
     @Upsert
     suspend fun upsert(item: FoodItem)
+
+    /**
+     * Uscita e rientro toccano solo le colonne dello stato: riscrivere la riga intera da
+     * una copia vecchia (quella mostrata a schermo) cancellerebbe una modifica fatta nel
+     * frattempo, per esempio la scadenza corretta subito dopo "Metti in frigo".
+     */
+    @Query(
+        """
+        UPDATE food_items SET removedAt = :at, removalReason = :reason, updatedAt = :at
+        WHERE uuid = :uuid
+        """
+    )
+    suspend fun markRemoved(uuid: String, reason: RemovalReason, at: Instant)
+
+    @Query(
+        """
+        UPDATE food_items SET removedAt = NULL, removalReason = NULL, updatedAt = :at
+        WHERE uuid = :uuid
+        """
+    )
+    suspend fun markRestored(uuid: String, at: Instant)
 }
