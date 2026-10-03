@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.igor.fridge.data.Transactor
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.QuantityUnit
@@ -31,11 +32,12 @@ import com.igor.fridge.domain.receipt.groupIntoRows
 import com.igor.fridge.domain.receipt.parseReceipt
 import com.igor.fridge.domain.receipt.parseReceiptMeta
 import com.igor.fridge.domain.receipt.receiptMatches
-import com.igor.fridge.ui.formatNumber
+import com.igor.fridge.ui.formatQuantityInput
 import com.igor.fridge.ui.formatPriceInput
 import com.igor.fridge.ui.igorApplication
 import com.igor.fridge.ui.parsePriceCents
 import com.igor.fridge.ui.parseQuantity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,6 +71,8 @@ data class ReceiptDraft(
     val knownLocation: StorageLocation? = null,
     /** Il codice a barre che il prodotto aveva in inventario, se c'era. */
     val knownBarcode: String? = null,
+    /** Confezioni comprate, se lo scontrino lo dice: serve al prezzo per confezione. */
+    val pieces: Int? = null,
     val quantityError: Boolean = false,
     val nameError: Boolean = false,
     val priceError: Boolean = false,
@@ -152,6 +156,7 @@ class ReceiptViewModel(
     private val today: () -> LocalDate = LocalDate::now,
     openPrices: Flow<OpenPricesSettings> = flowOf(OpenPricesSettings()),
     private val openPricesClient: OpenPricesClient? = null,
+    private val transactor: Transactor = Transactor.Direct,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReceiptUiState(purchaseDate = today()))
@@ -222,7 +227,7 @@ class ReceiptViewModel(
                 name = name,
                 category = category,
                 quantityText = when {
-                    entry.quantity != null -> formatNumber(entry.quantity)
+                    entry.quantity != null -> formatQuantityInput(entry.quantity)
                     toConfirm -> ""
                     else -> "1"
                 },
@@ -233,6 +238,7 @@ class ReceiptViewModel(
                 knownCategory = known?.category,
                 knownLocation = known?.location,
                 knownBarcode = known?.barcode,
+                pieces = entry.pieces,
             )
         }
     }
@@ -243,10 +249,13 @@ class ReceiptViewModel(
 
     fun onCategoryChange(id: Int, category: FoodCategory) = updateDraft(id) { it.copy(category = category) }
 
-    fun onQuantityChange(id: Int, text: String) =
-        updateDraft(id) { it.copy(quantityText = text, quantityError = false, quantityToConfirm = false) }
+    // Cambiare quantita' o unita' rende ignoto il numero di confezioni letto dallo
+    // scontrino: per i pezzi lo si ricava dalla quantita', per pesi e volumi non piu'.
+    fun onQuantityChange(id: Int, text: String) = updateDraft(id) {
+        it.copy(quantityText = text, quantityError = false, quantityToConfirm = false, pieces = null)
+    }
 
-    fun onUnitChange(id: Int, unit: QuantityUnit) = updateDraft(id) { it.copy(unit = unit) }
+    fun onUnitChange(id: Int, unit: QuantityUnit) = updateDraft(id) { it.copy(unit = unit, pieces = null) }
 
     fun onExpiryChange(id: Int, date: LocalDate?) = updateDraft(id) { it.copy(expiryDate = date) }
 
@@ -268,6 +277,10 @@ class ReceiptViewModel(
                 unit = QuantityUnit.PZ,
             ),
         )
+    }
+
+    fun onCameraUnavailable() = _uiState.update {
+        it.copy(message = "Nessuna app fotocamera disponibile: scegli la foto dalla galleria")
     }
 
     fun onMessageShown() = _uiState.update { it.copy(message = null) }
@@ -392,53 +405,75 @@ class ReceiptViewModel(
 
         _uiState.update { it.copy(phase = ReceiptPhase.SAVING, missingExpiryPrompt = null) }
         viewModelScope.launch {
-            // Come per "Metti in frigo": la sequenza va conclusa anche se si lascia la
-            // schermata, altrimenti meta' scontrino resterebbe fuori dal frigo.
-            withContext(NonCancellable) {
-                val toFridge = included.filter { it.goesToFridge }
-                toFridge.forEach { draft ->
-                    foodRepository.save(
-                        FoodItem(
-                            uuid = "",
-                            name = draft.name.trim(),
-                            category = draft.category,
-                            location = draft.location,
-                            quantity = parseQuantity(draft.quantityText) ?: 1.0,
-                            unit = draft.unit,
-                            expiryDate = draft.expiryDate,
-                        ),
-                    )
-                }
-                val prices = priceRepository.record(
-                    purchases = included.mapNotNull { draft ->
-                        val total = parsePriceCents(draft.priceText) ?: return@mapNotNull null
-                        Purchase(
-                            name = draft.name,
-                            quantity = parseQuantity(draft.quantityText) ?: 1.0,
-                            unit = draft.unit,
-                            totalCents = total,
-                        )
-                    },
-                    store = state.store,
-                    date = state.purchaseDate,
-                )
-                val fromList = included.mapNotNull { it.shoppingMatch }
-                fromList.forEach { shoppingRepository.delete(it) }
-
-                val contributable = included.mapNotNull { draft ->
-                    val barcode = priceRepository.barcodeForName(draft.name) ?: draft.knownBarcode
-                    contributionItem(draft, barcode)
-                }
+            try {
+                // Frigo, prezzi e lista in una sola transazione: un errore a meta' non lascia
+                // mezzo scontrino salvato, e riprovare non duplica cio' che era gia' entrato.
+                // NonCancellable la porta a termine anche se si lascia la schermata.
+                val saved = withContext(NonCancellable) { transactor.run { save(state, included) } }
                 _uiState.update {
                     it.copy(
                         phase = ReceiptPhase.DONE,
-                        summary = summaryOf(toFridge.size, prices, fromList.size),
-                        contributable = contributable,
+                        summary = summaryOf(saved.toFridge, saved.prices, saved.fromList),
+                        contributable = saved.contributable,
                         pricedLines = included.count { d -> parsePriceCents(d.priceText) != null },
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        phase = ReceiptPhase.REVIEW,
+                        message = "Salvataggio non riuscito: nulla è stato registrato, riprova",
                     )
                 }
             }
         }
+    }
+
+    private class Saved(
+        val toFridge: Int,
+        val prices: Int,
+        val fromList: Int,
+        val contributable: List<ContributionItem>,
+    )
+
+    private suspend fun save(state: ReceiptUiState, included: List<ReceiptDraft>): Saved {
+        val toFridge = included.filter { it.goesToFridge }
+        toFridge.forEach { draft ->
+            foodRepository.save(
+                FoodItem(
+                    uuid = "",
+                    name = draft.name.trim(),
+                    category = draft.category,
+                    location = draft.location,
+                    quantity = parseQuantity(draft.quantityText) ?: 1.0,
+                    unit = draft.unit,
+                    expiryDate = draft.expiryDate,
+                ),
+            )
+        }
+        val prices = priceRepository.record(
+            purchases = included.mapNotNull { draft ->
+                val total = parsePriceCents(draft.priceText) ?: return@mapNotNull null
+                Purchase(
+                    name = draft.name,
+                    quantity = parseQuantity(draft.quantityText) ?: 1.0,
+                    unit = draft.unit,
+                    totalCents = total,
+                )
+            },
+            store = state.store,
+            date = state.purchaseDate,
+        )
+        val fromList = included.mapNotNull { it.shoppingMatch }
+        fromList.forEach { shoppingRepository.delete(it) }
+
+        val contributable = included.mapNotNull { draft ->
+            val barcode = priceRepository.barcodeForName(draft.name) ?: draft.knownBarcode
+            contributionItem(draft, barcode)
+        }
+        return Saved(toFridge.size, prices, fromList.size, contributable)
     }
 
     private fun updateDraft(id: Int, change: (ReceiptDraft) -> ReceiptDraft) = _uiState.update { state ->
@@ -455,15 +490,17 @@ class ReceiptViewModel(
         internal fun contributionItem(draft: ReceiptDraft, barcode: String?): ContributionItem? {
             val code = barcode?.let(::normalizeGtin) ?: return null
             val total = parsePriceCents(draft.priceText)?.takeIf { it > 0 } ?: return null
-            val quantity = parseQuantity(draft.quantityText) ?: 1.0
-            val pieces = if (
-                (draft.unit == QuantityUnit.PZ || draft.unit == QuantityUnit.CONF) &&
-                quantity >= 1.0 && quantity % 1.0 == 0.0
-            ) {
-                quantity.toInt()
-            } else {
-                1
-            }
+            val quantity = parseQuantity(draft.quantityText) ?: return null
+            // Il prezzo va per confezione. I pezzi si contano se lo scontrino li dice o se
+            // la quantita' e' in pezzi interi; per un peso o un volume senza confezioni
+            // note il prezzo per confezione non si conosce, e un dato sbagliato in un
+            // database condiviso e' peggio di nessun dato.
+            val pieces = draft.pieces
+                ?: quantity.takeIf {
+                    (draft.unit == QuantityUnit.PZ || draft.unit == QuantityUnit.CONF) && it >= 1.0 && it % 1.0 == 0.0
+                }?.toInt()
+                ?: return null
+            if (pieces < 1) return null
             return ContributionItem(draft.name.trim(), code, Math.round(total.toDouble() / pieces), pieces)
         }
 
@@ -503,6 +540,7 @@ class ReceiptViewModel(
                     priceRepository = container.priceRepository,
                     openPrices = container.settingsStore.openPrices,
                     openPricesClient = container.openPricesClient,
+                    transactor = container.transactor,
                 )
             }
         }

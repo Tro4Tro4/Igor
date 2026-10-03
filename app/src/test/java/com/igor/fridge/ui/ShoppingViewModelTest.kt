@@ -485,4 +485,38 @@ class ShoppingViewModelTest {
 
         assertNull(shoppingDao.items.single().unitPriceCents)
     }
+
+    @Test
+    fun `lo spostamento in frigo avviene in una transazione e un errore non chiude l'app`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte")
+        shoppingRepository.setChecked(shoppingDao.items.single(), checked = true)
+        var transactions = 0
+        val failingFood = FoodRepository(
+            object : com.igor.fridge.data.local.FoodItemDao by foodDao {
+                override suspend fun upsert(item: FoodItem) = throw IllegalStateException("disco pieno")
+            },
+            { now },
+            { "f-${++counter}" },
+        )
+        val vm = ShoppingViewModel(
+            shoppingRepository,
+            failingFood,
+            FakePhotoStore(),
+            transactor = object : com.igor.fridge.data.Transactor {
+                override suspend fun <T> run(block: suspend () -> T): T {
+                    transactions++
+                    return block()
+                }
+            },
+        )
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, transactions)
+        assertEquals("Spostamento non riuscito: riprova", vm.uiState.value.message)
+        assertFalse(vm.uiState.value.canUndo)
+    }
 }

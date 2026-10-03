@@ -78,4 +78,12 @@ class FormattersTest {
         assertEquals("-3%", formatChange(-3.0))
         assertEquals("0%", formatChange(0.01))
     }
+
+    @Test
+    fun `la quantita' nei campi tiene fino a tre decimali`() {
+        assertEquals("0,125", formatQuantityInput(0.125))
+        assertEquals("1,234", formatQuantityInput(1.234))
+        assertEquals("2", formatQuantityInput(2.0))
+        assertEquals("0,5", formatQuantityInput(0.5))
+    }
 }

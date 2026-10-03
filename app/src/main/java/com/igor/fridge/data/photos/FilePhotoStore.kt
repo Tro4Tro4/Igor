@@ -2,9 +2,6 @@ package com.igor.fridge.data.photos
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
-import android.media.ExifInterface
 import android.net.Uri
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
@@ -27,8 +24,8 @@ class FilePhotoStore(context: Context) : PhotoStore {
 
     override suspend fun import(source: Uri): String? = withContext(Dispatchers.IO) {
         try {
-            val bitmap = decodeScaled(source) ?: return@withContext null
-            val upright = rotateUpright(bitmap, readRotation(source))
+            val upright = appContext.contentResolver.decodeUpright(source, MAX_SIDE_PX)
+                ?: return@withContext null
             photoDir.mkdirs()
             val name = "${UUID.randomUUID()}.jpg"
             File(photoDir, name).outputStream().use { out ->
@@ -49,8 +46,8 @@ class FilePhotoStore(context: Context) : PhotoStore {
 
     override suspend fun compressForUpload(source: Uri): ByteArray? = withContext(Dispatchers.IO) {
         try {
-            val bitmap = decodeScaled(source) ?: return@withContext null
-            val upright = rotateUpright(bitmap, readRotation(source))
+            val upright = appContext.contentResolver.decodeUpright(source, MAX_SIDE_PX)
+                ?: return@withContext null
             ByteArrayOutputStream().use { out ->
                 upright.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
                 out.toByteArray()
@@ -83,58 +80,6 @@ class FilePhotoStore(context: Context) : PhotoStore {
         }
 
     private fun authority(): String = "${appContext.packageName}$AUTHORITY_SUFFIX"
-
-    /** Legge prima solo le dimensioni, poi decodifica a una frazione della risoluzione. */
-    private fun decodeScaled(source: Uri): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        appContext.contentResolver.openInputStream(source)?.use {
-            BitmapFactory.decodeStream(it, null, bounds)
-        } ?: return null
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
-        var sampleSize = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sampleSize * 2) >= MAX_SIDE_PX) {
-            sampleSize *= 2
-        }
-        val decoded = appContext.contentResolver.openInputStream(source)?.use {
-            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sampleSize })
-        } ?: return null
-
-        val longSide = maxOf(decoded.width, decoded.height)
-        if (longSide <= MAX_SIDE_PX) return decoded
-        val scale = MAX_SIDE_PX.toFloat() / longSide
-        return Bitmap.createScaledBitmap(
-            decoded,
-            (decoded.width * scale).toInt().coerceAtLeast(1),
-            (decoded.height * scale).toInt().coerceAtLeast(1),
-            true,
-        )
-    }
-
-    /** Le fotocamere salvano spesso l'immagine coricata e indicano la rotazione nell'EXIF. */
-    private fun readRotation(source: Uri): Int = try {
-        appContext.contentResolver.openInputStream(source)?.use { stream ->
-            when (
-                ExifInterface(stream).getAttributeInt(
-                    ExifInterface.TAG_ORIENTATION,
-                    ExifInterface.ORIENTATION_NORMAL,
-                )
-            ) {
-                ExifInterface.ORIENTATION_ROTATE_90 -> 90
-                ExifInterface.ORIENTATION_ROTATE_180 -> 180
-                ExifInterface.ORIENTATION_ROTATE_270 -> 270
-                else -> 0
-            }
-        } ?: 0
-    } catch (e: IOException) {
-        0
-    }
-
-    private fun rotateUpright(bitmap: Bitmap, degrees: Int): Bitmap {
-        if (degrees == 0) return bitmap
-        val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
-        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-    }
 
     companion object {
         const val PHOTO_DIR = "shopping_photos"

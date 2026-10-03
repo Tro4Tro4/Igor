@@ -27,6 +27,18 @@ fun formatNumber(quantity: Double): String =
     }
 
 /**
+ * La quantita' in un campo di testo: fino a 3 decimali, senza zeri inutili e con la
+ * virgola. A differenza di [formatNumber] non arrotonda i grammi: 0,125 kg resta 0,125,
+ * e un prezzo al kg calcolato poi su quella quantita' resta giusto.
+ */
+fun formatQuantityInput(quantity: Double): String =
+    if (quantity % 1.0 == 0.0) {
+        quantity.toLong().toString()
+    } else {
+        String.format(Locale.ITALY, "%.3f", quantity).trimEnd('0').trimEnd(',')
+    }
+
+/**
  * Legge una quantita' scritta dall'utente, con la virgola o con il punto.
  * @return null se il testo non e' un numero maggiore di zero.
  */

@@ -27,8 +27,8 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
-
+      # I runner ubuntu hanno gia' l'Android SDK con le licenze accettate (ANDROID_HOME):
+      # Gradle scarica da solo piattaforma e build-tools mancanti.
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build e test

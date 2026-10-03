@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.igor.fridge.data.Transactor
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.PriceRecord
@@ -17,6 +18,7 @@ import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.ShoppingRepository
 import com.igor.fridge.domain.parseQuickEntry
 import com.igor.fridge.ui.igorApplication
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +45,7 @@ class ShoppingViewModel(
     private val photoStore: PhotoStore,
     categoryOrder: Flow<List<FoodCategory>> = flowOf(FoodCategory.entries),
     private val lastPrice: suspend (String) -> PriceRecord? = { null },
+    private val transactor: Transactor = Transactor.Direct,
 ) : ViewModel() {
 
     private val storeFilter = MutableStateFlow<String?>(null)
@@ -139,52 +142,65 @@ class ShoppingViewModel(
         moveInProgress = true
         viewModelScope.launch {
             try {
-                val checked = uiState.value.items.filter { it.isChecked }
-                if (checked.isEmpty()) {
+                // Le scritture sono 2N: si fanno in una sola transazione, cosi' un errore
+                // o la morte del processo a meta' non lasciano articoli creati con le voci
+                // ancora spuntate (che al tentativo successivo entrerebbero due volte).
+                // NonCancellable porta a termine la transazione anche se la schermata se
+                // ne e' gia' andata. Le voci spuntate si rileggono dal database dentro la
+                // transazione: un secondo tocco ravvicinato le trova gia' tolte.
+                val move = withContext(NonCancellable) {
+                    transactor.run { moveChecked(expiries) }
+                }
+                if (move == null) {
                     feedback.update { it.copy(message = "Nessun prodotto spuntato", canUndo = false) }
-                    return@launch
+                } else {
+                    lastMove = move.undo
+                    feedback.update { it.copy(message = move.message, canUndo = true) }
                 }
-
-                // Le scritture sono 2N e ognuna e' un punto di cancellazione: viewModelScope
-                // muore con la schermata, e uscire a meta' lascerebbe alcuni articoli creati
-                // e le voci corrispondenti ancora spuntate in lista. NonCancellable porta la
-                // sequenza a termine anche se la schermata se ne e' gia' andata.
-                withContext(NonCancellable) {
-                    // Prima il frigo, poi la lista: interrompendosi qui la spesa resta in
-                    // entrambi i posti, mai in nessuno dei due. Entra in frigo quanto e'
-                    // stato preso; cio' che non e' un alimento esce soltanto dalla lista.
-                    val (food, nonFood) = checked.partition { it.category.isFood }
-                    val created = food.map { item ->
-                        foodRepository.addFromShopping(
-                            name = item.name,
-                            quantity = item.purchasedQuantity ?: item.quantity,
-                            unit = item.unit,
-                            category = item.category,
-                            brand = item.brand,
-                            expiryDate = expiries[item.uuid],
-                        )
-                    }
-                    // Dopo un acquisto parziale la voce resta, per la parte mancante.
-                    // L'annullamento la rimette com'era con restore(), che sovrascrive.
-                    var remainders = 0
-                    checked.forEach { item ->
-                        val remaining = item.remainingAfterPurchase
-                        if (remaining != null) {
-                            shoppingRepository.keepRemainder(item, remaining)
-                            remainders++
-                        } else {
-                            shoppingRepository.delete(item)
-                        }
-                    }
-
-                    lastMove = LastMove(shoppingItems = checked, createdFood = created)
-                    val text = moveMessage(food = food, nonFood = nonFood, remainders = remainders)
-                    feedback.update { it.copy(message = text, canUndo = true) }
-                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                feedback.update { it.copy(message = "Spostamento non riuscito: riprova", canUndo = false) }
             } finally {
                 moveInProgress = false
             }
         }
+    }
+
+    private class MoveOutcome(val undo: LastMove, val message: String)
+
+    private suspend fun moveChecked(expiries: Map<String, LocalDate>): MoveOutcome? {
+        val checked = shoppingRepository.checkedItems()
+        if (checked.isEmpty()) return null
+        // Entra in frigo quanto e' stato preso; cio' che non e' un alimento esce soltanto
+        // dalla lista.
+        val (food, nonFood) = checked.partition { it.category.isFood }
+        val created = food.map { item ->
+            foodRepository.addFromShopping(
+                name = item.name,
+                quantity = item.purchasedQuantity ?: item.quantity,
+                unit = item.unit,
+                category = item.category,
+                brand = item.brand,
+                expiryDate = expiries[item.uuid],
+            )
+        }
+        // Dopo un acquisto parziale la voce resta, per la parte mancante. L'annullamento
+        // la rimette com'era con restore(), che sovrascrive.
+        var remainders = 0
+        checked.forEach { item ->
+            val remaining = item.remainingAfterPurchase
+            if (remaining != null) {
+                shoppingRepository.keepRemainder(item, remaining)
+                remainders++
+            } else {
+                shoppingRepository.delete(item)
+            }
+        }
+        return MoveOutcome(
+            undo = LastMove(shoppingItems = checked, createdFood = created),
+            message = moveMessage(food = food, nonFood = nonFood, remainders = remainders),
+        )
     }
 
     /** Rimette com'era: le voci tornano in lista e gli articoli escono dall'inventario. */
@@ -197,16 +213,20 @@ class ShoppingViewModel(
         feedback.update { Feedback() }
         if (move == null) return
         viewModelScope.launch {
-            // Come nello spostamento, la sequenza va conclusa: NonCancellable la protegge
-            // dalla morte di viewModelScope quando si lascia la schermata.
-            withContext(NonCancellable) {
-                // Prima la lista, poi il frigo, cioe' l'inverso dell'ordine in cui si legge
-                // la frase: se la sequenza si spezza a meta' la spesa risulta in entrambi i
-                // posti invece che in nessuno dei due. Rimettere prima le due righe "in
-                // ordine di racconto" e' la tentazione da non assecondare.
-                move.shoppingItems.forEach { shoppingRepository.restore(it) }
-                move.createdFood.forEach { foodRepository.remove(it, RemovalReason.ERRORE) }
+            try {
+                // Come lo spostamento: una transazione, portata a termine anche se si lascia
+                // la schermata.
+                withContext(NonCancellable) {
+                    transactor.run {
+                        move.shoppingItems.forEach { shoppingRepository.restore(it) }
+                        move.createdFood.forEach { foodRepository.remove(it, RemovalReason.ERRORE) }
+                    }
+                }
                 feedback.update { it.copy(message = "Spostamento annullato", canUndo = false) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                feedback.update { it.copy(message = "Annullamento non riuscito", canUndo = false) }
             }
         }
     }
@@ -264,6 +284,7 @@ class ShoppingViewModel(
                     photoStore = container.photoStore,
                     categoryOrder = container.settingsStore.categoryOrder,
                     lastPrice = container.priceRepository::latest,
+                    transactor = container.transactor,
                 )
             }
         }

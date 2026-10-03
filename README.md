@@ -141,12 +141,15 @@ esiste ancora un source set `androidTest`.
 
 **Database: versione 5.** Ogni cambio di schema alza la versione e porta la sua migrazione
 (da `MIGRATION_1_2` a `MIGRATION_4_5`): a versione invariata Room rifiuterebbe di aprire il
-database. La migrazione è
-provata da `MigrationTest`, che apre con `IgorDatabase.build` un database della versione 1
-scritto a mano. `fallbackToDestructiveMigration()` è ancora presente e copre solo un salto
-di versione senza migrazione, cancellando i dati: va tolto quando si decide come gestire
-quel caso. Lo schema esportato della versione 5 (`app/schemas/.../5.json`) viene generato
-dalla prima build e va committato.
+database. Le migrazioni sono provate da `MigrationTest`, che apre con `IgorDatabase.build`
+un database della versione 1 scritto a mano. Non c’è più `fallbackToDestructiveMigration()`:
+con una migrazione mancante, o installando una versione più vecchia sopra una più nuova, Room
+si rifiuta di aprire il database invece di ricrearlo vuoto, e i dati restano su disco. Gli
+schemi esportati (`app/schemas/`) vengono generati dalla build: la CI li pubblica
+nell'artifact `room-schemas`, da scaricare e committare.
+
+**CI.** `.github/workflows/android.yml` compila l’app ed esegue tutti i test JVM, Robolectric
+compreso, a ogni push.
 
 ### Difetti noti
 

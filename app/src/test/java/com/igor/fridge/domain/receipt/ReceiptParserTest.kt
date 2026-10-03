@@ -135,4 +135,17 @@ class ReceiptParserTest {
         assertEquals(2.0, entries[0].price!!, 0.001)
         assertEquals(1.0, entries[1].price!!, 0.001)
     }
+
+    @Test
+    fun `le confezioni restano separate dal formato`() {
+        val entries = parseReceipt(
+            listOf("LATTE 1L  2,58", "2 x 1,29", "PASTA 500G  1,15", "YOGURT  0,99", "MELE  2,00", "1,000 kg x 2,00"),
+        ).associateBy { it.name }
+
+        assertEquals(2, entries.getValue("Latte").pieces)
+        assertEquals(2.0, entries.getValue("Latte").quantity!!, 0.001)
+        assertEquals(1, entries.getValue("Pasta").pieces)
+        assertNull(entries.getValue("Yogurt").pieces)
+        assertNull(entries.getValue("Mele").pieces)
+    }
 }

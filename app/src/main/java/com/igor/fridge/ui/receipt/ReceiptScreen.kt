@@ -1,6 +1,7 @@
 package com.igor.fridge.ui.receipt
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -96,7 +97,13 @@ fun ReceiptScreen(
     fun launchCamera() {
         val uri = viewModel.newCaptureUri()
         pendingCapture = uri.toString()
-        takePicture.launch(uri)
+        try {
+            takePicture.launch(uri)
+        } catch (e: ActivityNotFoundException) {
+            // Tablet o profili di lavoro senza un'app fotocamera: resta la galleria.
+            pendingCapture = null
+            viewModel.onCameraUnavailable()
+        }
     }
     val requestCamera = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),

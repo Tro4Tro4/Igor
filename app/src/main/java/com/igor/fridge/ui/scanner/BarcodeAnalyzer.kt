@@ -13,7 +13,7 @@ import com.google.mlkit.vision.common.InputImage
  * Dopo la prima lettura si disattiva: la schermata chiamante chiude subito lo scanner
  * e frame successivi produrrebbero callback duplicati.
  */
-class BarcodeAnalyzer(private val onBarcode: (String) -> Unit) : ImageAnalysis.Analyzer {
+class BarcodeAnalyzer(private val onBarcode: (String) -> Unit) : ImageAnalysis.Analyzer, AutoCloseable {
 
     private val scanner = BarcodeScanning.getClient(
         BarcodeScannerOptions.Builder()
@@ -50,4 +50,7 @@ class BarcodeAnalyzer(private val onBarcode: (String) -> Unit) : ImageAnalysis.A
             // close() va chiamato sempre, altrimenti l'analisi si blocca al frame successivo.
             .addOnCompleteListener { imageProxy.close() }
     }
+
+    /** Libera il riconoscitore di ML Kit quando si lascia la schermata. */
+    override fun close() = scanner.close()
 }

@@ -43,6 +43,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.igor.fridge.R
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,9 +80,16 @@ fun BarcodeScannerScreen(
     // Serve per sganciare la fotocamera quando si lascia la schermata: il binding e' legato
     // al lifecycle dell'Activity, che resta vivo navigando fra le schermate.
     val boundProvider = remember { AtomicReference<ProcessCameraProvider?>(null) }
+    val analyzer = remember { AtomicReference<BarcodeAnalyzer?>(null) }
+    // Il provider arriva in modo asincrono: se si esce prima, il binding arrivato dopo
+    // accenderebbe la fotocamera per tutta l'Activity con un executor gia' chiuso.
+    // Listener e onDispose girano entrambi sul main thread, quindi il flag basta.
+    val disposed = remember { AtomicBoolean(false) }
     DisposableEffect(Unit) {
         onDispose {
+            disposed.set(true)
             boundProvider.getAndSet(null)?.unbindAll()
+            analyzer.getAndSet(null)?.close()
             analysisExecutor.shutdown()
         }
     }
@@ -112,6 +120,7 @@ fun BarcodeScannerScreen(
                         val previewView = PreviewView(ctx)
                         val providerFuture = ProcessCameraProvider.getInstance(ctx)
                         providerFuture.addListener({
+                            if (disposed.get()) return@addListener
                             val provider = providerFuture.get()
                             boundProvider.set(provider)
 
@@ -122,14 +131,13 @@ fun BarcodeScannerScreen(
                                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                 .build()
                                 .also { useCase ->
-                                    useCase.setAnalyzer(
-                                        analysisExecutor,
-                                        BarcodeAnalyzer { barcode ->
-                                            // L'analisi gira su un thread dedicato: la navigazione
-                                            // deve tornare sul main thread.
-                                            previewView.post { currentOnDetected(barcode) }
-                                        },
-                                    )
+                                    val barcodeAnalyzer = BarcodeAnalyzer { barcode ->
+                                        // L'analisi gira su un thread dedicato: la navigazione
+                                        // deve tornare sul main thread.
+                                        previewView.post { currentOnDetected(barcode) }
+                                    }
+                                    analyzer.set(barcodeAnalyzer)
+                                    useCase.setAnalyzer(analysisExecutor, barcodeAnalyzer)
                                 }
 
                             provider.unbindAll()

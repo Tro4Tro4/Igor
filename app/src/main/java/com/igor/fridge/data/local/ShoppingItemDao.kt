@@ -17,6 +17,10 @@ interface ShoppingItemDao {
     )
     fun observeAll(): Flow<List<ShoppingItem>>
 
+    /** Le voci nel carrello, lette dentro la transazione di "Metti in frigo". */
+    @Query("SELECT * FROM shopping_items WHERE isChecked = 1 ORDER BY createdAt DESC, name COLLATE NOCASE ASC")
+    suspend fun checkedItems(): List<ShoppingItem>
+
     @Query("SELECT * FROM shopping_items WHERE uuid = :uuid")
     suspend fun findByUuid(uuid: String): ShoppingItem?
 

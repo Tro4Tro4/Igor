@@ -11,6 +11,12 @@ data class ReceiptEntry(
     val unit: QuantityUnit? = null,
     /** Importo della riga in euro, cosi' come stampato. */
     val price: Double? = null,
+    /**
+     * Quante confezioni: 2 per "LATTE 1L" con "2 x 1,29", 1 per "PASTA 500G" senza
+     * dettaglio. Null se non si sa (un prodotto a peso): a quel punto il prezzo di una
+     * confezione non e' ricavabile.
+     */
+    val pieces: Int? = null,
 )
 
 /**
@@ -93,13 +99,18 @@ private data class Detail(val quantity: Double, val unit: QuantityUnit, val unit
     fun matches(price: Double?): Boolean =
         price != null && kotlin.math.abs(quantity * unitPrice - price) <= 0.02
 
-    /** "2 x LATTE 1L" fa 2 litri: il formato nel nome moltiplica il numero di pezzi. */
-    fun applyTo(entry: ReceiptEntry): ReceiptEntry =
-        if (unit == QuantityUnit.PZ && entry.quantity != null && entry.unit != null) {
-            entry.copy(quantity = entry.quantity * quantity)
+    /**
+     * "2 x LATTE 1L" fa 2 litri in 2 confezioni: il formato nel nome moltiplica il numero
+     * di pezzi, e i pezzi restano a parte. Un dettaglio a peso non dice quante confezioni.
+     */
+    fun applyTo(entry: ReceiptEntry): ReceiptEntry {
+        val count = quantity.toInt().takeIf { unit == QuantityUnit.PZ && quantity % 1.0 == 0.0 }
+        return if (count != null && entry.quantity != null && entry.unit != null) {
+            entry.copy(quantity = entry.quantity * quantity, pieces = count)
         } else {
-            entry.copy(quantity = quantity, unit = unit)
+            entry.copy(quantity = quantity, unit = unit, pieces = count)
         }
+    }
 }
 
 private fun parseDetail(line: String): Detail? {
@@ -168,7 +179,14 @@ private fun parseProductLine(line: String): ReceiptEntry? {
     val upper = name.uppercase(Locale.ITALIAN)
     if (SKIP_WORDS.any { Regex("\\b$it\\b").containsMatchIn(upper) }) return null
 
-    return ReceiptEntry(name = prettify(name), quantity = quantity, unit = unit, price = price)
+    return ReceiptEntry(
+        name = prettify(name),
+        quantity = quantity,
+        unit = unit,
+        price = price,
+        // Un formato nel nome senza dettaglio e' una confezione sola.
+        pieces = if (quantity != null) 1 else null,
+    )
 }
 
 /** Aliquote IVA, lettere di reparto, simboli di valuta: stanno fra nome e prezzo. */

@@ -125,14 +125,14 @@ abstract class IgorDatabase : RoomDatabase() {
         )
 
         /**
-         * DA RIMUOVERE il fallback distruttivo: ora che esiste una migrazione serve solo a
-         * non far morire l'app su un salto di versione per cui manchi la migrazione, ma
-         * in quel caso cancellerebbe l'inventario senza dire niente. Resta finche' non si
-         * decide come gestire quel caso.
+         * Nessun fallback distruttivo: senza la migrazione giusta (o installando una
+         * versione piu' vecchia sopra una piu' nuova) Room si rifiuta di aprire il
+         * database invece di ricrearlo vuoto. Un errore visibile e' meglio di inventario,
+         * storico dei prezzi e liste salvate cancellati senza dire niente; i dati restano
+         * su disco e tornano accessibili con la versione giusta.
          *
-         * Nota: il fallback NON copre uno schema cambiato a versione invariata (Room
-         * rifiuta di aprire il database per hash di identita' diverso). Ogni cambio di
-         * schema deve quindi alzare `version` e portare la sua migrazione.
+         * Ogni cambio di schema alza quindi `version` e porta la sua migrazione: anche a
+         * versione invariata Room rifiuta un database con un hash di identita' diverso.
          */
         fun build(context: Context, name: String = DATABASE_NAME): IgorDatabase =
             Room.databaseBuilder(
@@ -140,7 +140,6 @@ abstract class IgorDatabase : RoomDatabase() {
                 IgorDatabase::class.java,
                 name,
             ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
-                .fallbackToDestructiveMigration()
                 .build()
     }
 }

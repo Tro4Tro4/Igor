@@ -11,7 +11,7 @@ import com.igor.fridge.data.local.PriceRecord
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.photos.PhotoStore
 import com.igor.fridge.data.repository.ShoppingRepository
-import com.igor.fridge.ui.formatNumber
+import com.igor.fridge.ui.formatQuantityInput
 import com.igor.fridge.ui.formatPriceInput
 import com.igor.fridge.ui.igorApplication
 import com.igor.fridge.ui.parsePriceCents
@@ -119,9 +119,19 @@ class ShoppingItemEditViewModel(
      */
     fun useLastPaid() = _uiState.update { state ->
         val paid = state.lastPaid ?: return@update state
+        // 500 g diventano 0,5 kg: cambiare l'unita' senza convertire la quantita' farebbe
+        // stimare 500 kg.
+        val quantity = parseQuantity(state.quantityText)
+        val converted = when {
+            quantity == null -> null
+            state.unit == QuantityUnit.G && paid.referenceUnit == QuantityUnit.KG -> quantity / 1000.0
+            state.unit == QuantityUnit.ML && paid.referenceUnit == QuantityUnit.L -> quantity / 1000.0
+            else -> quantity
+        }
         state.copy(
             priceText = formatPriceInput(paid.unitPriceCents),
             unit = paid.referenceUnit,
+            quantityText = converted?.let(::formatQuantityInput) ?: state.quantityText,
             priceError = false,
         )
     }
@@ -134,6 +144,10 @@ class ShoppingItemEditViewModel(
     /** "Preso tutto": la quantita' presa diventa quella da comprare. */
     fun purchaseAll() = _uiState.update {
         it.copy(purchasedText = it.quantityText, purchasedError = false)
+    }
+
+    fun onCameraUnavailable() = _uiState.update {
+        it.copy(message = "Nessuna app fotocamera disponibile: scegli la foto dalla galleria")
     }
 
     fun onMessageShown() = _uiState.update { it.copy(message = null) }
@@ -232,7 +246,6 @@ class ShoppingItemEditViewModel(
             }
         }
 
-        /** Nel campo di testo un decimale si scrive con la virgola, come lo si legge. */
-        private fun formatQuantityInput(quantity: Double): String = formatNumber(quantity)
+
     }
 }

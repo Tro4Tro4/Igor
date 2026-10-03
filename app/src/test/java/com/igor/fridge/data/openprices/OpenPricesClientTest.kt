@@ -175,4 +175,22 @@ class OpenPricesClientTest {
         assertEquals("0.05", OpenPricesClient.amount(5))
         assertEquals("12.00", OpenPricesClient.amount(1200))
     }
+
+    @Test
+    fun `una risposta che non e' JSON diventa un errore leggibile, non un crash`() = runTest {
+        transport.respond("GET", "/prices", HttpResponse(200, "<html>Accedi al Wi-Fi dell'hotel</html>"))
+        transport.respond("POST", "/auth", HttpResponse(200, "{\"user_id\":"))
+
+        listOf(
+            suspend { client.productPrices("8001234567890") },
+            suspend { client.login("mario", "x") },
+        ).forEach { call ->
+            try {
+                call()
+                fail("doveva fallire")
+            } catch (e: OpenPricesException) {
+                assertEquals("Risposta non valida da Open Prices", e.message)
+            }
+        }
+    }
 }

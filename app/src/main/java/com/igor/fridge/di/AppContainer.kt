@@ -1,6 +1,8 @@
 package com.igor.fridge.di
 
 import android.content.Context
+import com.igor.fridge.data.RoomTransactor
+import com.igor.fridge.data.Transactor
 import com.igor.fridge.data.local.IgorDatabase
 import com.igor.fridge.data.openprices.OpenPricesClient
 import com.igor.fridge.data.openprices.UrlConnectionTransport
@@ -25,6 +27,8 @@ class AppContainer(context: Context) {
     private val appContext = context.applicationContext
 
     private val database: IgorDatabase by lazy { IgorDatabase.build(appContext) }
+
+    val transactor: Transactor by lazy { RoomTransactor(database) }
 
     val foodRepository: FoodRepository by lazy { FoodRepository(database.foodItemDao()) }
 

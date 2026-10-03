@@ -215,4 +215,27 @@ class ShoppingItemEditViewModelTest {
         assertEquals("2,00", vm.uiState.value.priceText)
         assertEquals(QuantityUnit.KG, vm.uiState.value.unit)
     }
+
+    @Test
+    fun `usare un prezzo al kg converte i grammi in chili`() = runTest(dispatcher) {
+        repository.addIfAbsent("Prosciutto", quantity = 500.0, unit = QuantityUnit.G)
+        val paid = com.igor.fridge.data.local.PriceRecord(
+            uuid = "p",
+            productKey = "prosciutto",
+            productName = "Prosciutto",
+            purchasedOn = java.time.LocalDate.of(2026, 10, 1),
+            quantity = 0.2,
+            unit = QuantityUnit.KG,
+            totalCents = 400,
+            unitPriceCents = 2000,
+            referenceUnit = QuantityUnit.KG,
+        )
+        val vm = ShoppingItemEditViewModel(dao.items.single().uuid, repository, photos) { paid }
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.useLastPaid()
+
+        assertEquals("0,5", vm.uiState.value.quantityText)
+        assertEquals(QuantityUnit.KG, vm.uiState.value.unit)
+    }
 }

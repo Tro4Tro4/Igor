@@ -316,8 +316,11 @@ class ReceiptViewModelTest {
         assertEquals(45L, item.unitPriceCents)
         assertEquals(4, item.quantity)
 
+        // Un peso senza confezioni note non si condivide: il prezzo per confezione non si sa.
         val pasta = draft.copy(name = "Pasta", quantityText = "500", unit = QuantityUnit.G, priceText = "0,95")
-        assertEquals(1, ReceiptViewModel.contributionItem(pasta, "4006381333931")!!.quantity)
+        assertEquals(null, ReceiptViewModel.contributionItem(pasta, "4006381333931"))
+        // Se lo scontrino dice una confezione, si'.
+        assertEquals(1, ReceiptViewModel.contributionItem(pasta.copy(pieces = 1), "4006381333931")!!.quantity)
         assertEquals(null, ReceiptViewModel.contributionItem(draft, "123"))
         assertEquals(null, ReceiptViewModel.contributionItem(draft.copy(priceText = ""), "4006381333931"))
     }
@@ -383,5 +386,82 @@ class ReceiptViewModelTest {
 
         assertEquals(1, vm.uiState.value.contributable.size)
         assertFalse(vm.uiState.value.canContribute)
+    }
+
+    @Test
+    fun `due bottiglie da un litro si condividono a 1,29 l'una, non a 2,58`() = runTest(dispatcher) {
+        priceRepository.setBarcode("latte", "4006381333931")
+        val vm = viewModel()
+        vm.read("LATTE 1L  2,58", "2 x 1,29")
+        val latte = vm.uiState.value.drafts.single()
+        assertEquals("2", latte.quantityText)
+        assertEquals(QuantityUnit.L, latte.unit)
+        assertEquals(2, latte.pieces)
+
+        vm.confirm(skipExpiryCheck = true)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val item = vm.uiState.value.contributable.single()
+        assertEquals(129L, item.unitPriceCents)
+        assertEquals(2, item.quantity)
+    }
+
+    @Test
+    fun `cambiare quantita' o unita' rende ignote le confezioni lette`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.read("LATTE 1L  2,58", "2 x 1,29")
+        val id = vm.uiState.value.drafts.single().id
+
+        vm.onQuantityChange(id, "3")
+
+        assertEquals(null, vm.uiState.value.drafts.single().pieces)
+    }
+
+    @Test
+    fun `le quantita' a peso non si arrotondano`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.read("PROSCIUTTO  2,50", "0,125 kg x 20,00")
+        vm.confirm(skipExpiryCheck = true)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("0,125", vm.uiState.value.drafts.single().quantityText)
+        assertEquals(2000L, priceDao.records.single().unitPriceCents)
+    }
+
+    @Test
+    fun `un errore a meta' salvataggio torna alla revisione invece di chiudere l'app`() = runTest(dispatcher) {
+        val failing = PriceRepository(
+            object : com.igor.fridge.data.local.PriceRecordDao by priceDao {
+                override suspend fun insertAll(records: List<com.igor.fridge.data.local.PriceRecord>) {
+                    throw IllegalStateException("disco pieno")
+                }
+            },
+            codeDao,
+            { now },
+            { "p-${++counter}" },
+        )
+        val transactions = mutableListOf<String>()
+        val vm = ReceiptViewModel(
+            reader,
+            FakePhotoStore(),
+            foodRepository,
+            shoppingRepository,
+            failing,
+            today = { today },
+            transactor = object : com.igor.fridge.data.Transactor {
+                override suspend fun <T> run(block: suspend () -> T): T {
+                    transactions += "inizio"
+                    return block()
+                }
+            },
+        )
+        vm.read("RISO  2,00")
+
+        vm.confirm()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("inizio"), transactions)
+        assertEquals(ReceiptPhase.REVIEW, vm.uiState.value.phase)
+        assertEquals("Salvataggio non riuscito: nulla è stato registrato, riprova", vm.uiState.value.message)
     }
 }

@@ -25,6 +25,8 @@ class ShoppingRepository(
 
     suspend fun findByUuid(uuid: String): ShoppingItem? = dao.findByUuid(uuid)
 
+    suspend fun checkedItems(): List<ShoppingItem> = dao.checkedItems()
+
     /**
      * Mette il prodotto fra le cose da comprare.
      *

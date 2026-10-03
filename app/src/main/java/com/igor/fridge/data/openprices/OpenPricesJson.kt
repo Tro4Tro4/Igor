@@ -29,7 +29,7 @@ internal object OpenPricesJson {
         items(body).mapNotNull { (it as? JsonObject)?.let(::location) }
 
     fun parseSession(body: String): OpenPricesSession {
-        val obj = json.parseToJsonElement(body) as? JsonObject
+        val obj = root(body) as? JsonObject
             ?: throw OpenPricesException("Risposta di accesso non valida")
         val user = obj.string("user_id") ?: throw OpenPricesException("Risposta di accesso non valida")
         val token = obj.string("access_token") ?: throw OpenPricesException("Risposta di accesso non valida")
@@ -38,7 +38,7 @@ internal object OpenPricesJson {
 
     /** L'identificativo dell'oggetto creato (prova o prezzo). */
     fun parseId(body: String): Long =
-        ((json.parseToJsonElement(body) as? JsonObject)?.get("id") as? JsonPrimitive)?.longOrNull
+        ((root(body) as? JsonObject)?.get("id") as? JsonPrimitive)?.longOrNull
             ?: throw OpenPricesException("Risposta di Open Prices senza identificativo")
 
     /** Il messaggio d'errore del server: `detail`, oppure il primo errore di un campo. */
@@ -58,9 +58,19 @@ internal object OpenPricesJson {
         null
     }
 
+    /**
+     * Il documento JSON, oppure un errore leggibile. Una risposta 200 che non e' JSON (un
+     * portale Wi-Fi, un proxy che restituisce HTML, un corpo troncato) altrimenti
+     * lancerebbe una SerializationException che nessuno si aspetta e chiuderebbe l'app.
+     */
+    private fun root(body: String): JsonElement = try {
+        json.parseToJsonElement(body)
+    } catch (e: IllegalArgumentException) {
+        throw OpenPricesException("Risposta non valida da Open Prices")
+    }
+
     private fun items(body: String): List<JsonElement> {
-        val root = json.parseToJsonElement(body)
-        return when (root) {
+        return when (val root = root(body)) {
             is JsonObject -> (root["items"] as? JsonArray).orEmpty()
             is JsonArray -> root
             else -> emptyList()
