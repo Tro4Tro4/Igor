@@ -51,4 +51,11 @@ class QuickEntryTest {
         assertEntry("  pane   integrale ", "pane integrale", null, null)
         assertEntry("pane 0,5", "pane 0,5", null, null)
     }
+
+    @Test
+    fun `una quantita' nulla o un nome con un numero davanti restano nome`() {
+        assertEntry("latte x0", "latte x0", null, null)
+        assertEntry("7 up", "7 up", null, null)
+        assertEntry("2 tè", "tè", 2.0, QuantityUnit.PZ)
+    }
 }

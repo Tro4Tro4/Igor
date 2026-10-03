@@ -9,7 +9,8 @@ package com.igor.fridge.domain.prices
  */
 fun normalizeGtin(text: String): String? {
     val digits = text.filter { !it.isWhitespace() && it != '-' }
-    if (digits.isEmpty() || !digits.all(Char::isDigit)) return null
+    // Solo cifre ASCII: Char.isDigit accetta anche quelle arabe o a larghezza piena.
+    if (digits.isEmpty() || !digits.all { it in '0'..'9' }) return null
     if (digits.length !in setOf(8, 12, 13, 14)) return null
     val body = digits.dropLast(1)
     // Da destra, pesi alterni 3 e 1 (la cifra di controllo esclusa).

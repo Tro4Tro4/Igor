@@ -12,7 +12,9 @@ import java.util.Locale
  * Vince la prima parola riconosciuta, perche' in italiano il nome principale viene prima
  * dei complementi: "gelato al latte" e' un surgelato, "succo di mela" una bevanda,
  * "petto di pollo" carne anche se "petto" da solo non dice nulla. Fanno eccezione le
- * parole come "surgelato", che cambiano la corsia qualunque sia il prodotto.
+ * parole come "surgelato", che cambiano la corsia qualunque sia il prodotto, e le
+ * espressioni di due parole ("burro di arachidi", "te freddo"), in cui articoli e
+ * preposizioni non contano.
  *
  * Se nessuna parola e' riconosciuta per intero, si prova con le abbreviazioni degli
  * scontrini: "MOZZ" e "PARMIG" sono l'inizio di una sola parola nota, e valgono quella.
@@ -26,14 +28,18 @@ fun guessCategory(name: String): FoodCategory {
     if (words.isEmpty()) return FoodCategory.ALTRO
     if (words.any { it in FROZEN_MARKERS }) return FoodCategory.SURGELATI
 
-    for (index in words.indices) {
-        if (index + 1 < words.size) {
-            PHRASES["${words[index]} ${words[index + 1]}"]?.let { return it }
+    // "fiocchi di latte" e' l'espressione "fiocchi latte": le preposizioni non contano.
+    val content = words.filterNot { it in STOPWORDS }
+    for (index in content.indices) {
+        if (index + 1 < content.size) {
+            PHRASES["${content[index]} ${content[index + 1]}"]?.let { return it }
         }
-        KEYWORDS[words[index]]?.let { return it }
+        KEYWORDS[content[index]]?.let { return it }
     }
-    for (word in words) {
-        if (word.length < MIN_ABBREVIATION) continue
+    // "fette" decide solo se nient'altro lo fa: "fette di salmone" e' pesce.
+    content.firstNotNullOfOrNull { WEAK_KEYWORDS[it] }?.let { return it }
+    for (word in content) {
+        if (word.length < MIN_ABBREVIATION || word in NOT_ABBREVIATIONS) continue
         val categories = KEYWORDS.filterKeys { it.startsWith(word) }.values.toSet()
         if (categories.size == 1) return categories.single()
     }
@@ -43,21 +49,47 @@ fun guessCategory(name: String): FoodCategory {
 /** Sotto questa lunghezza un inizio di parola e' troppo vago ("pa" e' pane o pasta?). */
 private const val MIN_ABBREVIATION = 4
 
+/**
+ * Parole comuni nei nomi commerciali che non sono abbreviazioni: "GRAN CEREALE" non e'
+ * grana, "MINI" non e' l'inizio di nulla.
+ */
+private val NOT_ABBREVIATIONS = setOf("gran", "mini", "maxi", "mega", "fior", "super", "extra", "light")
+
+/** Articoli e preposizioni: non separano le due parole di un'espressione. */
+private val STOPWORDS = setOf(
+    "di", "d", "del", "dello", "della", "dei", "degli", "delle", "al", "allo", "alla", "ai",
+    "agli", "alle", "da", "dal", "dalla", "con", "e", "ed", "per", "in", "il", "lo", "la",
+    "l", "i", "gli", "le",
+)
+
 /** Le parole di un nome, normalizzate: "Caffè d'orzo" diventa [caffe, d, orzo]. */
 internal fun nameWords(text: String): List<String> =
     normalize(text).split(' ').filter { it.isNotEmpty() }
 
-/** Minuscole, senza accenti e senza punteggiatura: "Caffè d'orzo" diventa "caffe d orzo". */
+/**
+ * Minuscole, senza accenti e senza punteggiatura: "Caffè d'orzo" diventa "caffe d orzo".
+ * Le lettere che non si scompongono in lettera e accento ("ß", "ø", il cirillico) restano:
+ * toglierle svuoterebbe il nome. Per i nomi in caratteri latini il risultato e' quello di
+ * sempre, e le chiavi gia' salvate continuano a valere ([com.igor.fridge.domain.prices.productKey]).
+ */
 private fun normalize(text: String): String =
     Normalizer.normalize(text.lowercase(Locale.ITALIAN), Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}+"), "")
-        .replace(Regex("[^a-z0-9]+"), " ")
+        .replace(MARKS, "")
+        .replace(NOT_WORD, " ")
         .trim()
+
+private val MARKS = Regex("\\p{M}+")
+
+/** Tutto cio' che non e' lettera o cifra; "ª" e "º" sono lettere solo per Unicode. */
+private val NOT_WORD = Regex("(?:[^\\p{L}\\p{Nd}]|[ªº])+")
 
 private val FROZEN_MARKERS = setOf(
     "surgelato", "surgelata", "surgelati", "surgelate", "congelato", "congelata", "congelati",
-    "congelate",
+    "congelate", "surg", "surgel",
 )
+
+/** Parole che dicono poco da sole: decidono solo se nessun'altra e' riconosciuta. */
+private val WEAK_KEYWORDS: Map<String, FoodCategory> = mapOf("fette" to FoodCategory.PANE)
 
 private val PHRASES: Map<String, FoodCategory> = mapOf(
     "carta igienica" to FoodCategory.IGIENE,
@@ -71,6 +103,19 @@ private val PHRASES: Map<String, FoodCategory> = mapOf(
     "pane grattugiato" to FoodCategory.DISPENSA,
     "fette biscottate" to FoodCategory.PANE,
     "sapone piatti" to FoodCategory.CASA,
+    "fiocchi latte" to FoodCategory.LATTICINI,
+    "crema latte" to FoodCategory.LATTICINI,
+    "burro arachidi" to FoodCategory.DISPENSA,
+    "burro cacao" to FoodCategory.IGIENE,
+    "te freddo" to FoodCategory.BEVANDE,
+    "the freddo" to FoodCategory.BEVANDE,
+    "olio motore" to FoodCategory.CASA,
+    "acqua ossigenata" to FoodCategory.IGIENE,
+    "acqua distillata" to FoodCategory.CASA,
+    "crema corpo" to FoodCategory.IGIENE,
+    "crema viso" to FoodCategory.IGIENE,
+    "crema mani" to FoodCategory.IGIENE,
+    "crema solare" to FoodCategory.IGIENE,
 )
 
 private val KEYWORDS: Map<String, FoodCategory> = buildMap {
@@ -97,7 +142,7 @@ private val KEYWORDS: Map<String, FoodCategory> = buildMap {
     put(
         FoodCategory.PANE,
         "pane", "panini", "panino", "piadina", "piadine", "focaccia", "grissini", "crackers",
-        "fette", "biscottate", "cornetti", "brioche", "croissant", "pancarre", "tramezzini",
+        "biscottate", "cornetti", "brioche", "croissant", "pancarre", "tramezzini",
         "taralli", "friselle",
     )
     put(
@@ -125,6 +170,7 @@ private val KEYWORDS: Map<String, FoodCategory> = buildMap {
     put(
         FoodCategory.SURGELATI,
         "gelato", "gelati", "ghiaccioli", "ghiaccio", "bastoncini", "sofficini", "minestrone",
+        "pizza", "pizze",
     )
     put(
         FoodCategory.DISPENSA,
@@ -135,7 +181,7 @@ private val KEYWORDS: Map<String, FoodCategory> = buildMap {
         "confettura", "miele", "caffe", "te", "the", "camomilla", "tisana", "orzo", "cacao",
         "mais", "noci", "mandorle", "nocciole", "pistacchi", "arachidi",
         "patatine", "merendine", "brodo", "dado", "couscous", "farro",
-        "quinoa", "polenta", "pangrattato",
+        "quinoa", "polenta", "pangrattato", "caramelle", "crema", "cereale",
     )
     put(
         FoodCategory.CONDIMENTI,

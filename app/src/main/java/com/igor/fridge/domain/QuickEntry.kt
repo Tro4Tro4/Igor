@@ -16,11 +16,16 @@ data class QuickEntry(
  * La quantita' puo' stare davanti ("2 kg mele", "500g farina", "6 uova", "mezzo chilo di
  * pane") o in fondo ("mele 2 kg", "latte x2", "uova 6"). Un numero senza unita' conta i
  * pezzi. Se la riga non e' riconoscibile resta tutta nome: meglio un nome con un numero
- * dentro che una quantita' inventata.
+ * dentro che una quantita' inventata. Per questo restano interi i nomi che cominciano con
+ * un numero ("7 up", "5 cereali"), e una quantita' deve essere maggiore di zero.
  */
 fun parseQuickEntry(text: String): QuickEntry {
     val tokens = tokenize(text)
     if (tokens.isEmpty()) return QuickEntry(name = "")
+    val whole = tokens.joinToString(" ")
+    if (NAMES_WITH_NUMBER.any { whole.lowercase() == it || whole.lowercase().startsWith("$it ") }) {
+        return QuickEntry(name = whole)
+    }
 
     leading(tokens)?.let { return it }
     trailing(tokens)?.let { return it }
@@ -53,9 +58,11 @@ private fun trailing(tokens: List<String>): QuickEntry? {
     val last = tokens.last().lowercase()
 
     // "latte x2" / "latte x 2"
-    Regex("^x(\\d+)$").matchEntire(last)?.let { match ->
+    TIMES.matchEntire(last)?.let { match ->
         val name = tokens.dropLast(1).joinToString(" ")
-        return QuickEntry(name, match.groupValues[1].toDouble(), QuantityUnit.PZ)
+        // "latte x0" non e' una quantita': resta tutto nome.
+        val value = number(match.groupValues[1]) ?: return null
+        return QuickEntry(name, value, QuantityUnit.PZ)
     }
     if (tokens.size >= 3 && tokens[tokens.size - 2].lowercase() == "x") {
         number(last)?.let { value ->
@@ -98,7 +105,7 @@ private fun amountAt(tokens: List<String>, index: Int): Pair<Amount, Int>? {
 }
 
 private fun attachedUnit(token: String): Pair<Double, QuantityUnit>? {
-    val match = Regex("^(\\d+(?:[.,]\\d+)?)([a-z]+\\.?)$").matchEntire(token) ?: return null
+    val match = ATTACHED_UNIT.matchEntire(token) ?: return null
     val unit = UNITS[match.groupValues[2]] ?: return null
     val value = number(match.groupValues[1]) ?: return null
     return value * unit.second to unit.first
@@ -108,7 +115,14 @@ private fun number(token: String): Double? =
     token.replace(',', '.').toDoubleOrNull()?.takeIf { it > 0.0 && it.isFinite() }
 
 private fun tokenize(text: String): List<String> =
-    text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    text.trim().split(SPACES).filter { it.isNotEmpty() }
+
+private val SPACES = Regex("\\s+")
+private val TIMES = Regex("^x(\\d+)$")
+private val ATTACHED_UNIT = Regex("^(\\d+(?:[.,]\\d+)?)([a-z]+\\.?)$")
+
+/** Prodotti il cui nome comincia con un numero che non e' una quantita'. */
+private val NAMES_WITH_NUMBER = listOf("7 up", "3 cereali", "5 cereali", "7 cereali", "4 salti")
 
 private val WORD_NUMBERS = mapOf("un" to 1.0, "uno" to 1.0, "una" to 1.0, "mezzo" to 0.5, "mezza" to 0.5)
 

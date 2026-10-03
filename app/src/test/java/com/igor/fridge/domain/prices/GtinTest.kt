@@ -21,4 +21,10 @@ class GtinTest {
         assertNull(normalizeGtin("12345"))
         assertNull(normalizeGtin(""))
     }
+
+    @Test
+    fun `solo cifre ASCII`() {
+        // La prima e' uno zero arabo: Char.isDigit lo accetterebbe, e la somma di controllo tornerebbe.
+        assertNull(normalizeGtin("\u0660006381333931"))
+    }
 }

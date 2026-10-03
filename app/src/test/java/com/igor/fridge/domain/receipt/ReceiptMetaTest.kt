@@ -47,4 +47,37 @@ class ReceiptMetaTest {
     fun `senza intestazione il negozio resta da chiedere`() {
         assertNull(parseReceiptMeta(listOf("LATTE  1,29", "PANE  0,90"), today).store)
     }
+
+    @Test
+    fun `vale la data accanto all'ora, altrimenti l'ultima`() {
+        assertEquals(
+            LocalDate.of(2026, 10, 3),
+            parseReceiptMeta(listOf("LOTTO 1.2.25", "LATTE  1,29", "03/10/2026"), today).date,
+        )
+        assertEquals(
+            LocalDate.of(2026, 9, 30),
+            parseReceiptMeta(listOf("SCONTRINO N. 1-10-26", "30/09/2026 18:22", "SCAD. 2/10/26"), today).date,
+        )
+    }
+
+    @Test
+    fun `date ISO`() {
+        assertEquals(LocalDate.of(2026, 9, 28), parseReceiptMeta(listOf("2026-09-28 10:15"), today).date)
+    }
+
+    @Test
+    fun `l'insegna di una catena nota vince su una riga generica`() {
+        assertEquals("Coop Lombardia", parseReceiptMeta(listOf("Supermercato", "COOP LOMBARDIA"), today).store)
+    }
+
+    @Test
+    fun `CAP, indirizzi e date non sono il negozio`() {
+        assertEquals(
+            "Bottega Rossi",
+            parseReceiptMeta(
+                listOf("20121 MILANO MI", "C.SO BUENOS AIRES 3", "Data 3/10/2026", "BOTTEGA ROSSI"),
+                today,
+            ).store,
+        )
+    }
 }

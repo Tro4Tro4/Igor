@@ -46,18 +46,30 @@ fun parseQuantity(text: String): Double? =
     text.replace(',', '.').trim().toDoubleOrNull()?.takeIf { it > 0.0 && it.isFinite() }
 
 /**
- * Legge un prezzo scritto dall'utente ("1,29", "1.29 €", "2") in centesimi.
+ * Legge un prezzo scritto dall'utente ("1,29", "1.29 €", "2", "1.234,56") in centesimi.
+ * Solo come si scrive un prezzo: al piu' due decimali, e il punto delle migliaia solo a
+ * gruppi di tre cifre. "1e3" o "1,234" non sono prezzi, anche se Kotlin li leggerebbe.
  * @return null se il testo non e' un importo maggiore o uguale a zero.
  */
 fun parsePriceCents(text: String): Long? {
-    val value = text.replace("€", "").replace(',', '.').trim().toDoubleOrNull() ?: return null
-    if (!value.isFinite() || value < 0.0) return null
-    return Math.round(value * 100)
+    val clean = text.replace("€", "").trim()
+    val normalized = when {
+        PRICE_THOUSANDS.matches(clean) -> clean.replace(".", "").replace(',', '.')
+        PRICE_PLAIN.matches(clean) -> clean.replace(',', '.')
+        else -> return null
+    }
+    val value = normalized.toBigDecimalOrNull() ?: return null
+    return value.movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).toLong()
 }
 
-/** 1290 diventa "12,90 €". */
-fun formatEuro(cents: Long): String =
-    String.format(Locale.ITALY, "%d,%02d €", cents / 100, kotlin.math.abs(cents % 100))
+/** "1.234,56": migliaia col punto, decimali con la virgola. */
+private val PRICE_THOUSANDS = Regex("^\\d{1,3}(?:\\.\\d{3})+(?:,\\d{1,2})?$")
+
+/** "1234,56", "1234.56", "2". */
+private val PRICE_PLAIN = Regex("^\\d+(?:[.,]\\d{1,2})?$")
+
+/** 1290 diventa "12,90 €"; -50 diventa "-0,50 €". */
+fun formatEuro(cents: Long): String = "${formatPriceInput(cents)} €"
 
 /** 129 al kg diventa "1,29 €/kg". */
 fun formatUnitPrice(cents: Long, unit: QuantityUnit): String = "${formatEuro(cents)}/${unit.label()}"
@@ -68,15 +80,23 @@ fun YearMonth.formatMonth(): String =
 
 /** +5,2 % / -3 %: la variazione di un prezzo, col segno sempre esplicito. */
 fun formatChange(percent: Double): String {
-    val rounded = Math.round(percent * 10) / 10.0
-    val sign = if (rounded > 0) "+" else ""
-    val number = if (rounded % 1.0 == 0.0) rounded.toLong().toString() else String.format(Locale.ITALY, "%.1f", rounded)
+    // Arrotonda il valore assoluto, cosi' +0,05 e -0,05 diventano +0,1 e -0,1.
+    val tenths = Math.round(kotlin.math.abs(percent) * 10)
+    val sign = when {
+        tenths == 0L -> ""
+        percent > 0 -> "+"
+        else -> "-"
+    }
+    val number = if (tenths % 10 == 0L) (tenths / 10).toString() else String.format(Locale.ITALY, "%.1f", tenths / 10.0)
     return "$sign$number%"
 }
 
-/** Il prezzo nel campo di testo, senza simbolo: 129 diventa "1,29". */
-fun formatPriceInput(cents: Long): String =
-    String.format(Locale.ITALY, "%d,%02d", cents / 100, cents % 100)
+/** Il prezzo nel campo di testo, senza simbolo: 129 diventa "1,29", -50 "-0,50". */
+fun formatPriceInput(cents: Long): String {
+    val sign = if (cents < 0) "-" else ""
+    val abs = kotlin.math.abs(cents)
+    return String.format(Locale.ITALY, "%s%d,%02d", sign, abs / 100, abs % 100)
+}
 
 fun QuantityUnit.label(): String = when (this) {
     QuantityUnit.PZ -> "pz"

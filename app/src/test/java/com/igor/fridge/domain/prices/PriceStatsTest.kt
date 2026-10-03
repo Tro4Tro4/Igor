@@ -91,7 +91,8 @@ class PriceStatsTest {
         assertEquals(QuantityUnit.KG, mele.referenceUnit)
         assertEquals(1, mele.purchases)
         assertNull(mele.previousCents)
-        assertEquals(249L, mele.totalSpentCents)
+        // La spesa totale parla degli stessi acquisti del confronto.
+        assertEquals(199L, mele.totalSpentCents)
     }
 
     @Test
@@ -107,5 +108,33 @@ class PriceStatsTest {
             listOf(YearMonth.of(2026, 10) to 500L, YearMonth.of(2026, 9) to 129L),
             monthlySpending(records),
         )
+    }
+
+    @Test
+    fun `la chiave non cambia per i nomi italiani e tiene le lettere non latine`() {
+        assertEquals("latte p s granarolo 1l", productKey("LATTE P.S. GRANAROLO 1L"))
+        assertEquals("caffe d orzo", productKey("Caffè d'orzo"))
+        assertEquals("perche si 100 naturale", productKey("Perché sì: 100% naturale!"))
+        assertEquals("mozzarella di bufala", productKey("Mozzarella di bufala"))
+        assertEquals("pina colada", productKey("Piña colada"))
+        assertEquals("weißbier", productKey("Weißbier"))
+        assertEquals("smørrebrød", productKey("Smørrebrød"))
+        assertEquals("кефир", productKey("Кефир"))
+    }
+
+    @Test
+    fun `una quantita' assurda non falsa minimo e massimo`() {
+        val records = listOf(
+            record("Prosciutto", LocalDate.of(2026, 9, 1), 250, 100.0, QuantityUnit.G),
+            record("Prosciutto", LocalDate.of(2026, 9, 10), 129, 0.001, QuantityUnit.G),
+            record("Prosciutto", LocalDate.of(2026, 10, 1), 300, 100.0, QuantityUnit.G),
+        )
+
+        val summary = summarize(records).single()
+
+        assertEquals(2500L, summary.minCents)
+        assertEquals(3000L, summary.maxCents)
+        assertEquals(2750L, summary.averageCents)
+        assertEquals(3, summary.purchases)
     }
 }

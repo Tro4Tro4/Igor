@@ -86,4 +86,31 @@ class FormattersTest {
         assertEquals("2", formatQuantityInput(2.0))
         assertEquals("0,5", formatQuantityInput(0.5))
     }
+
+    @Test
+    fun `gli importi negativi tengono il segno`() {
+        assertEquals("-0,50 €", formatEuro(-50))
+        assertEquals("-1,50 €", formatEuro(-150))
+        assertEquals("-0,50", formatPriceInput(-50))
+        assertEquals("-1,50", formatPriceInput(-150))
+    }
+
+    @Test
+    fun `la variazione si arrotonda allo stesso modo nei due sensi`() {
+        assertEquals("+0,1%", formatChange(0.05))
+        assertEquals("-0,1%", formatChange(-0.05))
+        assertEquals("0%", formatChange(-0.01))
+        assertEquals("-4,8%", formatChange(-4.76))
+    }
+
+    @Test
+    fun `un prezzo si legge solo se e' scritto come un prezzo`() {
+        assertNull(parsePriceCents("1e3"))
+        assertNull(parsePriceCents("1,234"))
+        assertNull(parsePriceCents("1,2,3"))
+        assertEquals(123456L, parsePriceCents("1.234,56"))
+        assertEquals(150L, parsePriceCents("1,5"))
+        assertEquals(1050L, parsePriceCents("10.50"))
+        assertEquals(123400L, parsePriceCents("1.234"))
+    }
 }

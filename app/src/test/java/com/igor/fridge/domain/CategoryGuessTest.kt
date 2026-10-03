@@ -57,4 +57,37 @@ class CategoryGuessTest {
     fun `una parola intera vince sempre su un'abbreviazione`() {
         assertEquals(FoodCategory.LATTICINI, guessCategory("Pomod latte"))
     }
+
+    @Test
+    fun `le parole di collegamento non separano le espressioni`() {
+        assertEquals(FoodCategory.PESCE, guessCategory("fette di salmone"))
+        assertEquals(FoodCategory.LATTICINI, guessCategory("fiocchi di latte"))
+        assertEquals(FoodCategory.DISPENSA, guessCategory("burro di arachidi"))
+        assertEquals(FoodCategory.CASA, guessCategory("sapone per piatti"))
+        assertEquals(FoodCategory.CASA, guessCategory("sapone piatti"))
+    }
+
+    @Test
+    fun `espressioni che cambiano il senso della prima parola`() {
+        assertEquals(FoodCategory.BEVANDE, guessCategory("te freddo"))
+        assertEquals(FoodCategory.BEVANDE, guessCategory("Tè freddo al limone"))
+        assertEquals(FoodCategory.CASA, guessCategory("olio motore"))
+        assertEquals(FoodCategory.IGIENE, guessCategory("acqua ossigenata"))
+        assertEquals(FoodCategory.PANE, guessCategory("fette biscottate"))
+    }
+
+    @Test
+    fun `parole aggiunte e surgelati abbreviati`() {
+        assertEquals(FoodCategory.SURGELATI, guessCategory("pizza margherita"))
+        assertEquals(FoodCategory.DISPENSA, guessCategory("caramelle"))
+        assertEquals(FoodCategory.DISPENSA, guessCategory("crema spalmabile"))
+        assertEquals(FoodCategory.SURGELATI, guessCategory("SPINACI SURG."))
+        assertEquals(FoodCategory.SURGELATI, guessCategory("PISELLI SURGEL"))
+    }
+
+    @Test
+    fun `le parole comuni non valgono come abbreviazioni`() {
+        assertEquals(FoodCategory.DISPENSA, guessCategory("GRAN CEREALE"))
+        assertEquals(FoodCategory.ALTRO, guessCategory("MINI"))
+    }
 }

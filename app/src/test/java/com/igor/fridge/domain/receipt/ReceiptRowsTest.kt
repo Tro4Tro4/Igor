@@ -36,4 +36,39 @@ class ReceiptRowsTest {
 
         assertEquals(listOf("PANE"), groupIntoRows(fragments))
     }
+
+    @Test
+    fun `un prezzo spostato di mezza riga va col nome sopra`() {
+        val fragments = listOf(
+            TextFragment("LATTE", left = 10, top = 100, right = 200, bottom = 130),
+            TextFragment("1,29", left = 400, top = 116, right = 450, bottom = 146),
+            TextFragment("YOGURT", left = 10, top = 130, right = 200, bottom = 160),
+            TextFragment("1,78", left = 400, top = 146, right = 450, bottom = 176),
+        )
+
+        assertEquals(listOf("LATTE  1,29", "YOGURT  1,78"), groupIntoRows(fragments))
+        assertEquals(listOf("LATTE  1,29"), groupIntoRows(fragments.take(2)))
+    }
+
+    @Test
+    fun `righe vicine non si fondono a catena`() {
+        val fragments = listOf(
+            TextFragment("PANE", left = 10, top = 100, right = 200, bottom = 130),
+            TextFragment("1,20", left = 400, top = 114, right = 450, bottom = 144),
+            TextFragment("UOVA", left = 10, top = 128, right = 200, bottom = 158),
+            TextFragment("2,10", left = 400, top = 142, right = 450, bottom = 172),
+        )
+
+        assertEquals(listOf("PANE  1,20", "UOVA  2,10"), groupIntoRows(fragments))
+    }
+
+    @Test
+    fun `due frammenti nella stessa colonna non stanno sulla stessa riga`() {
+        val fragments = listOf(
+            TextFragment("PANE", left = 10, top = 100, right = 200, bottom = 130),
+            TextFragment("UOVA", left = 10, top = 112, right = 200, bottom = 142),
+        )
+
+        assertEquals(listOf("PANE", "UOVA"), groupIntoRows(fragments))
+    }
 }

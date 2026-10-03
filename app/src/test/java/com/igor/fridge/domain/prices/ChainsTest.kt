@@ -39,4 +39,14 @@ class ChainsTest {
         val wanted = listOf("Tigros", "Esselunga", "Unes", "Eurospin", "Lidl", "Aldi", "Il Gigante")
         wanted.forEach { name -> assertEquals(name, KNOWN_CHAINS.single { it.name == name && it.domain != null }.name) }
     }
+
+    @Test
+    fun `Spar, U2 e M D sono catene note`() {
+        assertEquals("Despar", chainOf("SPAR - Aspiag Service")?.name)
+        assertEquals("Unes", chainOf("U2 Supermercato")?.name)
+        assertEquals("MD", chainOf("M.D. S.p.A.")?.name)
+        assertEquals("MD", chainOf("MD Discount")?.name)
+        assertNull(chainOf("Spartaco alimentari"))
+        assertNull(chainOf("Salumeria M. Rossi D. Bianchi"))
+    }
 }

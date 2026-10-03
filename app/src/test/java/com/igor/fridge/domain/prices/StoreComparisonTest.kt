@@ -101,4 +101,27 @@ class StoreComparisonTest {
     fun `un prezzo senza negozio non si confronta`() {
         assertNull(records.last().toObservation())
     }
+
+    @Test
+    fun `a pezzi si stima il costo di una confezione, non dell'acquisto intero`() {
+        val pesate = listOf(record("Mele", "Lidl", 298, 1.5, QuantityUnit.KG))
+        // Mele a pezzi contro un acquisto a peso: non si sa quanto pesa una mela.
+        val mele = compareList(listOf(item("Mele", 3.0, QuantityUnit.PZ))) { pesate.mapNotNull { r -> r.toObservation() } }
+        assertNull(mele.quotes.single().cheapest)
+
+        val pacchi = listOf(record("Pasta", "Lidl", 178, 2.0, QuantityUnit.PZ))
+        val unPacco = compareList(listOf(item("Pasta", 500.0, QuantityUnit.G))) { pacchi.mapNotNull { r -> r.toObservation() } }
+        assertEquals(89L, unPacco.quotes.single().cheapest?.second)
+        val trePacchi = compareList(listOf(item("Pasta", 3.0, QuantityUnit.CONF))) { pacchi.mapNotNull { r -> r.toObservation() } }
+        assertEquals(267L, trePacchi.quotes.single().cheapest?.second)
+    }
+
+    @Test
+    fun `a parita' di data e fonte vince sempre lo stesso prezzo`() {
+        val a = StoreObservation("Lidl", 120, QuantityUnit.PZ, LocalDate.of(2026, 9, 1), PriceSource.MINE)
+        val b = a.copy(unitPriceCents = 99)
+
+        assertEquals(listOf(99L), latestByStore(listOf(a, b)).map { it.unitPriceCents })
+        assertEquals(listOf(99L), latestByStore(listOf(b, a)).map { it.unitPriceCents })
+    }
 }

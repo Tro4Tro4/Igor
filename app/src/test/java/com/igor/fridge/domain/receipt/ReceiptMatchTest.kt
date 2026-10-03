@@ -25,4 +25,12 @@ class ReceiptMatchTest {
         assertFalse(receiptMatches("Pane", "Panna da cucina"))
         assertFalse(receiptMatches("di", "Latte di soia"))
     }
+
+    @Test
+    fun `una parola corta intera non e' l'abbreviazione di una lunga`() {
+        assertFalse(receiptMatches("Panettone", "PANE"))
+        assertFalse(receiptMatches("Panettone", "PANE COMUNE"))
+        assertTrue(receiptMatches("Panettone", "PANETT. CLASSICO"))
+        assertTrue(receiptMatches("Mozzarella", "MOZZAR FIOR DI LATTE"))
+    }
 }

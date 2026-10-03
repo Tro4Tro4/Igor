@@ -22,7 +22,7 @@ val KNOWN_CHAINS: List<Chain> = listOf(
     Chain("Esselunga", listOf("esselunga"), "esselunga.it"),
     Chain("Tigros", listOf("tigros"), "tigros.it"),
     Chain("Il Gigante", listOf("gigante"), "ilgigante.net"),
-    Chain("Unes", listOf("unes"), "unes.it"),
+    Chain("Unes", listOf("unes", "u2"), "unes.it"),
     Chain("Lidl", listOf("lidl"), "lidl.it"),
     Chain("Eurospin", listOf("eurospin"), "eurospin.it"),
     Chain("Aldi", listOf("aldi"), "aldi.it"),
@@ -33,17 +33,23 @@ val KNOWN_CHAINS: List<Chain> = listOf(
     Chain("Bennet", listOf("bennet"), "bennet.com"),
     Chain("Pam", listOf("pam", "panorama"), null),
     Chain("Iper", listOf("iper"), null),
-    Chain("MD", listOf("md"), null),
+    Chain("MD", listOf("md", "m d"), null),
     Chain("Famila", listOf("famila"), null),
-    Chain("Despar", listOf("despar", "eurospar", "interspar"), null),
+    Chain("Despar", listOf("despar", "spar", "eurospar", "interspar"), null),
     Chain("Crai", listOf("crai"), null),
 )
 
-/** La catena di un negozio, se il suo nome ne contiene una parola chiave. */
+/**
+ * La catena di un negozio, se il suo nome ne contiene una parola chiave. Una parola chiave
+ * di piu' parole ("m d", cioe' "M.D.") vale se le parole compaiono di seguito.
+ */
 fun chainOf(store: String?): Chain? {
     if (store.isNullOrBlank()) return null
-    val words = nameWords(store).toSet()
-    return KNOWN_CHAINS.firstOrNull { chain -> chain.keywords.any { it in words } }
+    val words = nameWords(store)
+    val joined = words.joinToString(" ", prefix = " ", postfix = " ")
+    return KNOWN_CHAINS.firstOrNull { chain ->
+        chain.keywords.any { if (' ' in it) " $it " in joined else it in words }
+    }
 }
 
 /**

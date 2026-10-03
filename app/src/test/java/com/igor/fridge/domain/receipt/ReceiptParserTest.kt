@@ -148,4 +148,98 @@ class ReceiptParserTest {
         assertNull(entries.getValue("Yogurt").pieces)
         assertNull(entries.getValue("Mele").pieces)
     }
+
+    @Test
+    fun `una parola di sconto senza segno a meta' riga non e' uno sconto`() {
+        val entries = parseReceipt(listOf("PASTA 1,29", "OFFERTA SPECIALE BISCOTTI 2,50"))
+
+        assertEquals(listOf("Pasta", "Offerta speciale biscotti"), entries.map { it.name })
+        assertEquals(1.29, entries[0].price!!, 0.001)
+        assertEquals(2.50, entries[1].price!!, 0.001)
+        assertEquals(listOf("Biscotti offerta"), parseReceipt(listOf("BISCOTTI OFFERTA 2,50")).map { it.name })
+    }
+
+    @Test
+    fun `un prodotto in promozione non azzera quello sopra`() {
+        val entries = parseReceipt(listOf("PASTA 1,29", "PROMO PASTA 1,29"))
+
+        assertEquals(2, entries.size)
+        assertEquals(1.29, entries[0].price!!, 0.001)
+        assertEquals("Pasta", entries[1].name)
+        assertEquals(1.29, entries[1].price!!, 0.001)
+    }
+
+    @Test
+    fun `uno sconto senza segno vale se apre la riga ed e' minore del prezzo sopra`() {
+        val entries = parseReceipt(listOf("PASTA 1,29", "SCONTO 0,30", "SC.FIDATY -0,30", "LATTE 1,00"))
+
+        assertEquals(listOf("Pasta", "Latte"), entries.map { it.name })
+        assertEquals(0.69, entries[0].price!!, 0.001)
+    }
+
+    @Test
+    fun `un dettaglio col totale dopo un nome senza prezzo crea il prodotto`() {
+        val banane = parseReceipt(listOf("BANANE", "1,234 kg x 1,49 €/kg  1,84")).single()
+        assertEquals("Banane", banane.name)
+        assertEquals(1.84, banane.price!!, 0.001)
+        assertEquals(1.234, banane.quantity!!, 0.001)
+        assertEquals(QuantityUnit.KG, banane.unit)
+        assertNull(banane.pieces)
+
+        val yogurt = parseReceipt(listOf("PANE  1,20", "YOGURT", "2 x 0,89  1,78")).last()
+        assertEquals("Yogurt", yogurt.name)
+        assertEquals(1.78, yogurt.price!!, 0.001)
+        assertEquals(2.0, yogurt.quantity!!, 0.001)
+        assertEquals(2, yogurt.pieces)
+    }
+
+    @Test
+    fun `il totale letto male, il sottototale e l'importo chiudono i prodotti`() {
+        assertEquals(listOf("Latte"), parseReceipt(listOf("LATTE 1,00", "T0TALE 12,50", "PANE 1,20")).map { it.name })
+        assertEquals(listOf("Latte"), parseReceipt(listOf("LATTE 1,00", "SOTTOTOTALE 2,00", "PANE 1,20")).map { it.name })
+        assertEquals(listOf("Latte"), parseReceipt(listOf("LATTE 1,00", "IMPORTO 12,50", "PANE 1,20")).map { it.name })
+    }
+
+    @Test
+    fun `la riga dell'IVA non e' un prodotto`() {
+        assertEquals(listOf("Latte"), parseReceipt(listOf("LATTE 1,00", "DI CUI IVA 1,23")).map { it.name })
+    }
+
+    @Test
+    fun `formati multipli, staccati e con la O al posto dello zero`() {
+        fun one(line: String) = parseReceipt(listOf(line)).single()
+
+        val mozzarella = one("MOZZARELLA 125G X3 2,49")
+        assertEquals("Mozzarella", mozzarella.name)
+        assertEquals(375.0, mozzarella.quantity!!, 0.001)
+        assertEquals(QuantityUnit.G, mozzarella.unit)
+        assertEquals(3, mozzarella.pieces)
+
+        val acqua = one("ACQUA 6X1,5L 2,10")
+        assertEquals("Acqua", acqua.name)
+        assertEquals(9.0, acqua.quantity!!, 0.001)
+        assertEquals(QuantityUnit.L, acqua.unit)
+        assertEquals(6, acqua.pieces)
+
+        val tonno = one("TONNO 3X80G 3,99")
+        assertEquals("Tonno", tonno.name)
+        assertEquals(240.0, tonno.quantity!!, 0.001)
+        assertEquals(3, tonno.pieces)
+
+        val prosciutto = one("PROSCIUTTO 100 G 2,30")
+        assertEquals("Prosciutto", prosciutto.name)
+        assertEquals(100.0, prosciutto.quantity!!, 0.001)
+        assertEquals(QuantityUnit.G, prosciutto.unit)
+        assertEquals(1, prosciutto.pieces)
+
+        val olio = one("OLIO EVO 1 L 6,99")
+        assertEquals("Olio evo", olio.name)
+        assertEquals(1.0, olio.quantity!!, 0.001)
+        assertEquals(QuantityUnit.L, olio.unit)
+
+        val spremuta = one("SPREMUTA O,5L 1,99")
+        assertEquals("Spremuta", spremuta.name)
+        assertEquals(0.5, spremuta.quantity!!, 0.001)
+        assertEquals(QuantityUnit.L, spremuta.unit)
+    }
 }
