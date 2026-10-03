@@ -33,11 +33,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
 
-/** Cosa serve per annullare l'ultimo spostamento in frigo. */
-private data class LastMove(
-    val shoppingItems: List<ShoppingItem>,
-    val createdFood: List<FoodItem>,
-)
+/** L'ultima operazione annullabile: come disfarla e cosa dire dopo. */
+private class PendingUndo(val done: String, val action: suspend () -> Unit)
 
 class ShoppingViewModel(
     private val shoppingRepository: ShoppingRepository,
@@ -52,11 +49,25 @@ class ShoppingViewModel(
 
     // Vive in memoria quanto lo snackbar: un annullamento che sopravvive alla schermata
     // non e' quello che l'utente si aspetta, e non vale una colonna in database.
-    private var lastMove: LastMove? = null
+    private var pendingUndo: PendingUndo? = null
 
     private val feedback = MutableStateFlow(Feedback())
+    private var nextMessageId = 0L
 
-    private data class Feedback(val message: String? = null, val canUndo: Boolean = false)
+    private data class Feedback(
+        val message: String? = null,
+        val canUndo: Boolean = false,
+        val id: Long = 0,
+    )
+
+    /**
+     * Un messaggio nuovo, con il suo annullamento se c'e'. L'id cambia ogni volta: due
+     * spostamenti con lo stesso testo mostrano due snackbar, e "Annulla" disfa l'ultimo.
+     */
+    private fun show(message: String, undo: PendingUndo? = null) {
+        pendingUndo = undo
+        feedback.value = Feedback(message, undo != null, ++nextMessageId)
+    }
 
     // Impedisce a una seconda pressione, prima che la lista riemetta senza le voci spuntate,
     // di rileggere le stesse voci e creare un secondo articolo per lo stesso acquisto.
@@ -73,6 +84,7 @@ class ShoppingViewModel(
                 items = items,
                 isLoading = false,
                 message = feedback.message,
+                messageId = feedback.id,
                 canUndo = feedback.canUndo,
                 categoryOrder = order,
                 storeFilter = store,
@@ -123,8 +135,15 @@ class ShoppingViewModel(
         viewModelScope.launch { shoppingRepository.setChecked(item, checked) }
     }
 
+    /** Un tocco accidentale sul cestino si annulla dallo snackbar. */
     fun delete(item: ShoppingItem) {
-        viewModelScope.launch { shoppingRepository.delete(item) }
+        viewModelScope.launch {
+            shoppingRepository.delete(item)
+            show(
+                "Eliminato: ${item.name}",
+                PendingUndo(done = "Ripristinato: ${item.name}") { shoppingRepository.restore(item) },
+            )
+        }
     }
 
     /**
@@ -151,23 +170,18 @@ class ShoppingViewModel(
                 val move = withContext(NonCancellable) {
                     transactor.run { moveChecked(expiries) }
                 }
-                if (move == null) {
-                    feedback.update { it.copy(message = "Nessun prodotto spuntato", canUndo = false) }
-                } else {
-                    lastMove = move.undo
-                    feedback.update { it.copy(message = move.message, canUndo = true) }
-                }
+                if (move == null) show("Nessun prodotto spuntato") else show(move.message, move.undo)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                feedback.update { it.copy(message = "Spostamento non riuscito: riprova", canUndo = false) }
+                show("Spostamento non riuscito: riprova")
             } finally {
                 moveInProgress = false
             }
         }
     }
 
-    private class MoveOutcome(val undo: LastMove, val message: String)
+    private class MoveOutcome(val undo: PendingUndo, val message: String)
 
     private suspend fun moveChecked(expiries: Map<String, LocalDate>): MoveOutcome? {
         val checked = shoppingRepository.checkedItems()
@@ -188,6 +202,7 @@ class ShoppingViewModel(
         // Dopo un acquisto parziale la voce resta, per la parte mancante. L'annullamento
         // la rimette com'era con restore(), che sovrascrive.
         var remainders = 0
+        val removedNonFood = nonFood.filter { it.remainingAfterPurchase == null }
         checked.forEach { item ->
             val remaining = item.remainingAfterPurchase
             if (remaining != null) {
@@ -198,35 +213,36 @@ class ShoppingViewModel(
             }
         }
         return MoveOutcome(
-            undo = LastMove(shoppingItems = checked, createdFood = created),
-            message = moveMessage(food = food, nonFood = nonFood, remainders = remainders),
+            undo = PendingUndo(done = "Spostamento annullato") {
+                checked.forEach { shoppingRepository.restore(it) }
+                created.forEach { foodRepository.remove(it, RemovalReason.ERRORE) }
+            },
+            message = moveMessage(food = food, nonFood = removedNonFood, remainders = remainders),
         )
     }
 
-    /** Rimette com'era: le voci tornano in lista e gli articoli escono dall'inventario. */
+    /**
+     * Disfa l'ultima operazione annullabile: uno spostamento in frigo (le voci tornano in
+     * lista e gli articoli escono dall'inventario) o un'eliminazione.
+     */
     fun undoLastMove() {
-        val move = lastMove
+        val undo = pendingUndo
         // Il messaggio che offriva l'annullamento ha finito il suo turno, comunque vada:
         // consumandolo qui la schermata non deve accoppiare questa chiamata a
         // onMessageShown() in un ordine preciso.
-        lastMove = null
+        pendingUndo = null
         feedback.update { Feedback() }
-        if (move == null) return
+        if (undo == null) return
         viewModelScope.launch {
             try {
                 // Come lo spostamento: una transazione, portata a termine anche se si lascia
                 // la schermata.
-                withContext(NonCancellable) {
-                    transactor.run {
-                        move.shoppingItems.forEach { shoppingRepository.restore(it) }
-                        move.createdFood.forEach { foodRepository.remove(it, RemovalReason.ERRORE) }
-                    }
-                }
-                feedback.update { it.copy(message = "Spostamento annullato", canUndo = false) }
+                withContext(NonCancellable) { transactor.run { undo.action() } }
+                show(undo.done)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                feedback.update { it.copy(message = "Annullamento non riuscito", canUndo = false) }
+                show("Annullamento non riuscito")
             }
         }
     }
@@ -236,7 +252,7 @@ class ShoppingViewModel(
      * lo snackbar e non quanto il ViewModel.
      */
     fun onMessageShown() {
-        lastMove = null
+        pendingUndo = null
         feedback.update { Feedback() }
     }
 
@@ -249,6 +265,14 @@ class ShoppingViewModel(
             nonFood: List<ShoppingItem>,
             remainders: Int,
         ): String {
+            // Solo voci comprate in parte: nulla e' entrato in frigo ne' uscito dalla lista.
+            if (food.isEmpty() && nonFood.isEmpty()) {
+                return if (remainders == 1) {
+                    "1 voce resta in lista per la parte mancante"
+                } else {
+                    "$remainders voci restano in lista per la parte mancante"
+                }
+            }
             val main = when {
                 nonFood.isEmpty() && food.size == 1 -> "Aggiunto in frigo: ${food.single().name}"
                 nonFood.isEmpty() -> "${food.size} prodotti messi in frigo"

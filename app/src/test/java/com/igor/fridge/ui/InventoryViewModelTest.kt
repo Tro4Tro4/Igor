@@ -14,13 +14,16 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -147,5 +150,41 @@ class InventoryViewModelTest {
         assertEquals(RemovalReason.ERRORE, stored.removalReason)
         assertTrue(shoppingDao.items.isEmpty())
         assertEquals(3, vm.uiState.first { it.totalCount == 3 }.totalCount)
+    }
+
+    @Test
+    fun `consumare si annulla dallo snackbar`() = runTest(dispatcher) {
+        seed()
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        val item = vm.uiState.first { !it.isLoading }.items.first { it.name == "Fresco" }
+
+        vm.consume(item)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.canUndo)
+
+        vm.undo()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(foodDao.items.single { it.uuid == item.uuid }.removedAt)
+        assertTrue(shoppingDao.items.isEmpty())
+        assertEquals("Annullato", vm.uiState.value.message)
+        assertFalse(vm.uiState.value.canUndo)
+    }
+
+    @Test
+    fun `un'eliminazione si annulla dallo snackbar`() = runTest(dispatcher) {
+        seed()
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        val item = vm.uiState.first { !it.isLoading }.items.first { it.name == "Fresco" }
+
+        vm.delete(item)
+        dispatcher.scheduler.advanceUntilIdle()
+        vm.undo()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(foodDao.items.single { it.uuid == item.uuid }.removedAt)
+        assertEquals(4, vm.uiState.value.totalCount)
     }
 }

@@ -124,7 +124,7 @@ class SettingsViewModel(
                     settingsStore = container.settingsStore,
                     onScheduleChanged = { enabled, hour ->
                         if (enabled) {
-                            ExpiryWorkScheduler.schedule(application, hour)
+                            ExpiryWorkScheduler.schedule(application, hour, hourChanged = true)
                         } else {
                             ExpiryWorkScheduler.cancel(application)
                         }

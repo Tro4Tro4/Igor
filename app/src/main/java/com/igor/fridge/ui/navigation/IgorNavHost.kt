@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -16,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -77,7 +79,10 @@ fun IgorApp(
     NavHost(
         navController = navController,
         startDestination = Routes.INVENTORY,
-        modifier = modifier,
+        // Con edge-to-edge la finestra non si restringe per la tastiera: senza questo
+        // margine i campi in fondo ai moduli e il pulsante Salva finirebbero sotto. Gli
+        // Scaffold interni vedono l'inset della tastiera gia' consumato e non lo ripetono.
+        modifier = modifier.imePadding(),
     ) {
         composable(Routes.INVENTORY) {
             InventoryScreen(
@@ -104,7 +109,7 @@ fun IgorApp(
                 scannedBarcode = scannedBarcode,
                 onBarcodeConsumed = { scannedBarcode = null },
                 onOpenScanner = { navController.navigate(Routes.SCANNER) },
-                onDone = { navController.popBackStack() },
+                onDone = { navController.popFrom(backStackEntry) },
             )
         }
 
@@ -119,15 +124,15 @@ fun IgorApp(
                     } else {
                         scannedBarcode = barcode
                     }
-                    navController.popBackStack()
+                    navController.popFrom(it)
                 },
-                onClose = { navController.popBackStack() },
+                onClose = { navController.popFrom(it) },
             )
         }
 
         composable(Routes.SHOPPING) {
             ShoppingScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popFrom(it) },
                 onOpenItem = { uuid -> navController.navigate(Routes.shoppingItem(uuid)) },
                 onOpenSavedLists = { navController.navigate(Routes.SAVED_LISTS) },
                 onOpenAisleOrder = { navController.navigate(Routes.AISLE_ORDER) },
@@ -143,21 +148,21 @@ fun IgorApp(
         ) { backStackEntry ->
             ShoppingItemEditScreen(
                 uuid = backStackEntry.arguments?.getString("uuid").orEmpty(),
-                onDone = { navController.popBackStack() },
+                onDone = { navController.popFrom(backStackEntry) },
             )
         }
 
         composable(Routes.SAVED_LISTS) {
-            SavedListsScreen(onBack = { navController.popBackStack() })
+            SavedListsScreen(onBack = { navController.popFrom(it) })
         }
 
         composable(Routes.AISLE_ORDER) {
-            AisleOrderScreen(onBack = { navController.popBackStack() })
+            AisleOrderScreen(onBack = { navController.popFrom(it) })
         }
 
         composable(Routes.RECEIPT) {
             ReceiptScreen(
-                onDone = { navController.popBackStack() },
+                onDone = { navController.popFrom(it) },
                 onOpenPrices = {
                     navController.navigate(Routes.PRICES) {
                         popUpTo(Routes.RECEIPT) { inclusive = true }
@@ -168,7 +173,7 @@ fun IgorApp(
 
         composable(Routes.PRICES) {
             PricesScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popFrom(it) },
                 onOpenProduct = { key -> navController.navigate(Routes.priceHistory(key)) },
             )
         }
@@ -182,7 +187,7 @@ fun IgorApp(
                 .collectAsState()
             PriceHistoryScreen(
                 productKey = backStackEntry.arguments?.getString("key").orEmpty(),
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popFrom(backStackEntry) },
                 onScanBarcode = { navController.navigate(Routes.SCANNER) },
                 scannedBarcode = scanned,
                 onBarcodeConsumed = { backStackEntry.savedStateHandle[Routes.SCANNED_BARCODE] = null },
@@ -192,26 +197,38 @@ fun IgorApp(
 
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popFrom(it) },
                 onOpenAisleOrder = { navController.navigate(Routes.AISLE_ORDER) },
                 onOpenOpenPrices = { navController.navigate(Routes.OPEN_PRICES) },
             )
         }
 
         composable(Routes.OPEN_PRICES) {
-            OpenPricesScreen(onBack = { navController.popBackStack() })
+            OpenPricesScreen(onBack = { navController.popFrom(it) })
         }
 
         composable(Routes.COMPARE) {
             CompareScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popFrom(it) },
                 onOpenOpenPrices = { navController.navigate(Routes.OPEN_PRICES) },
             )
         }
     }
 }
 
-/** Da Android 13 le notifiche richiedono un permesso: lo chiediamo al primo avvio. */
+/**
+ * Torna indietro solo se [entry] e' ancora la schermata in cima. Un secondo tocco su
+ * "Indietro" durante l'animazione di uscita toglierebbe anche la schermata sotto, fino a
+ * lasciare il NavHost vuoto e lo schermo bianco.
+ */
+private fun NavHostController.popFrom(entry: NavBackStackEntry) {
+    if (currentBackStackEntry?.id == entry.id) popBackStack()
+}
+
+/**
+ * Da Android 13 le notifiche richiedono un permesso: lo chiediamo al primo avvio, una
+ * volta sola e non a ogni rotazione dello schermo.
+ */
 @Composable
 private fun RequestNotificationPermissionOnce() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
@@ -221,11 +238,14 @@ private fun RequestNotificationPermissionOnce() {
         contract = ActivityResultContracts.RequestPermission(),
     ) { /* l'esito non cambia il flusso: senza permesso l'app funziona ma non notifica */ }
 
+    var asked by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
+        if (asked) return@LaunchedEffect
         val granted = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.POST_NOTIFICATIONS,
         ) == PackageManager.PERMISSION_GRANTED
+        asked = true
         if (!granted) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

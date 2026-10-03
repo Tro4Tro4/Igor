@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.igor.fridge.data.Transactor
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.FoodItem
 import com.igor.fridge.data.local.RemovalReason
@@ -16,6 +17,7 @@ import com.igor.fridge.domain.ExpiryStatus
 import com.igor.fridge.domain.currentDateFlow
 import com.igor.fridge.domain.expiryStatus
 import com.igor.fridge.ui.igorApplication
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 enum class InventoryFilter { TUTTI, IN_SCADENZA, SCADUTI, SENZA_DATA }
@@ -41,6 +44,9 @@ data class InventoryUiState(
     val noDateCount: Int = 0,
     val isLoading: Boolean = true,
     val message: String? = null,
+    /** Cambia a ogni messaggio: due messaggi uguali di seguito si mostrano entrambi. */
+    val messageId: Long = 0,
+    val canUndo: Boolean = false,
 )
 
 private data class Criteria(
@@ -48,6 +54,8 @@ private data class Criteria(
     val filter: InventoryFilter = InventoryFilter.TUTTI,
     val location: StorageLocation? = null,
     val message: String? = null,
+    val messageId: Long = 0,
+    val canUndo: Boolean = false,
 )
 
 class InventoryViewModel(
@@ -55,9 +63,20 @@ class InventoryViewModel(
     private val shoppingRepository: ShoppingRepository,
     warningDays: Flow<Int>,
     today: Flow<LocalDate>,
+    private val transactor: Transactor = Transactor.Direct,
 ) : ViewModel() {
 
     private val criteria = MutableStateFlow(Criteria())
+
+    /** Come disfare l'ultima eliminazione o consumazione: vive quanto lo snackbar. */
+    private var pendingUndo: (suspend () -> Unit)? = null
+    private var nextMessageId = 0L
+
+    private fun show(message: String, undo: (suspend () -> Unit)? = null) {
+        pendingUndo = undo
+        val id = ++nextMessageId
+        criteria.update { it.copy(message = message, messageId = id, canUndo = undo != null) }
+    }
 
     val uiState: StateFlow<InventoryUiState> =
         combine(
@@ -94,6 +113,8 @@ class InventoryViewModel(
                 noDateCount = statuses.values.count { it == ExpiryStatus.SENZA_DATA },
                 isLoading = false,
                 message = criteria.message,
+                messageId = criteria.messageId,
+                canUndo = criteria.canUndo,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -107,21 +128,53 @@ class InventoryViewModel(
 
     fun onLocationChange(value: StorageLocation?) = criteria.update { it.copy(location = value) }
 
-    fun onMessageShown() = criteria.update { it.copy(message = null) }
+    fun onMessageShown() {
+        pendingUndo = null
+        criteria.update { it.copy(message = null, canUndo = false) }
+    }
 
+    /** Un tocco accidentale sul cestino si annulla dallo snackbar. */
     fun delete(item: FoodItem) {
         viewModelScope.launch {
             foodRepository.remove(item, RemovalReason.ERRORE)
-            criteria.update { it.copy(message = "${item.name} eliminato") }
+            show("${item.name} eliminato") { foodRepository.restore(item) }
         }
     }
 
-    /** Segna il prodotto come consumato: esce dall'inventario ed entra nella lista della spesa. */
+    /**
+     * Segna il prodotto come consumato: esce dall'inventario ed entra nella lista della
+     * spesa, insieme. Uscire dalla schermata a meta' non lascia un prodotto fuori dal frigo
+     * e assente dalla lista.
+     */
     fun consume(item: FoodItem) {
         viewModelScope.launch {
-            foodRepository.remove(item, RemovalReason.CONSUMATO)
-            shoppingRepository.addIfAbsent(item.name, item.quantity, item.unit, item.knownCategory())
-            criteria.update { it.copy(message = "${item.name} spostato nella lista della spesa") }
+            val added = withContext(NonCancellable) {
+                transactor.run {
+                    foodRepository.remove(item, RemovalReason.CONSUMATO)
+                    shoppingRepository.addIfAbsent(
+                        item.name,
+                        item.quantity,
+                        item.unit,
+                        item.knownCategory(),
+                    )
+                }
+            }
+            show("${item.name} spostato nella lista della spesa") {
+                foodRepository.restore(item)
+                // La voce si toglie solo se l'ha creata questa consumazione.
+                if (added) shoppingRepository.removeUnchecked(item.name)
+            }
+        }
+    }
+
+    /** Disfa l'ultima eliminazione o consumazione. */
+    fun undo() {
+        val undo = pendingUndo ?: return
+        pendingUndo = null
+        criteria.update { it.copy(message = null, canUndo = false) }
+        viewModelScope.launch {
+            withContext(NonCancellable) { transactor.run { undo() } }
+            show("Annullato")
         }
     }
 
@@ -139,7 +192,7 @@ class InventoryViewModel(
                 added == 1 -> "1 prodotto aggiunto alla lista della spesa"
                 else -> "$added prodotti aggiunti alla lista della spesa"
             }
-            criteria.update { it.copy(message = text) }
+            show(text)
         }
     }
 
@@ -154,6 +207,7 @@ class InventoryViewModel(
                     shoppingRepository = container.shoppingRepository,
                     warningDays = container.settingsStore.warningDays,
                     today = currentDateFlow(),
+                    transactor = container.transactor,
                 )
             }
         }

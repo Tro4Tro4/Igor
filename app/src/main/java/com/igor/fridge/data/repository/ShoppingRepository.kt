@@ -184,6 +184,11 @@ class ShoppingRepository(
 
     suspend fun delete(item: ShoppingItem) = dao.delete(item)
 
+    /** Toglie la voce ancora da comprare con questo nome: annulla un [addIfAbsent]. */
+    suspend fun removeUnchecked(name: String) {
+        dao.findByNameKey(nameKeyOf(name))?.takeUnless { it.isChecked }?.let { dao.delete(it) }
+    }
+
     /** Le foto a cui la lista tiene ancora: le altre si possono cancellare. */
     suspend fun photoNames(): Set<String> = dao.photoPaths().toSet()
 }

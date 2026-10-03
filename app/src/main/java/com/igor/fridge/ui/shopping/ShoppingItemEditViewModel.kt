@@ -150,6 +150,14 @@ class ShoppingItemEditViewModel(
         it.copy(message = "Nessuna app fotocamera disponibile: scegli la foto dalla galleria")
     }
 
+    /** Senza un messaggio il rifiuto lascerebbe il pulsante muto, senza spiegare perche'. */
+    fun onCameraPermissionDenied() = _uiState.update {
+        it.copy(
+            message = "Senza il permesso della fotocamera scegli la foto dalla galleria, " +
+                "oppure concedilo dalle impostazioni di Android",
+        )
+    }
+
     fun onMessageShown() = _uiState.update { it.copy(message = null) }
 
     fun photoFile(name: String): File = photoStore.fileOf(name)

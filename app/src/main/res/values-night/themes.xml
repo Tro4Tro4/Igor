@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Con il tema scuro attivo, la finestra prima di Compose e' scura: niente lampo bianco. -->
+    <style name="Theme.Igor" parent="android:Theme.Material.NoActionBar" />
+</resources>

@@ -34,6 +34,7 @@
     <string name="shopping_title">Lista della spesa</string>
     <string name="shopping_add">Aggiungi alla lista</string>
     <string name="shopping_empty">La lista è vuota.</string>
+    <string name="shopping_empty_for_store">Niente da comprare da %1$s: togli il filtro per vedere il resto della lista.</string>
     <string name="shopping_move_to_fridge">Metti in frigo (%1$d)</string>
     <string name="action_undo">Annulla</string>
     <string name="edit_title_new">Nuovo alimento</string>
@@ -63,6 +64,8 @@
     <string name="scanner_back">Torna indietro</string>
     <string name="action_add">Aggiungi</string>
     <string name="action_delete">Elimina</string>
+    <string name="confirm_delete">Eliminare %1$s?</string>
+    <string name="prices_delete_confirm">Eliminare il prezzo del %1$s? Uscirà da medie e grafico.</string>
     <string name="action_save">Salva</string>
     <string name="action_increase">Aumenta</string>
     <string name="action_decrease">Diminuisci</string>
@@ -93,6 +96,7 @@
     <string name="saved_lists_one_item">1 prodotto</string>
     <string name="saved_lists_item_count">%1$d prodotti</string>
     <string name="action_more">Altre opzioni</string>
+    <string name="permission_open_settings">Apri le impostazioni</string>
     <string name="shopping_add_hint">Per esempio: 2 kg mele</string>
     <string name="shopping_share">Condividi la lista</string>
     <string name="shopping_price">Prezzo (€/%1$s)</string>

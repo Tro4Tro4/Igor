@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -29,12 +30,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,6 +43,7 @@ import com.igor.fridge.R
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.StorageLocation
+import com.igor.fridge.ui.components.ConfirmDeleteDialog
 import com.igor.fridge.ui.components.EnumDropdown
 import com.igor.fridge.ui.components.ExpiryDatePickerDialog
 import com.igor.fridge.ui.formatShort
@@ -64,6 +66,17 @@ fun EditItemScreen(
     ),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    if (confirmDelete) {
+        ConfirmDeleteDialog(
+            text = stringResource(R.string.confirm_delete, state.name.ifBlank { "questo alimento" }),
+            onConfirm = {
+                confirmDelete = false
+                viewModel.delete()
+            },
+            onDismiss = { confirmDelete = false },
+        )
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -104,7 +117,7 @@ fun EditItemScreen(
                 },
                 actions = {
                     if (!state.isNew) {
-                        IconButton(onClick = { viewModel.delete() }) {
+                        IconButton(onClick = { confirmDelete = true }) {
                             Icon(
                                 Icons.Filled.DeleteOutline,
                                 contentDescription = stringResource(R.string.action_delete),

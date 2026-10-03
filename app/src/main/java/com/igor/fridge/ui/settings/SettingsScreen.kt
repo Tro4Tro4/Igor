@@ -1,5 +1,8 @@
 package com.igor.fridge.ui.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -38,11 +41,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.igor.fridge.R
+import com.igor.fridge.ui.isPermissionPermanentlyDenied
+import com.igor.fridge.ui.openAppSettings
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,6 +64,28 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    // Accendere le notifiche senza il permesso di Android non servirebbe: si chiede, e
+    // se il sistema non lo chiede piu' si apre la pagina dell'app.
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            viewModel.onNotificationsToggle(true)
+        } else if (context.isPermissionPermanentlyDenied(Manifest.permission.POST_NOTIFICATIONS)) {
+            context.openAppSettings()
+        }
+    }
+    val onNotificationsChange: (Boolean) -> Unit = { enabled ->
+        val missing = enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        if (missing) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.onNotificationsToggle(enabled)
+        }
+    }
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri -> uri?.let(viewModel::exportTo) }
@@ -140,7 +169,7 @@ fun SettingsScreen(
                 )
                 Switch(
                     checked = state.notificationsEnabled,
-                    onCheckedChange = viewModel::onNotificationsToggle,
+                    onCheckedChange = onNotificationsChange,
                 )
             }
 

@@ -136,11 +136,12 @@ Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi 
 corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
 "3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-I test coprono 230 casi su 39 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
+I test sono quasi 300, tutti sulla JVM; Room e le foto girano sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
-**Database: versione 5.** Ogni cambio di schema alza la versione e porta la sua migrazione
-(da `MIGRATION_1_2` a `MIGRATION_4_5`): a versione invariata Room rifiuterebbe di aprire il
+**Database: versione 6.** Ogni cambio di schema alza la versione e porta la sua migrazione
+(da `MIGRATION_1_2` a `MIGRATION_5_6`, che aggiunge la colonna `nameKey` per cercare i nomi
+senza distinguere maiuscole anche con le lettere accentate): a versione invariata Room rifiuterebbe di aprire il
 database. Le migrazioni sono provate da `MigrationTest`, che apre con `IgorDatabase.build`
 un database della versione 1 scritto a mano. Non c’è più `fallbackToDestructiveMigration()`:
 con una migrazione mancante, o installando una versione più vecchia sopra una più nuova, Room
@@ -150,6 +151,13 @@ nell'artifact `room-schemas`, da scaricare e committare.
 
 **CI.** `.github/workflows/android.yml` compila l’app ed esegue tutti i test JVM, Robolectric
 compreso, a ogni push.
+
+**Privacy.** In Impostazioni › Privacy e dati si esportano tutti i dati in JSON e si cancella
+tutto. Il backup di Android include database (con il file WAL), foto e impostazioni, ma nel
+cloud solo se cifrato; l’accesso a Open Prices sta in un file a parte che non va mai nel
+backup. Prima di condividere uno scontrino se ne vede l’anteprima e si possono ritagliare le
+strisce con dati personali. ML Kit legge scontrini e codici sul telefono, ma può inviare a
+Google statistiche d’uso: l’app lo dice nella stessa sezione.
 
 ### Difetti noti
 

@@ -48,6 +48,7 @@ import com.igor.fridge.R
 import com.igor.fridge.data.local.PriceRecord
 import com.igor.fridge.domain.prices.ProductPriceSummary
 import com.igor.fridge.ui.compare.SearchOnChains
+import com.igor.fridge.ui.components.ConfirmDeleteDialog
 import com.igor.fridge.ui.formatChange
 import com.igor.fridge.ui.formatEuro
 import com.igor.fridge.ui.formatMonth
@@ -209,6 +210,17 @@ fun PriceHistoryScreen(
     ),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var pendingDelete by remember { mutableStateOf<PriceRecord?>(null) }
+    pendingDelete?.let { record ->
+        ConfirmDeleteDialog(
+            text = stringResource(R.string.prices_delete_confirm, record.purchasedOn.formatShort()),
+            onConfirm = {
+                pendingDelete = null
+                viewModel.delete(record)
+            },
+            onDismiss = { pendingDelete = null },
+        )
+    }
     val summary = state.summary
     val snackbarHostState = remember { SnackbarHostState() }
     var typingBarcode by remember { mutableStateOf(false) }
@@ -324,7 +336,7 @@ fun PriceHistoryScreen(
             }
             item { Text(stringResource(R.string.prices_purchases), style = MaterialTheme.typography.titleSmall) }
             items(items = state.records, key = { it.uuid }) { record ->
-                PurchaseRow(record = record, onDelete = { viewModel.delete(record) })
+                PurchaseRow(record = record, onDelete = { pendingDelete = record })
             }
         }
     }

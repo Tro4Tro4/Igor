@@ -61,6 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.igor.fridge.R
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
+import com.igor.fridge.ui.components.ConfirmDeleteDialog
 import com.igor.fridge.ui.components.EnumDropdown
 import com.igor.fridge.ui.components.PhotoThumbnail
 import com.igor.fridge.ui.formatShort
@@ -80,6 +81,17 @@ fun ShoppingItemEditScreen(
     ),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    if (confirmDelete) {
+        ConfirmDeleteDialog(
+            text = stringResource(R.string.confirm_delete, state.name.ifBlank { "questa voce" }),
+            onConfirm = {
+                confirmDelete = false
+                viewModel.delete()
+            },
+            onDismiss = { confirmDelete = false },
+        )
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -105,7 +117,7 @@ fun ShoppingItemEditScreen(
     }
     val requestCamera = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) launchCamera() }
+    ) { granted -> if (granted) launchCamera() else viewModel.onCameraPermissionDenied() }
     val pickPhoto = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri -> if (uri != null) viewModel.onPhotoChosen(uri) }
@@ -132,7 +144,7 @@ fun ShoppingItemEditScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.delete() }) {
+                    IconButton(onClick = { confirmDelete = true }) {
                         Icon(Icons.Filled.DeleteOutline, contentDescription = stringResource(R.string.action_delete))
                     }
                 },
@@ -183,15 +195,17 @@ fun ShoppingItemEditScreen(
                 IconButton(onClick = { viewModel.stepQuantity(1) }) {
                     Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_increase))
                 }
-                EnumDropdown(
-                    label = stringResource(R.string.edit_unit),
-                    value = state.unit,
-                    options = QuantityUnit.entries,
-                    optionLabel = { it.label() },
-                    onSelect = viewModel::onUnitChange,
-                    modifier = Modifier.weight(1f),
-                )
             }
+            // Su una riga sua: accanto a quantita' e pulsanti, su un telefono stretto
+            // etichetta e valore venivano tagliati.
+            EnumDropdown(
+                label = stringResource(R.string.edit_unit),
+                value = state.unit,
+                options = QuantityUnit.entries,
+                optionLabel = { it.label() },
+                onSelect = viewModel::onUnitChange,
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (state.quantityError) {
                 Text(
                     text = stringResource(R.string.error_quantity_invalid),

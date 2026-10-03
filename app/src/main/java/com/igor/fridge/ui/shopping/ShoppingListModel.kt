@@ -35,6 +35,8 @@ data class ShoppingUiState(
     val items: List<ShoppingItem> = emptyList(),
     val isLoading: Boolean = true,
     val message: String? = null,
+    /** Cambia a ogni messaggio: due messaggi uguali di seguito si mostrano entrambi. */
+    val messageId: Long = 0,
     val canUndo: Boolean = false,
     val categoryOrder: List<FoodCategory> = FoodCategory.entries,
     /** Negozio scelto nel filtro; null mostra tutto. */

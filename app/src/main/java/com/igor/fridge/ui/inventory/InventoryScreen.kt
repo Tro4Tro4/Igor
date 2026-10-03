@@ -1,6 +1,8 @@
 package com.igor.fridge.ui.inventory
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,13 +12,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -25,8 +29,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -65,10 +71,17 @@ fun InventoryScreen(
     var query by rememberSaveable { mutableStateOf(state.query) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.message) {
+    val undoLabel = stringResource(R.string.action_undo)
+    var menuOpen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.messageId) {
         val message = state.message ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
-        viewModel.onMessageShown()
+        val result = snackbarHostState.showSnackbar(
+            message = message,
+            actionLabel = if (state.canUndo) undoLabel else null,
+            duration = if (state.canUndo) SnackbarDuration.Long else SnackbarDuration.Short,
+        )
+        if (result == SnackbarResult.ActionPerformed) viewModel.undo() else viewModel.onMessageShown()
     }
 
     Scaffold(
@@ -77,11 +90,13 @@ fun InventoryScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.inventory_title)) },
+                // Due azioni in vista e il resto nel menu: con quattro icone il titolo
+                // veniva troncato sugli schermi stretti.
                 actions = {
-                    IconButton(onClick = { viewModel.addExpiringToShoppingList() }) {
+                    IconButton(onClick = onOpenShoppingList) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
-                            contentDescription = stringResource(R.string.action_add_expiring),
+                            imageVector = Icons.Filled.ShoppingCart,
+                            contentDescription = stringResource(R.string.action_open_shopping),
                         )
                     }
                     IconButton(onClick = onOpenReceipt) {
@@ -90,17 +105,33 @@ fun InventoryScreen(
                             contentDescription = stringResource(R.string.receipt_title),
                         )
                     }
-                    IconButton(onClick = onOpenShoppingList) {
-                        Icon(
-                            imageVector = Icons.Filled.ShoppingCart,
-                            contentDescription = stringResource(R.string.action_open_shopping),
-                        )
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = stringResource(R.string.action_settings),
-                        )
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = stringResource(R.string.action_more),
+                            )
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_add_expiring)) },
+                                leadingIcon = {
+                                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null)
+                                },
+                                onClick = {
+                                    menuOpen = false
+                                    viewModel.addExpiringToShoppingList()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_settings)) },
+                                leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onOpenSettings()
+                                },
+                            )
+                        }
                     }
                 },
             )

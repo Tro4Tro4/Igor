@@ -23,6 +23,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -211,6 +212,43 @@ class ShoppingViewModelTest {
     }
 
     @Test
+    fun `un'eliminazione si annulla e la voce torna com'era`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte", 2.0, store = "Coop")
+        val item = shoppingDao.items.single()
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+
+        vm.delete(item)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(shoppingDao.items.isEmpty())
+        assertEquals("Eliminato: Latte", vm.uiState.value.message)
+        assertTrue(vm.uiState.value.canUndo)
+
+        vm.undoLastMove()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(item.uuid, shoppingDao.items.single().uuid)
+        assertEquals("Coop", shoppingDao.items.single().store)
+        assertEquals("Ripristinato: Latte", vm.uiState.value.message)
+    }
+
+    @Test
+    fun `due messaggi uguali di seguito hanno id diversi`() = runTest(dispatcher) {
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+        val first = vm.uiState.value.messageId
+        vm.moveCheckedToInventory()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Nessun prodotto spuntato", vm.uiState.value.message)
+        assertNotEquals(first, vm.uiState.value.messageId)
+    }
+
+    @Test
     fun `quando il messaggio e' stato mostrato scade anche l'annullamento`() = runTest(dispatcher) {
         shoppingRepository.addIfAbsent("Latte")
         shoppingRepository.setChecked(shoppingDao.items.single(), checked = true)
@@ -371,6 +409,11 @@ class ShoppingViewModelTest {
         assertEquals(
             "2 prodotti messi in frigo, 2 tolti dalla lista; 2 restano in lista per la parte mancante",
             ShoppingViewModel.moveMessage(listOf(latte, pane), listOf(sapone, spugne), 2),
+        )
+        // Un non alimentare preso in parte non e' "tolto dalla lista".
+        assertEquals(
+            "1 voce resta in lista per la parte mancante",
+            ShoppingViewModel.moveMessage(emptyList(), emptyList(), 1),
         )
     }
 

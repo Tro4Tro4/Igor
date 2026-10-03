@@ -54,6 +54,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -96,7 +99,7 @@ fun ShoppingScreen(
     val context = LocalContext.current
     val shareTitle = stringResource(R.string.shopping_share)
 
-    LaunchedEffect(state.message) {
+    LaunchedEffect(state.messageId) {
         val message = state.message ?: return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
             message = message,
@@ -248,8 +251,14 @@ fun ShoppingScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
+                    // Con un negozio scelto la lista puo' avere voci, solo non per quel negozio.
+                    val activeStore = state.activeStore
                     Text(
-                        text = stringResource(R.string.shopping_empty),
+                        text = if (state.items.isNotEmpty() && activeStore != null) {
+                            stringResource(R.string.shopping_empty_for_store, activeStore)
+                        } else {
+                            stringResource(R.string.shopping_empty)
+                        },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -399,7 +408,9 @@ private fun ExpiryPromptDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "${item.category.icon()} ${item.name}",
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .semantics { contentDescription = item.name },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -444,7 +455,8 @@ private fun SectionHeader(icon: String, title: String, count: Int) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(text = icon, fontSize = 20.sp)
+            // Decorativa: TalkBack leggerebbe il nome dell'emoji prima della categoria.
+            Text(text = icon, fontSize = 20.sp, modifier = Modifier.clearAndSetSemantics {})
             Text(
                 text = "$title ($count)",
                 style = MaterialTheme.typography.titleSmall,

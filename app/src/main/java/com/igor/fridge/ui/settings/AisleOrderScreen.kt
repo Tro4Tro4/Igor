@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -81,7 +82,12 @@ fun AisleOrderScreen(
                         .padding(start = 16.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(text = category.icon(), fontSize = 20.sp)
+                    // Decorativa: TalkBack leggerebbe il nome dell'emoji prima della categoria.
+                    Text(
+                        text = category.icon(),
+                        fontSize = 20.sp,
+                        modifier = Modifier.clearAndSetSemantics {},
+                    )
                     Text(
                         text = category.label(),
                         style = MaterialTheme.typography.bodyLarge,

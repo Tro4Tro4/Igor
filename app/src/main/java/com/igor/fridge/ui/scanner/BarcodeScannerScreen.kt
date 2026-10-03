@@ -40,8 +40,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.igor.fridge.R
+import com.igor.fridge.ui.isPermissionPermanentlyDenied
+import com.igor.fridge.ui.openAppSettings
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -74,6 +77,13 @@ fun BarcodeScannerScreen(
 
     LaunchedEffect(Unit) {
         if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
+    // Di ritorno dalle impostazioni di Android il permesso puo' essere stato concesso.
+    LifecycleResumeEffect(Unit) {
+        hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        onPauseOrDispose {}
     }
 
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
@@ -166,8 +176,23 @@ fun BarcodeScannerScreen(
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                     )
-                    Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                        Text(stringResource(R.string.scanner_allow))
+                    // Dopo due rifiuti il sistema non chiede piu': resta la pagina dell'app.
+                    val blocked = permissionRequested &&
+                        context.isPermissionPermanentlyDenied(Manifest.permission.CAMERA)
+                    Button(
+                        onClick = {
+                            if (blocked) {
+                                context.openAppSettings()
+                            } else {
+                                permissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        },
+                    ) {
+                        Text(
+                            stringResource(
+                                if (blocked) R.string.permission_open_settings else R.string.scanner_allow,
+                            ),
+                        )
                     }
                     Button(onClick = onClose) { Text(stringResource(R.string.scanner_back)) }
                 }

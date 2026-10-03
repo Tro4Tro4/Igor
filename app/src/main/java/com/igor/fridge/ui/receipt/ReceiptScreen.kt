@@ -121,7 +121,7 @@ fun ReceiptScreen(
     }
     val requestCamera = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) launchCamera() }
+    ) { granted -> if (granted) launchCamera() else viewModel.onCameraPermissionDenied() }
     val pickPhoto = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri -> if (uri != null) viewModel.onImageChosen(uri) }

@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.RemoveShoppingCart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.igor.fridge.R
 import com.igor.fridge.data.local.FoodItem
@@ -77,21 +79,26 @@ fun FoodItemCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = statusColor,
                 )
+                val details = listOfNotNull(
+                    formatQuantity(item.quantity, item.unit),
+                    item.brand,
+                    item.location.label(),
+                )
                 Text(
-                    text = listOfNotNull(
-                        formatQuantity(item.quantity, item.unit),
-                        item.brand,
-                        item.location.label(),
-                        "${item.category.icon()} ${item.category.label()}",
-                    ).joinToString(" · "),
+                    text = (details + "${item.category.icon()} ${item.category.label()}")
+                        .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // A TalkBack la stessa riga senza l'emoji della categoria.
+                    modifier = Modifier.semantics {
+                        contentDescription = (details + item.category.label()).joinToString(", ")
+                    },
                 )
             }
 
             IconButton(onClick = onConsume) {
                 Icon(
-                    imageVector = Icons.Filled.RemoveShoppingCart,
+                    imageVector = Icons.Filled.AddShoppingCart,
                     contentDescription = stringResource(R.string.action_consume),
                 )
             }

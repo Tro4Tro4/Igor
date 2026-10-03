@@ -7,6 +7,7 @@ import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
 import java.io.IOException
+import kotlin.math.roundToInt
 
 /**
  * Legge un'immagine da un Uri ridotta a [maxSidePx] sul lato lungo e raddrizzata secondo
@@ -97,8 +98,11 @@ private fun transformUpright(bitmap: Bitmap, orientation: Int): Bitmap {
 /** Toglie le strisce indicate da [crop]; l'originale viene liberato. */
 internal fun cropVertical(bitmap: Bitmap, crop: VerticalCrop): Bitmap {
     if (crop.isNone) return bitmap
-    val top = (bitmap.height * crop.top).toInt()
-    val height = (bitmap.height * (1f - crop.top - crop.bottom)).toInt().coerceIn(1, bitmap.height - top)
+    // Le strisce si arrotondano ai pixel una per una: 1000 * (1 - 0,1 - 0,3) in virgola
+    // mobile fa 599,99..., e troncandolo si perderebbe una riga.
+    val top = (bitmap.height * crop.top).roundToInt()
+    val bottom = (bitmap.height * crop.bottom).roundToInt()
+    val height = (bitmap.height - top - bottom).coerceIn(1, bitmap.height - top)
     val cropped = Bitmap.createBitmap(bitmap, 0, top, bitmap.width, height)
     if (cropped !== bitmap) bitmap.recycle()
     return cropped
