@@ -194,7 +194,7 @@ class ReceiptViewModel(
             val fragments = reader.read(source)
             if (fragments == null) {
                 _uiState.update {
-                    it.copy(phase = ReceiptPhase.CHOOSE, message = "Impossibile leggere la foto")
+                    it.copy(phase = ReceiptPhase.CHOOSE, message = "Impossibile leggere lo scontrino")
                 }
                 return@launch
             }
@@ -302,6 +302,10 @@ class ReceiptViewModel(
     }
 
     /** Senza un messaggio il rifiuto lascerebbe il pulsante muto, senza spiegare perche'. */
+    fun onFilePickerUnavailable() = _uiState.update {
+        it.copy(message = "Nessuna app per scegliere i file: fotografa lo scontrino o sceglilo dalla galleria")
+    }
+
     fun onCameraPermissionDenied() = _uiState.update {
         it.copy(
             message = "Senza il permesso della fotocamera scegli la foto dalla galleria, " +

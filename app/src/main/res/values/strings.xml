@@ -115,9 +115,10 @@
     <string name="aisle_order_up">Sposta %1$s più su</string>
     <string name="aisle_order_down">Sposta %1$s più giù</string>
     <string name="receipt_title">Carica uno scontrino</string>
-    <string name="receipt_intro">Fotografa lo scontrino: Igor riconosce i prodotti e i prezzi, propone la categoria e ti chiede solo ciò che manca.</string>
+    <string name="receipt_intro">Fotografa lo scontrino o scegli il PDF di quello digitale: Igor riconosce i prodotti e i prezzi, propone la categoria e ti chiede solo ciò che manca.</string>
     <string name="receipt_take_photo">Fotografa lo scontrino</string>
     <string name="receipt_pick_photo">Scegli dalla galleria</string>
+    <string name="receipt_pick_pdf">Scegli un PDF</string>
     <string name="receipt_tips">Per una lettura migliore: scontrino disteso e dritto, ben illuminato, tutto nell’inquadratura.</string>
     <string name="receipt_reading">Lettura dello scontrino…</string>
     <string name="receipt_saving">Salvataggio…</string>

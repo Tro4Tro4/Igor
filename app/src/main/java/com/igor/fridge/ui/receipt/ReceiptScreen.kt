@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -125,6 +126,10 @@ fun ReceiptScreen(
     val pickPhoto = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri -> if (uri != null) viewModel.onImageChosen(uri) }
+    // Il selettore delle foto non mostra i PDF: per lo scontrino digitale serve quello dei file.
+    val pickPdf = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> if (uri != null) viewModel.onImageChosen(uri) }
 
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
@@ -176,6 +181,13 @@ fun ReceiptScreen(
                 },
                 onGallery = {
                     pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
+                onPdf = {
+                    try {
+                        pickPdf.launch(arrayOf("application/pdf"))
+                    } catch (e: ActivityNotFoundException) {
+                        viewModel.onFilePickerUnavailable()
+                    }
                 },
             )
 
@@ -329,6 +341,7 @@ fun ReceiptScreen(
 private fun ChooseImage(
     onCamera: () -> Unit,
     onGallery: () -> Unit,
+    onPdf: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -347,6 +360,10 @@ private fun ChooseImage(
         OutlinedButton(onClick = onGallery, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.PhotoLibrary, contentDescription = null)
             Text(stringResource(R.string.receipt_pick_photo), modifier = Modifier.padding(start = 8.dp))
+        }
+        OutlinedButton(onClick = onPdf, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.PictureAsPdf, contentDescription = null)
+            Text(stringResource(R.string.receipt_pick_pdf), modifier = Modifier.padding(start = 8.dp))
         }
         Text(
             text = stringResource(R.string.receipt_tips),

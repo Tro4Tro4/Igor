@@ -207,7 +207,7 @@ class ReceiptViewModelTest {
         vm.onImageChosen(photo)
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(ReceiptPhase.CHOOSE, vm.uiState.value.phase)
-        assertEquals("Impossibile leggere la foto", vm.uiState.value.message)
+        assertEquals("Impossibile leggere lo scontrino", vm.uiState.value.message)
 
         vm.read("GRAZIE E ARRIVEDERCI")
         assertEquals(ReceiptPhase.CHOOSE, vm.uiState.value.phase)
