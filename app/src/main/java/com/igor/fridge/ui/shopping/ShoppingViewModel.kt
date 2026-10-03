@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.FoodItem
+import com.igor.fridge.data.local.PriceRecord
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.RemovalReason
 import com.igor.fridge.data.local.ShoppingItem
@@ -41,6 +42,7 @@ class ShoppingViewModel(
     private val foodRepository: FoodRepository,
     private val photoStore: PhotoStore,
     categoryOrder: Flow<List<FoodCategory>> = flowOf(FoodCategory.entries),
+    private val lastPrice: suspend (String) -> PriceRecord? = { null },
 ) : ViewModel() {
 
     private val storeFilter = MutableStateFlow<String?>(null)
@@ -83,6 +85,7 @@ class ShoppingViewModel(
      * quella che il prodotto ha avuto per ultimo in inventario, se c'e' passato e non era
      * "Altro"; altrimenti la propone il repository a partire dal nome. Con un negozio
      * scelto nel filtro, la voce nasce per quel negozio: e' li' che la si sta scrivendo.
+     * Il prezzo e' l'ultimo pagato per quel prodotto, se e' espresso nella stessa unita'.
      */
     fun add(text: String) {
         val entry = parseQuickEntry(text)
@@ -91,11 +94,14 @@ class ShoppingViewModel(
         viewModelScope.launch {
             val known = foodRepository.findLastByName(entry.name)?.category
                 ?.takeIf { it != FoodCategory.ALTRO }
+            val paid = lastPrice(entry.name)
+            val unit = entry.unit ?: paid?.referenceUnit ?: QuantityUnit.PZ
             shoppingRepository.addIfAbsent(
                 name = entry.name,
                 quantity = entry.quantity ?: 1.0,
-                unit = entry.unit ?: QuantityUnit.PZ,
+                unit = unit,
                 category = known,
+                unitPriceCents = paid?.takeIf { it.referenceUnit == unit }?.unitPriceCents,
                 store = store,
             )
         }
@@ -257,6 +263,7 @@ class ShoppingViewModel(
                     foodRepository = container.foodRepository,
                     photoStore = container.photoStore,
                     categoryOrder = container.settingsStore.categoryOrder,
+                    lastPrice = container.priceRepository::latest,
                 )
             }
         }

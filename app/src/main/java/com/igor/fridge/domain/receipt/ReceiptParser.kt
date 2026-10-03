@@ -23,7 +23,9 @@ data class ReceiptEntry(
  * corrisponde al conto, o in mancanza a quello sopra. Un formato nel nome ("1L", "500G")
  * vale come quantita' quando manca il dettaglio.
  *
- * Sconti, resi e righe di servizio si scartano; dopo il totale non ci sono piu' prodotti.
+ * Uno sconto ("SCONTO PASTA -0,20", "PROMO 0,50-") riduce l'importo del prodotto sopra:
+ * il prezzo che interessa tenere d'occhio e' quello pagato. Resi e righe di servizio si
+ * scartano; dopo il totale non ci sono piu' prodotti.
  * Cio' che non e' leggibile si salta: la schermata di conferma permette di correggere, ma
  * non di scoprire una riga inventata.
  */
@@ -50,6 +52,16 @@ fun parseReceipt(lines: List<String>): List<ReceiptEntry> {
             } else {
                 pending = detail
                 pendingAbove = if (above >= 0 && !lastHasDetail) above else -1
+            }
+            continue
+        }
+
+        val discount = parseDiscount(line)
+        if (discount != null) {
+            val last = entries.lastIndex
+            if (last >= 0) {
+                val price = entries[last].price
+                if (price != null) entries[last] = entries[last].copy(price = (price - discount).coerceAtLeast(0.0))
             }
             continue
         }
@@ -105,6 +117,23 @@ private fun parseDetail(line: String): Detail? {
     return null
 }
 
+/**
+ * L'importo di una riga di sconto, in positivo: un importo col segno meno (davanti o, come
+ * stampano molte casse, dietro) oppure una riga che si dichiara sconto.
+ */
+private fun parseDiscount(line: String): Double? {
+    val tokens = line.split(Regex("\\s+"))
+    var index = tokens.lastIndex
+    while (index >= 0 && isMarker(tokens[index])) index--
+    if (index < 0) return null
+    val token = tokens[index]
+    val match = DISCOUNT_AMOUNT.matchEntire(token) ?: return null
+    val signed = token.startsWith("-") || token.endsWith("-")
+    val declared = DISCOUNT_WORDS.containsMatchIn(line.uppercase(Locale.ITALIAN))
+    if (!signed && !declared) return null
+    return amount(match.groupValues[1])?.takeIf { it > 0.0 }
+}
+
 private fun parseProductLine(line: String): ReceiptEntry? {
     val tokens = line.split(Regex("\\s+")).toMutableList()
     // L'importo e' l'ultimo numero con due decimali; dopo possono esserci solo marcatori.
@@ -158,6 +187,8 @@ private fun amount(text: String): Double? =
     text.removePrefix("-").replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() }
 
 private val PRICE = Regex("^-?\\d{1,4}[.,]\\d{2}$")
+private val DISCOUNT_AMOUNT = Regex("^-?(\\d{1,4}[.,]\\d{2})-?$")
+private val DISCOUNT_WORDS = Regex("\\b(SCONTO|SCONTI|PROMO|ABBUONO|RIDUZIONE|OFFERTA)\\b")
 private val PIECES = Regex("^(\\d{1,3})\\s*[xX*]\\s*(\\d{1,4}[.,]\\d{2})(?:\\s.*)?$")
 private val WEIGHT = Regex(
     "^(\\d{1,3}[.,]\\d{1,3})\\s*(?:kg|KG|Kg)\\s*[xX*]\\s*(\\d{1,4}[.,]\\d{2})(?:\\s.*)?$",

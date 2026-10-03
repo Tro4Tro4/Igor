@@ -90,8 +90,8 @@ possibile installare l’Android SDK né eseguire `./gradlew`. È stato verifica
 **Da verificare con `./gradlew assembleDebug testDebugUnitTest`:** le schermate Compose,
 `FilePhotoStore`, l’elaborazione KSP di Room e i test Robolectric (`SavedListDaoTest`,
 `MigrationTest`, `ShoppingItemEditViewModelTest`, `ReceiptViewModelTest`,
-`SettingsStoreTest`) e il riconoscimento ML Kit su scontrini veri. La prima build genera
-`app/schemas/com.igor.fridge.data.local.IgorDatabase/3.json`, che va committato.
+`SettingsStoreTest`, `PriceRecordDaoTest`), il grafico dei prezzi e il riconoscimento ML Kit su scontrini veri. La prima build genera
+`app/schemas/com.igor.fridge.data.local.IgorDatabase/4.json`, che va committato.
 
 ## Seconda tornata: i sei suggerimenti e lo scontrino
 
@@ -163,11 +163,48 @@ inventario è quello della lista ("Mozzarella"), più leggibile di quello della 
 - L'abbinamento con la lista richiede che ogni parola della voce compaia nella riga
   ("Latte di soia" non corrisponde a "LATTE PS").
 
+## Terza tornata: monitoraggio dei prezzi
+
+Ogni scontrino confermato lascia un **prezzo per riga** nello storico (`price_records`, database
+versione 4, `MIGRATION_3_4`). La schermata **Prezzi** (menu ⋮ della lista, o "Vedi i prezzi"
+a fine scontrino) mostra:
+- per ogni prodotto, l'ultimo prezzo, la variazione rispetto all'acquisto precedente
+  (▲/▼ con percentuale; il colore accompagna, non sostituisce, segno e freccia), il prezzo
+  minimo e il massimo, il numero di acquisti, la data e il negozio dell'ultimo;
+- la spesa di ogni mese (ultimi sei), sommando gli scontrini registrati;
+- per ogni prodotto, il dettaglio: ultimo, minimo, medio e massimo, un grafico
+  dell'andamento con l'asse delle date (il tocco legge il singolo acquisto) e la tabella
+  di tutti gli acquisti. Da lì si può togliere un prezzo letto male.
+
+### Decisioni
+
+- **Si registra il prezzo pagato**: gli sconti stampati sotto un prodotto ("SCONTO -0,20",
+  "PROMO 0,50-") ne riducono l'importo.
+- **Prezzo per unità di riferimento**: al kg per grammi e chili, al litro per millilitri e
+  litri, al pezzo o alla confezione altrimenti. Così 500 g e 1 kg di pasta si confrontano.
+  Acquisti in unità diverse (le mele a peso e al pezzo) non si mescolano.
+- **Negozio e data dallo scontrino**: l'insegna in testa e la prima data plausibile (non nel
+  futuro). Nella revisione sono modificabili, e lo è anche il prezzo di ogni riga.
+- **La spunta di una riga ora vuol dire "tieni"**: gli alimenti tenuti vanno in frigo,
+  tutte le righe tenute con un importo finiscono nello storico. Così il detersivo non entra
+  in frigo, ma il suo prezzo sì.
+- **Raggruppamento per nome normalizzato** (minuscole, senza accenti e punteggiatura). Il
+  nome è quello confermato nella revisione, che per le voci abbinate alla lista è il nome
+  della lista: correggere il nome una volta rende confrontabili gli scontrini successivi.
+- **Il prezzo torna nella spesa**: una voce nuova riceve l'ultimo prezzo pagato se l'unità
+  coincide, e la scheda della voce mostra "Ultimo prezzo pagato" con il pulsante "Usa".
+
+### Limiti
+
+- Lo stesso prodotto scritto in modi diversi dalla cassa ("LATTE PS GRANAROLO" e "LATTE
+  GRANAROLO PS") resta su due righe finché non lo si rinomina nella revisione.
+- La spesa mensile conta solo gli scontrini caricati.
+
 ## Suggerimenti per i passi successivi
 
 1. **Inserimento vocale** (già nella spec della Fase 3): il parser di `QuickEntry` è pronto
    per essere riusato.
-2. **Prezzo in inventario e storico dei prezzi**, a partire dagli scontrini: andamento del
-   costo di un prodotto e della spesa mensile.
+2. **Unire due prodotti** nello storico dei prezzi (nomi di cassa diversi per lo stesso
+   articolo), e un alias che lo ricordi per gli scontrini successivi.
 3. **Suggerimenti** dai prodotti consumati più spesso ("di solito compri…").
 4. **Cancellazione logica** anche per `shopping_items`, prima di qualunque sincronizzazione.

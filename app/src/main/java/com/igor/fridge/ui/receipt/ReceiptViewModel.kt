@@ -14,14 +14,19 @@ import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.data.photos.PhotoStore
 import com.igor.fridge.data.receipt.ReceiptReader
 import com.igor.fridge.data.repository.FoodRepository
+import com.igor.fridge.data.repository.PriceRepository
+import com.igor.fridge.data.repository.Purchase
 import com.igor.fridge.data.repository.ShoppingRepository
 import com.igor.fridge.domain.guessCategory
 import com.igor.fridge.domain.receipt.ReceiptEntry
 import com.igor.fridge.domain.receipt.groupIntoRows
 import com.igor.fridge.domain.receipt.parseReceipt
+import com.igor.fridge.domain.receipt.parseReceiptMeta
 import com.igor.fridge.domain.receipt.receiptMatches
 import com.igor.fridge.ui.formatNumber
+import com.igor.fridge.ui.formatPriceInput
 import com.igor.fridge.ui.igorApplication
+import com.igor.fridge.ui.parsePriceCents
 import com.igor.fridge.ui.parseQuantity
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +48,8 @@ data class ReceiptDraft(
     val quantityText: String,
     val unit: QuantityUnit,
     val expiryDate: LocalDate? = null,
-    val priceCents: Long? = null,
+    /** Importo della riga com'e' stampato (sconti compresi), modificabile se l'OCR sbaglia. */
+    val priceText: String = "",
     /** La quantita' non si legge dallo scontrino e va chiesta (prodotti a peso). */
     val quantityToConfirm: Boolean = false,
     /** La voce della lista della spesa che questo acquisto soddisfa. */
@@ -53,9 +59,13 @@ data class ReceiptDraft(
     val knownLocation: StorageLocation? = null,
     val quantityError: Boolean = false,
     val nameError: Boolean = false,
+    val priceError: Boolean = false,
 ) {
+    /** Va in frigo: e' stato tenuto ed e' un alimento. Gli altri lasciano solo il prezzo. */
+    val goesToFridge: Boolean get() = include && category.isFood
+
     /** Un prodotto fresco senza scadenza: la si chiede prima di salvare. */
-    val needsExpiry: Boolean get() = include && category.isFood && category.isPerishable && expiryDate == null
+    val needsExpiry: Boolean get() = goesToFridge && category.isPerishable && expiryDate == null
 
     /** In frigo va dove era stato messo l'ultima volta, se e' lo stesso prodotto. */
     val location: StorageLocation
@@ -65,12 +75,17 @@ data class ReceiptDraft(
 data class ReceiptUiState(
     val phase: ReceiptPhase = ReceiptPhase.CHOOSE,
     val drafts: List<ReceiptDraft> = emptyList(),
+    /** Negozio e data dello scontrino: danno senso ai prezzi registrati. */
+    val store: String = "",
+    val purchaseDate: LocalDate = LocalDate.now(),
     val message: String? = null,
     /** Quanti prodotti freschi sono ancora senza scadenza, mentre si chiede se procedere. */
     val missingExpiryPrompt: Int? = null,
     val summary: String? = null,
 ) {
     val includedCount: Int get() = drafts.count { it.include }
+
+    val fridgeCount: Int get() = drafts.count { it.goesToFridge }
 }
 
 /**
@@ -80,17 +95,21 @@ data class ReceiptUiState(
  * conferma. La categoria si decide come altrove: quella dell'ultima volta che il prodotto e'
  * stato in casa, poi quella della voce di lista che lo scontrino soddisfa, poi la proposta
  * dal nome. I prodotti a peso senza peso stampato chiedono la quantita', quelli freschi la
- * scadenza; cio' che non si mangia parte escluso. Confermando, le voci della lista della
- * spesa soddisfatte escono dalla lista.
+ * scadenza. Confermando, gli alimenti entrano in frigo, ogni riga con un importo finisce
+ * nello storico dei prezzi (con negozio e data dello scontrino) e le voci della lista della
+ * spesa soddisfatte escono dalla lista. Cio' che non si mangia non va in frigo, ma il suo
+ * prezzo si registra: anche il detersivo fa parte della spesa.
  */
 class ReceiptViewModel(
     private val reader: ReceiptReader,
     private val photoStore: PhotoStore,
     private val foodRepository: FoodRepository,
     private val shoppingRepository: ShoppingRepository,
+    private val priceRepository: PriceRepository,
+    private val today: () -> LocalDate = LocalDate::now,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ReceiptUiState())
+    private val _uiState = MutableStateFlow(ReceiptUiState(purchaseDate = today()))
     val uiState: StateFlow<ReceiptUiState> = _uiState.asStateFlow()
 
     private var nextId = 0
@@ -107,7 +126,8 @@ class ReceiptViewModel(
                 }
                 return@launch
             }
-            val entries = parseReceipt(groupIntoRows(fragments))
+            val rows = groupIntoRows(fragments)
+            val entries = parseReceipt(rows)
             if (entries.isEmpty()) {
                 _uiState.update {
                     it.copy(
@@ -118,7 +138,15 @@ class ReceiptViewModel(
                 return@launch
             }
             val drafts = buildDrafts(entries)
-            _uiState.update { it.copy(phase = ReceiptPhase.REVIEW, drafts = drafts) }
+            val meta = parseReceiptMeta(rows, today())
+            _uiState.update {
+                it.copy(
+                    phase = ReceiptPhase.REVIEW,
+                    drafts = drafts,
+                    store = meta.store.orEmpty(),
+                    purchaseDate = meta.date ?: today(),
+                )
+            }
         }
     }
 
@@ -137,7 +165,7 @@ class ReceiptViewModel(
             val toConfirm = entry.quantity == null && category.isSoldByWeight
             ReceiptDraft(
                 id = nextId++,
-                include = category.isFood,
+                include = true,
                 name = name,
                 category = category,
                 quantityText = when {
@@ -146,7 +174,7 @@ class ReceiptViewModel(
                     else -> "1"
                 },
                 unit = entry.unit ?: if (toConfirm) QuantityUnit.KG else QuantityUnit.PZ,
-                priceCents = entry.price?.let { Math.round(it * 100) },
+                priceText = entry.price?.let { formatPriceInput(Math.round(it * 100)) }.orEmpty(),
                 quantityToConfirm = toConfirm,
                 shoppingMatch = match,
                 knownCategory = known?.category,
@@ -168,6 +196,12 @@ class ReceiptViewModel(
 
     fun onExpiryChange(id: Int, date: LocalDate?) = updateDraft(id) { it.copy(expiryDate = date) }
 
+    fun onPriceChange(id: Int, text: String) = updateDraft(id) { it.copy(priceText = text, priceError = false) }
+
+    fun onStoreChange(store: String) = _uiState.update { it.copy(store = store) }
+
+    fun onDateChange(date: LocalDate) = _uiState.update { it.copy(purchaseDate = date) }
+
     /** Una riga che il riconoscimento ha perso si aggiunge a mano. */
     fun addDraft() = _uiState.update { state ->
         state.copy(
@@ -187,7 +221,7 @@ class ReceiptViewModel(
     fun dismissMissingExpiry() = _uiState.update { it.copy(missingExpiryPrompt = null) }
 
     /** Riparte da capo con un'altra foto. */
-    fun restart() = _uiState.update { ReceiptUiState() }
+    fun restart() = _uiState.update { ReceiptUiState(purchaseDate = today()) }
 
     /**
      * Mette in inventario le bozze incluse. Se dei prodotti freschi non hanno scadenza lo
@@ -204,12 +238,13 @@ class ReceiptViewModel(
                 draft.copy(
                     nameError = draft.name.isBlank(),
                     quantityError = parseQuantity(draft.quantityText) == null,
+                    priceError = draft.priceText.isNotBlank() && parsePriceCents(draft.priceText) == null,
                 )
             }
         }
-        if (checked.any { it.nameError || it.quantityError }) {
+        if (checked.any { it.nameError || it.quantityError || it.priceError }) {
             _uiState.update {
-                it.copy(drafts = checked, message = "Completa i nomi e le quantità evidenziati")
+                it.copy(drafts = checked, message = "Correggi i campi evidenziati")
             }
             return
         }
@@ -229,7 +264,8 @@ class ReceiptViewModel(
             // Come per "Metti in frigo": la sequenza va conclusa anche se si lascia la
             // schermata, altrimenti meta' scontrino resterebbe fuori dal frigo.
             withContext(NonCancellable) {
-                included.forEach { draft ->
+                val toFridge = included.filter { it.goesToFridge }
+                toFridge.forEach { draft ->
                     foodRepository.save(
                         FoodItem(
                             uuid = "",
@@ -242,11 +278,27 @@ class ReceiptViewModel(
                         ),
                     )
                 }
+                val prices = priceRepository.record(
+                    purchases = included.mapNotNull { draft ->
+                        val total = parsePriceCents(draft.priceText) ?: return@mapNotNull null
+                        Purchase(
+                            name = draft.name,
+                            quantity = parseQuantity(draft.quantityText) ?: 1.0,
+                            unit = draft.unit,
+                            totalCents = total,
+                        )
+                    },
+                    store = state.store,
+                    date = state.purchaseDate,
+                )
                 val fromList = included.mapNotNull { it.shoppingMatch }
                 fromList.forEach { shoppingRepository.delete(it) }
 
                 _uiState.update {
-                    it.copy(phase = ReceiptPhase.DONE, summary = summaryOf(included.size, fromList.size))
+                    it.copy(
+                        phase = ReceiptPhase.DONE,
+                        summary = summaryOf(toFridge.size, prices, fromList.size),
+                    )
                 }
             }
         }
@@ -257,14 +309,23 @@ class ReceiptViewModel(
     }
 
     companion object {
-        internal fun summaryOf(added: Int, fromList: Int): String {
-            val first = if (added == 1) "1 prodotto aggiunto in frigo" else "$added prodotti aggiunti in frigo"
-            return when (fromList) {
-                0 -> first
-                1 -> "$first; 1 tolto dalla lista della spesa"
-                else -> "$first; $fromList tolti dalla lista della spesa"
-            }
-        }
+        internal fun summaryOf(added: Int, prices: Int, fromList: Int): String = listOfNotNull(
+            when (added) {
+                0 -> "Nessun prodotto in frigo"
+                1 -> "1 prodotto aggiunto in frigo"
+                else -> "$added prodotti aggiunti in frigo"
+            },
+            when (prices) {
+                0 -> null
+                1 -> "1 prezzo registrato"
+                else -> "$prices prezzi registrati"
+            },
+            when (fromList) {
+                0 -> null
+                1 -> "1 tolto dalla lista della spesa"
+                else -> "$fromList tolti dalla lista della spesa"
+            },
+        ).joinToString("; ")
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -274,6 +335,7 @@ class ReceiptViewModel(
                     photoStore = container.photoStore,
                     foodRepository = container.foodRepository,
                     shoppingRepository = container.shoppingRepository,
+                    priceRepository = container.priceRepository,
                 )
             }
         }

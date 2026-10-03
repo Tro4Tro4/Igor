@@ -9,8 +9,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [FoodItem::class, ShoppingItem::class, SavedList::class, SavedListItem::class],
-    version = 3,
+    entities = [
+        FoodItem::class,
+        ShoppingItem::class,
+        SavedList::class,
+        SavedListItem::class,
+        PriceRecord::class,
+    ],
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -21,6 +27,8 @@ abstract class IgorDatabase : RoomDatabase() {
     abstract fun shoppingItemDao(): ShoppingItemDao
 
     abstract fun savedListDao(): SavedListDao
+
+    abstract fun priceRecordDao(): PriceRecordDao
 
     companion object {
         const val DATABASE_NAME = "igor-database"
@@ -81,6 +89,26 @@ abstract class IgorDatabase : RoomDatabase() {
             "ALTER TABLE `saved_list_items` ADD COLUMN `store` TEXT",
         )
 
+        /** Lo storico dei prezzi letti dagli scontrini: una tabella nuova, nient'altro. */
+        val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_3_4_SQL.forEach(db::execSQL)
+            }
+        }
+
+        internal val MIGRATION_3_4_SQL: List<String> = listOf(
+            "CREATE TABLE IF NOT EXISTS `price_records` (`uuid` TEXT NOT NULL, " +
+                "`productKey` TEXT NOT NULL, `productName` TEXT NOT NULL, " +
+                "`purchasedOn` INTEGER NOT NULL, `store` TEXT, `quantity` REAL NOT NULL, " +
+                "`unit` TEXT NOT NULL, `totalCents` INTEGER NOT NULL, " +
+                "`unitPriceCents` INTEGER NOT NULL, `referenceUnit` TEXT NOT NULL, " +
+                "`createdAt` INTEGER NOT NULL, PRIMARY KEY(`uuid`))",
+            "CREATE INDEX IF NOT EXISTS `index_price_records_productKey` " +
+                "ON `price_records` (`productKey`)",
+            "CREATE INDEX IF NOT EXISTS `index_price_records_purchasedOn` " +
+                "ON `price_records` (`purchasedOn`)",
+        )
+
         /**
          * DA RIMUOVERE il fallback distruttivo: ora che esiste una migrazione serve solo a
          * non far morire l'app su un salto di versione per cui manchi la migrazione, ma
@@ -96,7 +124,7 @@ abstract class IgorDatabase : RoomDatabase() {
                 context.applicationContext,
                 IgorDatabase::class.java,
                 name,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build()
     }

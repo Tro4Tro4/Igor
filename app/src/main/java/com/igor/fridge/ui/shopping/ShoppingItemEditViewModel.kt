@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.igor.fridge.data.local.FoodCategory
+import com.igor.fridge.data.local.PriceRecord
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.photos.PhotoStore
 import com.igor.fridge.data.repository.ShoppingRepository
@@ -36,6 +37,8 @@ data class ShoppingItemEditUiState(
     val store: String = "",
     /** Negozi gia' usati nella lista, da proporre. */
     val knownStores: List<String> = emptyList(),
+    /** L'ultimo prezzo pagato per questo prodotto, letto dagli scontrini. */
+    val lastPaid: PriceRecord? = null,
     val isImportingPhoto: Boolean = false,
     val nameError: Boolean = false,
     val quantityError: Boolean = false,
@@ -53,6 +56,7 @@ class ShoppingItemEditViewModel(
     private val itemUuid: String,
     private val repository: ShoppingRepository,
     private val photoStore: PhotoStore,
+    private val lastPrice: suspend (String) -> PriceRecord? = { null },
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ShoppingItemEditUiState())
@@ -82,6 +86,7 @@ class ShoppingItemEditViewModel(
                     .mapNotNull { it.store?.trim()?.takeIf(String::isNotEmpty) }
                     .distinctBy { it.lowercase() }
                     .sortedWith(String.CASE_INSENSITIVE_ORDER),
+                lastPaid = lastPrice(item.name),
             )
         }
     }
@@ -107,6 +112,19 @@ class ShoppingItemEditViewModel(
     fun onNotesChange(value: String) = _uiState.update { it.copy(notes = value) }
 
     fun onPriceChange(value: String) = _uiState.update { it.copy(priceText = value, priceError = false) }
+
+    /**
+     * Usa l'ultimo prezzo pagato: anche l'unita' passa a quella del prezzo (€/kg, €/l),
+     * altrimenti il numero non vorrebbe dire nulla.
+     */
+    fun useLastPaid() = _uiState.update { state ->
+        val paid = state.lastPaid ?: return@update state
+        state.copy(
+            priceText = formatPriceInput(paid.unitPriceCents),
+            unit = paid.referenceUnit,
+            priceError = false,
+        )
+    }
 
     fun onStoreChange(value: String) = _uiState.update { it.copy(store = value) }
 
@@ -209,6 +227,7 @@ class ShoppingItemEditViewModel(
                     itemUuid = itemUuid,
                     repository = container.shoppingRepository,
                     photoStore = container.photoStore,
+                    lastPrice = container.priceRepository::latest,
                 )
             }
         }

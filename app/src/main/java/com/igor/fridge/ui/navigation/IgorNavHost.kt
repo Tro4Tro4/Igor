@@ -2,6 +2,7 @@ package com.igor.fridge.ui.navigation
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +24,8 @@ import androidx.navigation.navArgument
 import com.igor.fridge.ui.edit.EditItemScreen
 import com.igor.fridge.ui.edit.NEW_ITEM_UUID
 import com.igor.fridge.ui.inventory.InventoryScreen
+import com.igor.fridge.ui.prices.PriceHistoryScreen
+import com.igor.fridge.ui.prices.PricesScreen
 import com.igor.fridge.ui.receipt.ReceiptScreen
 import com.igor.fridge.ui.scanner.BarcodeScannerScreen
 import com.igor.fridge.ui.settings.AisleOrderScreen
@@ -40,11 +43,16 @@ object Routes {
     const val SAVED_LISTS = "shopping/saved"
     const val AISLE_ORDER = "shopping/aisles"
     const val RECEIPT = "receipt"
+    const val PRICES = "prices"
+    const val PRICE_HISTORY = "prices/{key}"
     const val SETTINGS = "settings"
 
     fun edit(uuid: String): String = "edit/$uuid"
 
     fun shoppingItem(uuid: String): String = "shopping/item/$uuid"
+
+    /** La chiave di un prodotto contiene spazi: va codificata per stare in un percorso. */
+    fun priceHistory(key: String): String = "prices/${Uri.encode(key)}"
 }
 
 @Composable
@@ -109,6 +117,7 @@ fun IgorApp(
                 onOpenSavedLists = { navController.navigate(Routes.SAVED_LISTS) },
                 onOpenAisleOrder = { navController.navigate(Routes.AISLE_ORDER) },
                 onOpenReceipt = { navController.navigate(Routes.RECEIPT) },
+                onOpenPrices = { navController.navigate(Routes.PRICES) },
             )
         }
 
@@ -131,7 +140,31 @@ fun IgorApp(
         }
 
         composable(Routes.RECEIPT) {
-            ReceiptScreen(onDone = { navController.popBackStack() })
+            ReceiptScreen(
+                onDone = { navController.popBackStack() },
+                onOpenPrices = {
+                    navController.navigate(Routes.PRICES) {
+                        popUpTo(Routes.RECEIPT) { inclusive = true }
+                    }
+                },
+            )
+        }
+
+        composable(Routes.PRICES) {
+            PricesScreen(
+                onBack = { navController.popBackStack() },
+                onOpenProduct = { key -> navController.navigate(Routes.priceHistory(key)) },
+            )
+        }
+
+        composable(
+            route = Routes.PRICE_HISTORY,
+            arguments = listOf(navArgument("key") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            PriceHistoryScreen(
+                productKey = backStackEntry.arguments?.getString("key").orEmpty(),
+                onBack = { navController.popBackStack() },
+            )
         }
 
         composable(Routes.SETTINGS) {

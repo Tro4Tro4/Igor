@@ -433,4 +433,56 @@ class ShoppingViewModelTest {
         assertEquals(listOf(FoodCategory.LATTICINI, FoodCategory.FRUTTA), state.toBuy.map { it.category })
         assertTrue(vm.shareText().indexOf("Latte") < vm.shareText().indexOf("Mele"))
     }
+
+    @Test
+    fun `una voce nuova riceve l'ultimo prezzo pagato se l'unita' torna`() = runTest(dispatcher) {
+        val paid = com.igor.fridge.data.local.PriceRecord(
+            uuid = "p",
+            productKey = "mele",
+            productName = "Mele",
+            purchasedOn = LocalDate.of(2026, 10, 1),
+            quantity = 1.0,
+            unit = QuantityUnit.KG,
+            totalCents = 199,
+            unitPriceCents = 199,
+            referenceUnit = QuantityUnit.KG,
+        )
+        val vm = ShoppingViewModel(
+            shoppingRepository,
+            foodRepository,
+            FakePhotoStore(),
+            lastPrice = { name -> paid.takeIf { name.equals("mele", ignoreCase = true) } },
+        )
+
+        vm.add("Mele")
+        vm.add("6 mele")
+        vm.add("Pane")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val mele = shoppingDao.items.single { it.name == "Mele" }
+        assertEquals(QuantityUnit.KG, mele.unit)
+        assertEquals(199L, mele.unitPriceCents)
+        assertNull(shoppingDao.items.single { it.name == "Pane" }.unitPriceCents)
+    }
+
+    @Test
+    fun `con un'unita' diversa il prezzo non si propone`() = runTest(dispatcher) {
+        val paid = com.igor.fridge.data.local.PriceRecord(
+            uuid = "p",
+            productKey = "uova",
+            productName = "Uova",
+            purchasedOn = LocalDate.of(2026, 10, 1),
+            quantity = 1.0,
+            unit = QuantityUnit.CONF,
+            totalCents = 250,
+            unitPriceCents = 250,
+            referenceUnit = QuantityUnit.CONF,
+        )
+        val vm = ShoppingViewModel(shoppingRepository, foodRepository, FakePhotoStore(), lastPrice = { paid })
+
+        vm.add("6 uova")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(shoppingDao.items.single().unitPriceCents)
+    }
 }

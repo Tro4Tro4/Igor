@@ -81,6 +81,7 @@ fun ShoppingScreen(
     onOpenSavedLists: () -> Unit,
     onOpenAisleOrder: () -> Unit,
     onOpenReceipt: () -> Unit,
+    onOpenPrices: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ShoppingViewModel = viewModel(factory = ShoppingViewModel.Factory),
 ) {
@@ -158,6 +159,13 @@ fun ShoppingScreen(
                             onClick = {
                                 menuOpen = false
                                 onOpenReceipt()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.prices_title)) },
+                            onClick = {
+                                menuOpen = false
+                                onOpenPrices()
                             },
                         )
                         DropdownMenuItem(

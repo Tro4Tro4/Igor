@@ -29,6 +29,10 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
 - **Scontrino**: dalla foto di uno scontrino (OCR sul telefono, ML Kit) Igor propone i
   prodotti con la categoria, chiede quantità e scadenza dove servono, li mette in
   inventario e toglie dalla lista della spesa ciò che è stato comprato.
+- **Prezzi**: ogni scontrino registra il prezzo pagato di ogni riga (sconti compresi), con
+  negozio e data. Per ogni prodotto: ultimo prezzo al kg/litro/pezzo, variazione, minimo,
+  massimo, media e grafico dell'andamento; per ogni mese, la spesa totale. L'ultimo prezzo
+  pagato viene proposto nella lista della spesa.
 
 ## Stack tecnico
 
@@ -64,6 +68,7 @@ app/src/main/java/com/igor/fridge/
     ├── inventory/    # elenco, filtri, ricerca
     ├── edit/         # inserimento e modifica
     ├── scanner/      # lettura codice a barre
+    ├── prices/       # storico e andamento dei prezzi
     ├── receipt/      # dallo scontrino all'inventario
     ├── settings/     # impostazioni: soglia, ora della notifica, ordine delle corsie
     └── shopping/     # lista della spesa, dettagli della voce, liste salvate
@@ -122,16 +127,16 @@ Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi 
 corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
 "3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-I test coprono 168 casi su 27 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
+I test coprono 194 casi su 32 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
-**Database: versione 3.** Ogni cambio di schema alza la versione e porta la sua migrazione
-(`MIGRATION_1_2`, `MIGRATION_2_3`): a versione invariata Room rifiuterebbe di aprire il
+**Database: versione 4.** Ogni cambio di schema alza la versione e porta la sua migrazione
+(`MIGRATION_1_2`, `MIGRATION_2_3`, `MIGRATION_3_4`): a versione invariata Room rifiuterebbe di aprire il
 database. La migrazione è
 provata da `MigrationTest`, che apre con `IgorDatabase.build` un database della versione 1
 scritto a mano. `fallbackToDestructiveMigration()` è ancora presente e copre solo un salto
 di versione senza migrazione, cancellando i dati: va tolto quando si decide come gestire
-quel caso. Lo schema esportato della versione 3 (`app/schemas/.../3.json`) viene generato
+quel caso. Lo schema esportato della versione 4 (`app/schemas/.../4.json`) viene generato
 dalla prima build e va committato.
 
 ### Difetti noti

@@ -61,6 +61,8 @@ class ReceiptParserTest {
 
         val pasta = entries.getValue("Pasta de cecco")
         assertEquals(500.0, pasta.quantity!!, 0.001)
+        // Lo sconto sotto la pasta ne riduce l'importo: conta il prezzo pagato.
+        assertEquals(0.95, pasta.price!!, 0.001)
         assertEquals(QuantityUnit.G, pasta.unit)
 
         assertNull(entries.getValue("Mozz. fior di latte").quantity)
@@ -124,5 +126,13 @@ class ReceiptParserTest {
     @Test
     fun `uno scontrino illeggibile non inventa prodotti`() {
         assertTrue(parseReceipt(listOf("", "   ", "12/10/2026", "***", "1,00")).isEmpty())
+    }
+
+    @Test
+    fun `uno sconto col meno in fondo vale come col meno davanti`() {
+        val entries = parseReceipt(listOf("BISCOTTI  2,50", "PROMO  0,50-", "LATTE  1,00"))
+
+        assertEquals(2.0, entries[0].price!!, 0.001)
+        assertEquals(1.0, entries[1].price!!, 0.001)
     }
 }

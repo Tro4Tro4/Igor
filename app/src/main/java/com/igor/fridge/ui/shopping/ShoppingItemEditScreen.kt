@@ -62,6 +62,8 @@ import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.ui.components.EnumDropdown
 import com.igor.fridge.ui.components.PhotoThumbnail
+import com.igor.fridge.ui.formatShort
+import com.igor.fridge.ui.formatUnitPrice
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
 
@@ -222,6 +224,27 @@ fun ShoppingItemEditScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            state.lastPaid?.let { paid ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(
+                            R.string.shopping_last_paid,
+                            listOfNotNull(
+                                formatUnitPrice(paid.unitPriceCents, paid.referenceUnit),
+                                paid.store,
+                                paid.purchasedOn.formatShort(),
+                            ).joinToString(" · "),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = viewModel::useLastPaid) {
+                        Text(stringResource(R.string.shopping_use_last_paid))
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = state.store,

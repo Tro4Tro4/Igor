@@ -9,6 +9,7 @@ import com.igor.fridge.data.receipt.MlKitReceiptReader
 import com.igor.fridge.data.receipt.ReceiptReader
 import com.igor.fridge.data.prefs.settingsDataStore
 import com.igor.fridge.data.repository.FoodRepository
+import com.igor.fridge.data.repository.PriceRepository
 import com.igor.fridge.data.repository.SavedListRepository
 import com.igor.fridge.data.repository.ShoppingRepository
 
@@ -32,6 +33,8 @@ class AppContainer(context: Context) {
     val savedListRepository: SavedListRepository by lazy {
         SavedListRepository(database.savedListDao())
     }
+
+    val priceRepository: PriceRepository by lazy { PriceRepository(database.priceRecordDao()) }
 
     val photoStore: PhotoStore by lazy { FilePhotoStore(appContext) }
 

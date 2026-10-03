@@ -61,7 +61,6 @@ import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.ui.components.EnumDropdown
 import com.igor.fridge.ui.components.ExpiryDatePickerDialog
-import com.igor.fridge.ui.formatEuro
 import com.igor.fridge.ui.formatShort
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
@@ -71,6 +70,7 @@ import java.time.LocalDate
 @Composable
 fun ReceiptScreen(
     onDone: () -> Unit,
+    onOpenPrices: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ReceiptViewModel = viewModel(factory = ReceiptViewModel.Factory),
 ) {
@@ -79,6 +79,7 @@ fun ReceiptScreen(
     val context = LocalContext.current
     var pendingCapture by rememberSaveable { mutableStateOf<String?>(null) }
     var pickingExpiryFor by remember { mutableStateOf<ReceiptDraft?>(null) }
+    var pickingDate by remember { mutableStateOf(false) }
 
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         val target = pendingCapture
@@ -176,6 +177,23 @@ fun ReceiptScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                item {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = state.store,
+                            onValueChange = viewModel::onStoreChange,
+                            label = { Text(stringResource(R.string.shopping_store)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedButton(onClick = { pickingDate = true }) {
+                            Text(state.purchaseDate.formatShort())
+                        }
+                    }
+                }
                 items(items = state.drafts, key = { it.id }) { draft ->
                     DraftCard(
                         draft = draft,
@@ -184,6 +202,7 @@ fun ReceiptScreen(
                         onCategory = { viewModel.onCategoryChange(draft.id, it) },
                         onQuantity = { viewModel.onQuantityChange(draft.id, it) },
                         onUnit = { viewModel.onUnitChange(draft.id, it) },
+                        onPrice = { viewModel.onPriceChange(draft.id, it) },
                         onPickExpiry = { pickingExpiryFor = draft },
                         onClearExpiry = { viewModel.onExpiryChange(draft.id, null) },
                     )
@@ -205,6 +224,7 @@ fun ReceiptScreen(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Button(onClick = onDone) { Text(stringResource(R.string.receipt_done)) }
+                OutlinedButton(onClick = onOpenPrices) { Text(stringResource(R.string.prices_open)) }
                 OutlinedButton(onClick = viewModel::restart) { Text(stringResource(R.string.receipt_another)) }
             }
         }
@@ -217,6 +237,17 @@ fun ReceiptScreen(
             onConfirm = { date ->
                 viewModel.onExpiryChange(draft.id, date)
                 pickingExpiryFor = null
+            },
+        )
+    }
+
+    if (pickingDate) {
+        ExpiryDatePickerDialog(
+            initialDate = state.purchaseDate,
+            onDismiss = { pickingDate = false },
+            onConfirm = { date ->
+                viewModel.onDateChange(date)
+                pickingDate = false
             },
         )
     }
@@ -279,6 +310,7 @@ private fun DraftCard(
     onCategory: (FoodCategory) -> Unit,
     onQuantity: (String) -> Unit,
     onUnit: (QuantityUnit) -> Unit,
+    onPrice: (String) -> Unit,
     onPickExpiry: () -> Unit,
     onClearExpiry: () -> Unit,
 ) {
@@ -305,7 +337,6 @@ private fun DraftCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val details = listOfNotNull(
-                    draft.priceCents?.let { formatEuro(it) },
                     draft.shoppingMatch?.let { stringResource(R.string.receipt_from_list, it.name) },
                     if (!draft.category.isFood) stringResource(R.string.receipt_not_food) else null,
                 )
@@ -354,6 +385,16 @@ private fun DraftCard(
                         modifier = Modifier.weight(1f),
                     )
                 }
+
+                OutlinedTextField(
+                    value = draft.priceText,
+                    onValueChange = onPrice,
+                    label = { Text(stringResource(R.string.receipt_price)) },
+                    singleLine = true,
+                    isError = draft.priceError,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
                 if (draft.category.isFood) {
                     Row(

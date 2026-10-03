@@ -4,7 +4,9 @@ import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.StorageLocation
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.util.Locale
 
 private val dateFormatter: DateTimeFormatter =
@@ -44,6 +46,21 @@ fun parsePriceCents(text: String): Long? {
 /** 1290 diventa "12,90 €". */
 fun formatEuro(cents: Long): String =
     String.format(Locale.ITALY, "%d,%02d €", cents / 100, kotlin.math.abs(cents % 100))
+
+/** 129 al kg diventa "1,29 €/kg". */
+fun formatUnitPrice(cents: Long, unit: QuantityUnit): String = "${formatEuro(cents)}/${unit.label()}"
+
+/** "ottobre 2026". */
+fun YearMonth.formatMonth(): String =
+    "${month.getDisplayName(TextStyle.FULL_STANDALONE, Locale.ITALIAN)} $year"
+
+/** +5,2 % / -3 %: la variazione di un prezzo, col segno sempre esplicito. */
+fun formatChange(percent: Double): String {
+    val rounded = Math.round(percent * 10) / 10.0
+    val sign = if (rounded > 0) "+" else ""
+    val number = if (rounded % 1.0 == 0.0) rounded.toLong().toString() else String.format(Locale.ITALY, "%.1f", rounded)
+    return "$sign$number%"
+}
 
 /** Il prezzo nel campo di testo, senza simbolo: 129 diventa "1,29". */
 fun formatPriceInput(cents: Long): String =

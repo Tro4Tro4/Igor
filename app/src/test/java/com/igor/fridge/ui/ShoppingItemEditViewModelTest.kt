@@ -190,4 +190,29 @@ class ShoppingItemEditViewModelTest {
         assertTrue(vm.uiState.value.priceError)
         assertFalse(vm.uiState.value.isDone)
     }
+
+    @Test
+    fun `l'ultimo prezzo pagato si mostra e si usa con la sua unita'`() = runTest(dispatcher) {
+        repository.addIfAbsent("Mele")
+        val paid = com.igor.fridge.data.local.PriceRecord(
+            uuid = "p",
+            productKey = "mele",
+            productName = "Mele",
+            purchasedOn = java.time.LocalDate.of(2026, 10, 1),
+            store = "Mercato",
+            quantity = 1.5,
+            unit = QuantityUnit.KG,
+            totalCents = 300,
+            unitPriceCents = 200,
+            referenceUnit = QuantityUnit.KG,
+        )
+        val vm = ShoppingItemEditViewModel(dao.items.single().uuid, repository, photos) { paid }
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(paid, vm.uiState.value.lastPaid)
+        vm.useLastPaid()
+
+        assertEquals("2,00", vm.uiState.value.priceText)
+        assertEquals(QuantityUnit.KG, vm.uiState.value.unit)
+    }
 }

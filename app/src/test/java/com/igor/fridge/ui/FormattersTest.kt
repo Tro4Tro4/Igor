@@ -69,4 +69,13 @@ class FormattersTest {
         assertEquals("0,05 €", formatEuro(5))
         assertEquals("1,29", formatPriceInput(129))
     }
+
+    @Test
+    fun `prezzo unitario, mese e variazione`() {
+        assertEquals("1,90 €/kg", formatUnitPrice(190, QuantityUnit.KG))
+        assertEquals("ottobre 2026", java.time.YearMonth.of(2026, 10).formatMonth())
+        assertEquals("+4,8%", formatChange(4.76))
+        assertEquals("-3%", formatChange(-3.0))
+        assertEquals("0%", formatChange(0.01))
+    }
 }

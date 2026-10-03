@@ -3,6 +3,7 @@ package com.igor.fridge.ui
 import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.igor.fridge.data.FakeFoodItemDao
+import com.igor.fridge.data.FakePriceRecordDao
 import com.igor.fridge.data.FakePhotoStore
 import com.igor.fridge.data.FakeReceiptReader
 import com.igor.fridge.data.FakeShoppingItemDao
@@ -12,6 +13,7 @@ import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.RemovalReason
 import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.data.repository.FoodRepository
+import com.igor.fridge.data.repository.PriceRepository
 import com.igor.fridge.data.repository.ShoppingRepository
 import com.igor.fridge.ui.receipt.ReceiptPhase
 import com.igor.fridge.ui.receipt.ReceiptViewModel
@@ -48,6 +50,9 @@ class ReceiptViewModelTest {
     private val shoppingDao = FakeShoppingItemDao()
     private val foodRepository = FoodRepository(foodDao, { now }, { "f-${++counter}" })
     private val shoppingRepository = ShoppingRepository(shoppingDao, { now }, { "s-${++counter}" })
+    private val priceDao = FakePriceRecordDao()
+    private val priceRepository = PriceRepository(priceDao, { now }, { "p-${++counter}" })
+    private val today = LocalDate.of(2026, 10, 3)
 
     private val photo = Uri.parse("content://scontrino/1")
 
@@ -57,7 +62,8 @@ class ReceiptViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = ReceiptViewModel(reader, FakePhotoStore(), foodRepository, shoppingRepository)
+    private fun viewModel() =
+        ReceiptViewModel(reader, FakePhotoStore(), foodRepository, shoppingRepository, priceRepository) { today }
 
     private fun ReceiptViewModel.read(vararg lines: String) {
         reader.lines = lines.toList()
@@ -76,11 +82,12 @@ class ReceiptViewModelTest {
         assertEquals(FoodCategory.LATTICINI, latte.category)
         assertEquals("1", latte.quantityText)
         assertEquals(QuantityUnit.L, latte.unit)
-        assertEquals(129L, latte.priceCents)
-        assertTrue(latte.include)
-        // Cio' che non si mangia parte escluso dal frigo.
+        assertEquals("1,29", latte.priceText)
+        assertTrue(latte.goesToFridge)
+        // Cio' che non si mangia si tiene (per il prezzo) ma non va in frigo.
         assertEquals(FoodCategory.CASA, detersivo.category)
-        assertFalse(detersivo.include)
+        assertTrue(detersivo.include)
+        assertFalse(detersivo.goesToFridge)
     }
 
     @Test
@@ -132,7 +139,7 @@ class ReceiptViewModelTest {
         assertEquals(ReceiptPhase.DONE, vm.uiState.value.phase)
         assertEquals(expiry, foodDao.items.single { it.name == "Yogurt" }.expiryDate)
         assertNull(foodDao.items.single { it.name == "Pasta" }.expiryDate)
-        assertEquals("2 prodotti aggiunti in frigo", vm.uiState.value.summary)
+        assertEquals("2 prodotti aggiunti in frigo; 2 prezzi registrati", vm.uiState.value.summary)
     }
 
     @Test
@@ -165,7 +172,7 @@ class ReceiptViewModelTest {
         assertEquals(listOf("Pane"), shoppingDao.items.map { it.name })
         assertEquals("Mozzarella", foodDao.items.single().name)
         assertEquals(
-            "1 prodotto aggiunto in frigo; 1 tolto dalla lista della spesa",
+            "1 prodotto aggiunto in frigo; 1 prezzo registrato; 1 tolto dalla lista della spesa",
             vm.uiState.value.summary,
         )
     }
@@ -180,6 +187,7 @@ class ReceiptViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(listOf("Pasta"), foodDao.items.map { it.name })
+        assertEquals(listOf("Pasta"), priceDao.records.map { it.productName })
     }
 
     @Test
@@ -210,5 +218,83 @@ class ReceiptViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(setOf("Pasta", "Riso"), foodDao.items.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `i prezzi si registrano con negozio e data dello scontrino, anche per cio' che non va in frigo`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.read(
+                "SUPERMERCATO ESEMPIO",
+                "PASTA 500G  1,15",
+                "SCONTO PASTA  -0,20",
+                "DETERSIVO PIATTI  2,49",
+                "TOTALE  3,44",
+                "28/09/2026 18:22",
+            )
+
+            assertEquals("Supermercato Esempio", vm.uiState.value.store)
+            assertEquals(LocalDate.of(2026, 9, 28), vm.uiState.value.purchaseDate)
+
+            vm.confirm()
+            dispatcher.scheduler.advanceUntilIdle()
+
+            assertEquals(listOf("Pasta"), foodDao.items.map { it.name })
+            val pasta = priceDao.records.single { it.productName == "Pasta" }
+            assertEquals(95L, pasta.totalCents)
+            // 0,95 € per 500 g fanno 1,90 €/kg.
+            assertEquals(190L, pasta.unitPriceCents)
+            assertEquals(QuantityUnit.KG, pasta.referenceUnit)
+            assertEquals("Supermercato Esempio", pasta.store)
+            assertEquals(LocalDate.of(2026, 9, 28), pasta.purchasedOn)
+            assertEquals(249L, priceDao.records.single { it.productName == "Detersivo piatti" }.totalCents)
+            assertEquals(
+                "1 prodotto aggiunto in frigo; 2 prezzi registrati",
+                vm.uiState.value.summary,
+            )
+        }
+
+    @Test
+    fun `negozio, data e prezzo si correggono prima di confermare`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.read("RISO  2,00")
+        val riso = vm.uiState.value.drafts.single()
+
+        vm.onStoreChange("Mercato")
+        vm.onDateChange(LocalDate.of(2026, 10, 1))
+        vm.onPriceChange(riso.id, "1,80")
+        vm.confirm()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val record = priceDao.records.single()
+        assertEquals(180L, record.totalCents)
+        assertEquals("Mercato", record.store)
+        assertEquals(LocalDate.of(2026, 10, 1), record.purchasedOn)
+    }
+
+    @Test
+    fun `senza data sullo scontrino vale oggi, e un prezzo illeggibile blocca`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.read("RISO  2,00")
+        assertEquals(today, vm.uiState.value.purchaseDate)
+
+        vm.onPriceChange(vm.uiState.value.drafts.single().id, "due euro")
+        vm.confirm()
+
+        assertTrue(vm.uiState.value.drafts.single().priceError)
+        assertTrue(priceDao.records.isEmpty())
+    }
+
+    @Test
+    fun `una riga senza prezzo entra in frigo ma non nello storico`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.read("RISO  2,00")
+        vm.onPriceChange(vm.uiState.value.drafts.single().id, "")
+
+        vm.confirm()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, foodDao.items.size)
+        assertTrue(priceDao.records.isEmpty())
     }
 }
