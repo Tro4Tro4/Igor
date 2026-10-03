@@ -2,6 +2,7 @@ package com.igor.fridge.data.openprices
 
 import android.net.Uri
 import com.igor.fridge.data.photos.PhotoStore
+import com.igor.fridge.data.photos.VerticalCrop
 import java.time.LocalDate
 
 /** Un prezzo da condividere: prodotto con codice a barre, prezzo di un pezzo e pezzi comprati. */
@@ -12,7 +13,13 @@ data class ContributionItem(
     val quantity: Int,
 )
 
-data class ContributionResult(val sent: Int, val failed: Int, val lastError: String? = null)
+/** [unauthorized]: il server ha rifiutato l'accesso, va ripetuto il login. */
+data class ContributionResult(
+    val sent: Int,
+    val failed: Int,
+    val lastError: String? = null,
+    val unauthorized: Boolean = false,
+)
 
 /**
  * Condivide su Open Prices i prezzi di uno scontrino: prima la foto come prova, poi un
@@ -35,9 +42,10 @@ class ReceiptContributor(
         date: LocalDate,
         items: List<ContributionItem>,
         receiptPriceCount: Int,
+        crop: VerticalCrop = VerticalCrop(),
     ): ContributionResult {
         if (items.isEmpty()) return ContributionResult(0, 0)
-        val jpeg = photoStore.compressForUpload(photo)
+        val jpeg = photoStore.compressForUpload(photo, crop)
             ?: throw OpenPricesException("Impossibile leggere la foto dello scontrino")
         val proofId = client.uploadReceipt(
             token = token,
@@ -50,6 +58,7 @@ class ReceiptContributor(
         var sent = 0
         var failed = 0
         var lastError: String? = null
+        var unauthorized = false
         for (item in items) {
             try {
                 client.addPrice(
@@ -66,12 +75,13 @@ class ReceiptContributor(
                 failed++
                 lastError = e.message
                 // Accesso scaduto: anche i prezzi successivi fallirebbero.
-                if (e.code == 401 || e.code == 403) {
+                if (e.isUnauthorized) {
+                    unauthorized = true
                     failed += items.size - sent - failed
                     break
                 }
             }
         }
-        return ContributionResult(sent, failed, lastError)
+        return ContributionResult(sent, failed, lastError, unauthorized)
     }
 }

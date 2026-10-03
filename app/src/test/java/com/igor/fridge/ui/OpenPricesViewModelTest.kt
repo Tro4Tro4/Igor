@@ -60,12 +60,30 @@ class OpenPricesViewModelTest {
     fun `un accesso rifiutato lo dice e non salva nulla`() = runTest(dispatcher) {
         val vm = viewModel { _, _ -> throw OpenPricesException("Utente o password non corretti", 401) }
         backgroundScope.launch { vm.uiState.collect {} }
+        settings.value = OpenPricesSettings(enabled = true)
 
         vm.login("mario", "sbagliata")
         dispatcher.scheduler.advanceUntilIdle()
 
         assertFalse(settings.value.isLoggedIn)
         assertEquals("Utente o password non corretti", vm.uiState.value.message)
+        assertFalse(vm.uiState.value.isLoggingIn)
+    }
+
+    @Test
+    fun `con Open Prices spento l'accesso non parte`() = runTest(dispatcher) {
+        var asked = false
+        val vm = viewModel { _, _ ->
+            asked = true
+            OpenPricesSession("mario", "tok")
+        }
+        backgroundScope.launch { vm.uiState.collect {} }
+
+        vm.login("mario", "password")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(asked)
+        assertFalse(settings.value.isLoggedIn)
         assertFalse(vm.uiState.value.isLoggingIn)
     }
 }

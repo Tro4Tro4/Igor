@@ -29,4 +29,7 @@ data class CommunityPrice(
 data class OpenPricesSession(val userId: String, val token: String)
 
 /** Un errore di Open Prices, con un messaggio da mostrare. */
-class OpenPricesException(message: String, val code: Int? = null) : Exception(message)
+class OpenPricesException(message: String, val code: Int? = null) : Exception(message) {
+    /** Il server non riconosce piu' l'accesso: token scaduto o revocato. */
+    val isUnauthorized: Boolean get() = code == 401 || code == 403
+}

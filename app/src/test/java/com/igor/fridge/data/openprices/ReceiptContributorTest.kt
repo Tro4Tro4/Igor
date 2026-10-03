@@ -56,7 +56,10 @@ class ReceiptContributorTest {
         }
         val result = ReceiptContributor(OpenPricesClient(expired), photos)
             .contribute("tok", Uri.parse("content://s"), shop, day, items, 2)
-        assertEquals(ContributionResult(sent = 0, failed = 2, lastError = "Invalid token"), result)
+        assertEquals(
+            ContributionResult(sent = 0, failed = 2, lastError = "Invalid token", unauthorized = true),
+            result,
+        )
         assertEquals(2, expired.requests.size)
     }
 

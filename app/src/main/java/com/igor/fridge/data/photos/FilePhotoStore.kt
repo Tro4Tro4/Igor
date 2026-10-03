@@ -38,28 +38,36 @@ class FilePhotoStore(context: Context) : PhotoStore {
             null
         } finally {
             // Lo scatto della fotocamera e' solo un passaggio: l'immagine buona e' la copia.
+            // Solo il nome del file: un segmento con "../" non deve uscire dalla cartella.
             if (source.authority == authority()) {
-                File(captureDir, source.lastPathSegment.orEmpty()).delete()
+                File(captureDir, File(source.lastPathSegment.orEmpty()).name).delete()
             }
         }
     }
 
-    override suspend fun compressForUpload(source: Uri): ByteArray? = withContext(Dispatchers.IO) {
+    override suspend fun compressForUpload(
+        source: Uri,
+        crop: VerticalCrop,
+    ): ByteArray? = withContext(Dispatchers.IO) {
         try {
             val upright = appContext.contentResolver.decodeUpright(source, MAX_SIDE_PX)
                 ?: return@withContext null
+            val cropped = cropVertical(upright, crop)
             ByteArrayOutputStream().use { out ->
-                upright.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
+                cropped.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
                 out.toByteArray()
             }
         } catch (e: IOException) {
             null
         } catch (e: SecurityException) {
             null
+        } catch (e: OutOfMemoryError) {
+            null
         }
     }
 
-    override fun fileOf(name: String): File = File(photoDir, name)
+    /** I nomi arrivano dal database: si tiene solo il nome, mai un percorso. */
+    override fun fileOf(name: String): File = File(photoDir, File(name).name)
 
     override fun newCaptureUri(): Uri {
         captureDir.mkdirs()

@@ -93,7 +93,9 @@ internal object OpenPricesJson {
 
     private fun location(obj: JsonObject): CommunityLocation? {
         val osmId = obj.long("osm_id") ?: return null
-        val osmType = obj.string("osm_type") ?: return null
+        // Il tipo OSM torna al server nelle richieste di invio: si accettano solo i tre
+        // valori che esistono, non qualunque testo arrivi dalla rete.
+        val osmType = obj.string("osm_type")?.takeIf { it in OSM_TYPES } ?: return null
         return CommunityLocation(
             osmId = osmId,
             osmType = osmType,
@@ -117,4 +119,6 @@ internal object OpenPricesJson {
     private fun JsonObject.double(key: String): Double? = (this[key] as? JsonPrimitive)?.doubleOrNull
 
     private fun JsonObject.long(key: String): Long? = (this[key] as? JsonPrimitive)?.longOrNull
+
+    private val OSM_TYPES = setOf("NODE", "WAY", "RELATION")
 }

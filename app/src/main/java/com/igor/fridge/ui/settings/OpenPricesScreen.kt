@@ -110,7 +110,15 @@ fun OpenPricesScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             val user = state.settings.userId
-            if (state.settings.isLoggedIn && user != null) {
+            if (!state.settings.enabled) {
+                Text(
+                    text = stringResource(R.string.open_prices_enable_first),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (state.settings.isLoggedIn) {
+                    OutlinedButton(onClick = viewModel::logout) { Text(stringResource(R.string.open_prices_logout)) }
+                }
+            } else if (state.settings.isLoggedIn && user != null) {
                 Text(stringResource(R.string.open_prices_logged_in, user))
                 OutlinedButton(onClick = viewModel::logout) { Text(stringResource(R.string.open_prices_logout)) }
             } else {

@@ -16,7 +16,7 @@ import java.io.IOException
  * @return null se l'Uri non e' leggibile, non e' un'immagine o la memoria non basta.
  */
 internal fun ContentResolver.decodeUpright(source: Uri, maxSidePx: Int): Bitmap? = try {
-    decodeScaled(source, maxSidePx)?.let { rotateUpright(it, readRotation(source)) }
+    decodeScaled(source, maxSidePx)?.let { transformUpright(it, readOrientation(source)) }
 } catch (e: IOException) {
     null
 } catch (e: SecurityException) {
@@ -55,29 +55,51 @@ private fun ContentResolver.decodeScaled(source: Uri, maxSidePx: Int): Bitmap? {
     return scaled
 }
 
-/** Le fotocamere salvano spesso l'immagine coricata e indicano la rotazione nell'EXIF. */
-private fun ContentResolver.readRotation(source: Uri): Int = try {
+/**
+ * Le fotocamere salvano spesso l'immagine coricata (o specchiata, con la fotocamera
+ * frontale) e indicano nell'EXIF come raddrizzarla.
+ */
+private fun ContentResolver.readOrientation(source: Uri): Int = try {
     openInputStream(source)?.use { stream ->
-        when (
-            ExifInterface(stream).getAttributeInt(
-                ExifInterface.TAG_ORIENTATION,
-                ExifInterface.ORIENTATION_NORMAL,
-            )
-        ) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270
-            else -> 0
-        }
-    } ?: 0
+        ExifInterface(stream).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL,
+        )
+    } ?: ExifInterface.ORIENTATION_NORMAL
 } catch (e: IOException) {
-    0
+    ExifInterface.ORIENTATION_NORMAL
 }
 
-private fun rotateUpright(bitmap: Bitmap, degrees: Int): Bitmap {
-    if (degrees == 0) return bitmap
-    val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
-    val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-    if (rotated !== bitmap) bitmap.recycle()
-    return rotated
+/** Le otto orientazioni EXIF: quattro rotazioni, ciascuna anche specchiata. */
+private fun transformUpright(bitmap: Bitmap, orientation: Int): Bitmap {
+    val matrix = Matrix()
+    when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+        ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+        ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+        ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+        ExifInterface.ORIENTATION_TRANSPOSE -> {
+            matrix.postRotate(90f)
+            matrix.postScale(-1f, 1f)
+        }
+        ExifInterface.ORIENTATION_TRANSVERSE -> {
+            matrix.postRotate(270f)
+            matrix.postScale(-1f, 1f)
+        }
+        else -> return bitmap
+    }
+    val transformed = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    if (transformed !== bitmap) bitmap.recycle()
+    return transformed
+}
+
+/** Toglie le strisce indicate da [crop]; l'originale viene liberato. */
+internal fun cropVertical(bitmap: Bitmap, crop: VerticalCrop): Bitmap {
+    if (crop.isNone) return bitmap
+    val top = (bitmap.height * crop.top).toInt()
+    val height = (bitmap.height * (1f - crop.top - crop.bottom)).toInt().coerceIn(1, bitmap.height - top)
+    val cropped = Bitmap.createBitmap(bitmap, 0, top, bitmap.width, height)
+    if (cropped !== bitmap) bitmap.recycle()
+    return cropped
 }

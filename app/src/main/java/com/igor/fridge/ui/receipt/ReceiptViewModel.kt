@@ -18,6 +18,7 @@ import com.igor.fridge.data.openprices.OpenPricesClient
 import com.igor.fridge.data.openprices.OpenPricesException
 import com.igor.fridge.data.openprices.ReceiptContributor
 import com.igor.fridge.data.photos.PhotoStore
+import com.igor.fridge.data.photos.VerticalCrop
 import com.igor.fridge.data.prefs.OpenPricesSettings
 import com.igor.fridge.data.receipt.ReceiptReader
 import com.igor.fridge.data.repository.FoodRepository
@@ -133,6 +134,8 @@ data class ContributionUiState(
     val isSending: Boolean = false,
     val result: String? = null,
     val error: String? = null,
+    /** Strisce da togliere dalla foto prima di renderla pubblica (dati personali). */
+    val crop: VerticalCrop = VerticalCrop(),
 ) {
     val canSend: Boolean get() = location != null && selected.isNotEmpty() && !isSending && result == null
 }
@@ -160,6 +163,7 @@ class ReceiptViewModel(
     private val openPricesClient: OpenPricesClient? = null,
     private val transactor: Transactor = Transactor.Direct,
     private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val clearOpenPricesSession: suspend () -> Unit = {},
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReceiptUiState(purchaseDate = today()))
@@ -174,6 +178,13 @@ class ReceiptViewModel(
     }
 
     private var nextId = 0
+
+    /**
+     * L'esito di un invio riuscito. Vive fuori da [ContributionUiState], che si ricrea a ogni
+     * apertura: altrimenti chiudere e riaprire la finestra permetterebbe di caricare una
+     * seconda volta la stessa prova e gli stessi prezzi su un database pubblico.
+     */
+    private var sentResult: String? = null
 
     fun newCaptureUri(): Uri = photoStore.newCaptureUri()
 
@@ -295,7 +306,10 @@ class ReceiptViewModel(
     fun dismissMissingExpiry() = _uiState.update { it.copy(missingExpiryPrompt = null) }
 
     /** Riparte da capo con un'altra foto. */
-    fun restart() = _uiState.update { ReceiptUiState(purchaseDate = today(), openPrices = it.openPrices) }
+    fun restart() {
+        sentResult = null
+        _uiState.update { ReceiptUiState(purchaseDate = today(), openPrices = it.openPrices) }
+    }
 
     /** Apre la condivisione: tutti i prodotti scelti, il negozio da cercare col nome letto. */
     fun openContribution() = _uiState.update { state ->
@@ -304,8 +318,16 @@ class ReceiptViewModel(
                 items = state.contributable,
                 selected = state.contributable.map { it.barcode }.toSet(),
                 query = storeLabel(state.store).orEmpty(),
+                result = sentResult,
             ),
         )
+    }
+
+    /** [top] e [bottom] in frazioni dell'altezza; un ritaglio che lascerebbe troppo poco si ignora. */
+    fun onCropChange(top: Float, bottom: Float) {
+        val crop = runCatching { VerticalCrop(top.coerceIn(0f, 1f), bottom.coerceIn(0f, 1f)) }.getOrNull()
+            ?: return
+        updateContribution { it.copy(crop = crop) }
     }
 
     fun closeContribution() = _uiState.update { it.copy(contribution = null) }
@@ -350,25 +372,42 @@ class ReceiptViewModel(
         updateContribution { it.copy(isSending = true, error = null) }
         viewModelScope.launch {
             try {
-                val result = worker.contribute(
-                    token = token,
-                    photo = Uri.parse(photo),
-                    location = location,
-                    date = state.purchaseDate,
-                    items = contribution.items.filter { it.barcode in contribution.selected },
-                    receiptPriceCount = state.pricedLines,
-                )
+                // Prova e prezzi vanno insieme: uscire dalla schermata a meta' lascerebbe una
+                // prova pubblica senza i suoi prezzi.
+                val result = withContext(NonCancellable) {
+                    worker.contribute(
+                        token = token,
+                        photo = Uri.parse(photo),
+                        location = location,
+                        date = state.purchaseDate,
+                        items = contribution.items.filter { it.barcode in contribution.selected },
+                        receiptPriceCount = state.pricedLines,
+                        crop = contribution.crop,
+                    )
+                }
+                if (result.unauthorized) forgetSession()
+                val message = contributionMessage(result.sent, result.failed)
+                if (result.sent > 0) sentResult = message
                 updateContribution {
                     it.copy(
                         isSending = false,
-                        result = contributionMessage(result.sent, result.failed),
-                        error = result.lastError,
+                        // Senza nulla di inviato si puo' riprovare, per esempio dopo il login.
+                        result = message.takeIf { result.sent > 0 },
+                        error = if (result.unauthorized) SESSION_EXPIRED else result.lastError,
                     )
                 }
             } catch (e: OpenPricesException) {
-                updateContribution { it.copy(isSending = false, error = e.message) }
+                if (e.isUnauthorized) forgetSession()
+                updateContribution {
+                    it.copy(isSending = false, error = if (e.isUnauthorized) SESSION_EXPIRED else e.message)
+                }
             }
         }
+    }
+
+    /** Un token rifiutato non serve piu': senza, l'app torna a chiedere l'accesso. */
+    private suspend fun forgetSession() {
+        runCatching { clearOpenPricesSession() }
     }
 
     private fun updateContribution(change: (ContributionUiState) -> ContributionUiState) =
@@ -500,6 +539,9 @@ class ReceiptViewModel(
          */
         internal fun contributionItem(draft: ReceiptDraft, barcode: String?): ContributionItem? {
             val code = barcode?.let(::normalizeGtin) ?: return null
+            // I codici EAN-13 che iniziano con 2 li assegna il singolo negozio (pesati,
+            // banco): non identificano un prodotto per tutti.
+            if (code.length == 13 && code.startsWith("2")) return null
             val total = parsePriceCents(draft.priceText)?.takeIf { it > 0 } ?: return null
             val quantity = parseQuantity(draft.quantityText) ?: return null
             // Il prezzo va per confezione. I pezzi si contano se lo scontrino li dice o se
@@ -514,6 +556,9 @@ class ReceiptViewModel(
             if (pieces < 1) return null
             return ContributionItem(draft.name.trim(), code, Math.round(total.toDouble() / pieces), pieces)
         }
+
+        internal const val SESSION_EXPIRED =
+            "Accesso a Open Prices scaduto: accedi di nuovo dalle impostazioni"
 
         internal fun contributionMessage(sent: Int, failed: Int): String = when {
             failed == 0 && sent == 1 -> "1 prezzo condiviso su Open Prices. Grazie!"
@@ -558,6 +603,7 @@ class ReceiptViewModel(
                     openPrices = container.settingsStore.openPrices,
                     openPricesClient = container.openPricesClient,
                     transactor = container.transactor,
+                    clearOpenPricesSession = { container.settingsStore.setOpenPricesSession(null, null) },
                 )
             }
         }

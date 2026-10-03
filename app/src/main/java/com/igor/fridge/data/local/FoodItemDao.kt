@@ -20,6 +20,10 @@ interface FoodItemDao {
     )
     fun observeAll(): Flow<List<FoodItem>>
 
+    /** Tutto l'inventario, compresi gli alimenti usciti: per l'esportazione dei dati. */
+    @Query("SELECT * FROM food_items ORDER BY addedAt ASC")
+    suspend fun all(): List<FoodItem>
+
     @Query("SELECT * FROM food_items WHERE uuid = :uuid")
     suspend fun findByUuid(uuid: String): FoodItem?
 

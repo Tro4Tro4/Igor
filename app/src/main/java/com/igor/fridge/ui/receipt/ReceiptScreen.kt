@@ -7,10 +7,12 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -39,6 +41,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -49,12 +52,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -66,12 +76,16 @@ import com.igor.fridge.R
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.openprices.CommunityLocation
+import com.igor.fridge.data.photos.VerticalCrop
+import com.igor.fridge.data.photos.decodeUpright
 import com.igor.fridge.ui.components.EnumDropdown
 import com.igor.fridge.ui.components.ExpiryDatePickerDialog
 import com.igor.fridge.ui.formatEuro
 import com.igor.fridge.ui.formatShort
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -280,6 +294,8 @@ fun ReceiptScreen(
     state.contribution?.let { contribution ->
         ContributionDialog(
             state = contribution,
+            imageUri = state.imageUri,
+            onCropChange = viewModel::onCropChange,
             onQuery = viewModel::onContributionQuery,
             onCity = viewModel::onContributionCity,
             onSearch = viewModel::searchStores,
@@ -476,6 +492,8 @@ private fun DraftCard(
 @Composable
 private fun ContributionDialog(
     state: ContributionUiState,
+    imageUri: String?,
+    onCropChange: (Float, Float) -> Unit,
     onQuery: (String) -> Unit,
     onCity: (String) -> Unit,
     onSearch: () -> Unit,
@@ -507,6 +525,9 @@ private fun ContributionDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (imageUri != null) {
+                    ProofPreview(imageUri = imageUri, crop = state.crop, onCropChange = onCropChange)
+                }
                 Text(stringResource(R.string.contribute_store), style = MaterialTheme.typography.titleSmall)
                 OutlinedTextField(
                     value = state.query,
@@ -576,3 +597,61 @@ private fun ContributionDialog(
         },
     )
 }
+
+/**
+ * La foto come diventera' pubblica: le strisce scure in alto e in basso sono quelle che
+ * il ritaglio toglie, di solito dove lo scontrino stampa carta fedelta' e pagamento.
+ */
+@Composable
+private fun ProofPreview(
+    imageUri: String,
+    crop: VerticalCrop,
+    onCropChange: (Float, Float) -> Unit,
+) {
+    val context = LocalContext.current
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, imageUri) {
+        value = withContext(Dispatchers.IO) {
+            context.contentResolver.decodeUpright(Uri.parse(imageUri), PREVIEW_SIDE_PX)?.asImageBitmap()
+        }
+    }
+    Text(stringResource(R.string.contribute_preview), style = MaterialTheme.typography.titleSmall)
+    val image = bitmap
+    if (image == null) {
+        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+        return
+    }
+    val scrim = MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f)
+    Image(
+        bitmap = image,
+        contentDescription = stringResource(R.string.contribute_preview),
+        contentScale = ContentScale.Fit,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 260.dp)
+            .aspectRatio(image.width.toFloat() / image.height)
+            .drawWithContent {
+                drawContent()
+                drawRect(scrim, size = Size(size.width, size.height * crop.top))
+                drawRect(
+                    scrim,
+                    topLeft = Offset(0f, size.height * (1f - crop.bottom)),
+                    size = Size(size.width, size.height * crop.bottom),
+                )
+            },
+    )
+    Text(stringResource(R.string.contribute_crop_top), style = MaterialTheme.typography.bodySmall)
+    Slider(
+        value = crop.top,
+        onValueChange = { onCropChange(it, crop.bottom) },
+        valueRange = 0f..MAX_CROP,
+    )
+    Text(stringResource(R.string.contribute_crop_bottom), style = MaterialTheme.typography.bodySmall)
+    Slider(
+        value = crop.bottom,
+        onValueChange = { onCropChange(crop.top, it) },
+        valueRange = 0f..MAX_CROP,
+    )
+}
+
+private const val PREVIEW_SIDE_PX = 800
+private const val MAX_CROP = 0.4f

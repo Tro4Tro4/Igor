@@ -9,6 +9,12 @@
     <string name="settings_notifications">Notifiche</string>
     <string name="settings_hour">Ora del controllo: %1$d</string>
     <string name="settings_hour_help">L’orario è indicativo: il sistema può rimandare il controllo di qualche ora per risparmiare batteria.</string>
+    <string name="settings_privacy">Privacy e dati</string>
+    <string name="settings_privacy_info">Inventario, liste, prezzi e foto restano sul telefono. Scontrini e codici a barre si leggono sul telefono con ML Kit di Google, che può inviare a Google statistiche d’uso e diagnostica, senza le immagini. I pulsanti «Cerca su…» aprono nel browser il sito della catena o una ricerca Google con il nome del prodotto. Il backup di Android salva questi dati nel tuo account Google solo se è cifrato (telefono con blocco schermo); l’accesso a Open Prices non va mai nel backup.</string>
+    <string name="settings_export">Esporta i miei dati</string>
+    <string name="settings_delete_all">Elimina tutti i miei dati</string>
+    <string name="settings_delete_all_confirm">Inventario, lista della spesa, liste salvate, storico dei prezzi, foto e impostazioni verranno cancellati, e uscirai da Open Prices. Non si può annullare. I prezzi già condivisi su Open Prices sono pubblici e si cancellano dal sito del servizio.</string>
+    <string name="settings_delete_all_action">Elimina tutto</string>
     <string name="action_back">Indietro</string>
     <string name="action_settings">Impostazioni</string>
     <string name="inventory_title">Igor · Frigorifero</string>
@@ -173,7 +179,8 @@
     <string name="open_prices_title">Open Prices</string>
     <string name="open_prices_intro">Open Prices è un database aperto di prezzi raccolti dalla comunità di Open Food Facts. Igor può leggere i prezzi degli altri per confrontarli con i tuoi e, se vuoi, condividere i prezzi dei tuoi scontrini.</string>
     <string name="open_prices_enable">Usa Open Prices</string>
-    <string name="open_prices_enable_help">È l’unica funzione di Igor che usa Internet. Spenta, nulla esce dal telefono.</string>
+    <string name="open_prices_enable_help">È l’unica funzione di Igor che scambia dati con un servizio online. Spenta, Igor non contatta Open Prices: né per leggere prezzi né per accedere.</string>
+    <string name="open_prices_enable_first">Attiva Open Prices per accedere e condividere i tuoi prezzi.</string>
     <string name="open_prices_account">Condividere i tuoi prezzi</string>
     <string name="open_prices_account_help">Per condividere serve un account Open Food Facts (gratuito, su openfoodfacts.org). Per leggere i prezzi non serve.</string>
     <string name="open_prices_username">Nome utente Open Food Facts</string>
@@ -187,7 +194,10 @@
     <string name="contribute_open">Condividi su Open Prices (%1$d)</string>
     <string name="contribute_needs_login">Accedi a Open Prices nelle impostazioni per condividere i prezzi di questo scontrino.</string>
     <string name="contribute_title">Condividi su Open Prices</string>
-    <string name="contribute_privacy">La foto dello scontrino sarà pubblica come prova dei prezzi. Se mostra dati personali (carta fedeltà, carta di pagamento, nome), annulla e rifotografa coprendoli. Si condividono solo i prodotti con codice a barre.</string>
+    <string name="contribute_privacy">La foto dello scontrino sarà pubblica come prova dei prezzi. Se mostra dati personali (carta fedeltà, carta di pagamento, nome), toglili con il ritaglio qui sotto o rifotografa coprendoli. Si condividono solo i prodotti con codice a barre.</string>
+    <string name="contribute_preview">Foto che diventerà pubblica</string>
+    <string name="contribute_crop_top">Togli dall’alto (intestazione, dati del cliente)</string>
+    <string name="contribute_crop_bottom">Togli dal basso (carta fedeltà, pagamento)</string>
     <string name="contribute_store">Negozio</string>
     <string name="contribute_city">Città (facoltativa)</string>
     <string name="contribute_search">Cerca il negozio</string>

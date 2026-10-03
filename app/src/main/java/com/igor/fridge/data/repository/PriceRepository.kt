@@ -122,6 +122,8 @@ class PriceRepository(
 
     suspend fun clearBarcode(productKey: String) = codes.delete(productKey)
 
+    suspend fun allCodes(): List<ProductCode> = codes.all()
+
     /** Tutti i codici associati, per chiave del prodotto. */
     suspend fun allBarcodes(): Map<String, String> = codes.all().associate { it.productKey to it.barcode }
 }

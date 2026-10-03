@@ -69,6 +69,21 @@ class FilePhotoStoreTest {
     }
 
     @Test
+    fun `il ritaglio toglie le strisce in alto e in basso`() = runTest {
+        val bytes = store.compressForUpload(image(800, 1000), VerticalCrop(top = 0.1f, bottom = 0.3f))!!
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        assertEquals(800, bounds.outWidth)
+        assertEquals(600, bounds.outHeight)
+    }
+
+    @Test
+    fun `un nome con un percorso non esce dalla cartella delle foto`() {
+        assertEquals(store.fileOf("a.jpg").parentFile, store.fileOf("../../a.jpg").parentFile)
+    }
+
+    @Test
     fun `un file che non e' un'immagine non si importa`() = runTest {
         val file = File(context.cacheDir, "non-immagine.png").apply { writeText("ciao") }
 

@@ -30,6 +30,8 @@ class FakeFoodItemDao : FoodItemDao {
     override fun observeAll(): Flow<List<FoodItem>> =
         state.map { list -> list.filter { it.removedAt == null }.sortedWith(INVENTORY_ORDER) }
 
+    override suspend fun all(): List<FoodItem> = items.sortedBy { it.addedAt }
+
     override suspend fun findByUuid(uuid: String): FoodItem? =
         items.firstOrNull { it.uuid == uuid }
 

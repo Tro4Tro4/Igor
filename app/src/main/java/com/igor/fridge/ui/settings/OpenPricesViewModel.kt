@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -29,7 +30,7 @@ data class OpenPricesUiState(
  * si conserva il token che il server restituisce.
  */
 class OpenPricesViewModel(
-    settings: Flow<OpenPricesSettings>,
+    private val settings: Flow<OpenPricesSettings>,
     private val setEnabled: suspend (Boolean) -> Unit,
     private val saveSession: suspend (String?, String?) -> Unit,
     private val authenticate: suspend (String, String) -> OpenPricesSession,
@@ -49,10 +50,15 @@ class OpenPricesViewModel(
         viewModelScope.launch { setEnabled(enabled) }
     }
 
+    /** Con Open Prices spento nessuna richiesta parte, nemmeno l'accesso. */
     fun login(username: String, password: String) {
         if (username.isBlank() || password.isEmpty() || status.value.isLoggingIn) return
         status.update { it.copy(isLoggingIn = true, message = null) }
         viewModelScope.launch {
+            if (!settings.first().enabled) {
+                status.update { it.copy(isLoggingIn = false) }
+                return@launch
+            }
             try {
                 val session = authenticate(username, password)
                 saveSession(session.userId, session.token)

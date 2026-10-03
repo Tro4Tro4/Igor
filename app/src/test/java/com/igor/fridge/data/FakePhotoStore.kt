@@ -2,6 +2,7 @@ package com.igor.fridge.data
 
 import android.net.Uri
 import com.igor.fridge.data.photos.PhotoStore
+import com.igor.fridge.data.photos.VerticalCrop
 import java.io.File
 
 /**
@@ -21,7 +22,12 @@ class FakePhotoStore : PhotoStore {
     /** null simula una foto illeggibile al momento di caricarla come prova. */
     var uploadBytes: ByteArray? = byteArrayOf(1, 2, 3)
 
-    override suspend fun compressForUpload(source: Uri): ByteArray? = uploadBytes
+    var uploadCrop: VerticalCrop? = null
+
+    override suspend fun compressForUpload(source: Uri, crop: VerticalCrop): ByteArray? {
+        uploadCrop = crop
+        return uploadBytes
+    }
 
     override fun fileOf(name: String): File = File("/foto", name)
 

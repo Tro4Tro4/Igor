@@ -330,6 +330,8 @@ class ReceiptViewModelTest {
         // Se lo scontrino dice una confezione, si'.
         assertEquals(1, ReceiptViewModel.contributionItem(pasta.copy(pieces = 1), "4006381333931")!!.quantity)
         assertEquals(null, ReceiptViewModel.contributionItem(draft, "123"))
+        // Codice interno del negozio (prefisso 2): non va condiviso.
+        assertEquals(null, ReceiptViewModel.contributionItem(draft, "2000000000008"))
         assertEquals(null, ReceiptViewModel.contributionItem(draft.copy(priceText = ""), "4006381333931"))
     }
 
@@ -383,6 +385,55 @@ class ReceiptViewModelTest {
         val price = transport.requests.last()
         assertTrue(price.bodyText!!.contains("\"date\":\"2026-10-01\""))
         assertTrue(price.bodyText!!.contains("\"location_osm_id\":42"))
+
+        // Chiudere e riaprire non permette un secondo invio della stessa prova.
+        val sentRequests = transport.requests.size
+        vm.closeContribution()
+        vm.openContribution()
+        assertEquals("1 prezzo condiviso su Open Prices. Grazie!", vm.uiState.value.contribution?.result)
+        assertFalse(vm.uiState.value.contribution!!.canSend)
+        vm.sendContribution()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(sentRequests, transport.requests.size)
+    }
+
+    @Test
+    fun `un accesso scaduto si dimentica e si chiede di rientrare`() = runTest(dispatcher) {
+        val transport = com.igor.fridge.data.openprices.FakeTransport().apply {
+            respond("POST", "/proofs/upload", com.igor.fridge.data.openprices.HttpResponse(401, "{}"))
+        }
+        priceRepository.setBarcode("latte", "4006381333931")
+        var cleared = false
+        val photos = FakePhotoStore()
+        val vm = ReceiptViewModel(
+            reader,
+            photos,
+            foodRepository,
+            shoppingRepository,
+            priceRepository,
+            today = { today },
+            computeDispatcher = dispatcher,
+            openPrices = kotlinx.coroutines.flow.flowOf(
+                com.igor.fridge.data.prefs.OpenPricesSettings(enabled = true, userId = "mario", token = "vecchio"),
+            ),
+            openPricesClient = com.igor.fridge.data.openprices.OpenPricesClient(transport, boundary = { "B" }),
+            clearOpenPricesSession = { cleared = true },
+        )
+        vm.read("LATTE  1,29")
+        vm.confirm(skipExpiryCheck = true)
+        dispatcher.scheduler.advanceUntilIdle()
+        vm.openContribution()
+        vm.selectLocation(com.igor.fridge.data.openprices.CommunityLocation(42, "NODE", "Esselunga"))
+        vm.onCropChange(top = 0f, bottom = 0.25f)
+
+        vm.sendContribution()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(cleared)
+        assertEquals(ReceiptViewModel.SESSION_EXPIRED, vm.uiState.value.contribution?.error)
+        assertEquals(com.igor.fridge.data.photos.VerticalCrop(0f, 0.25f), photos.uploadCrop)
+        // Nulla e' partito: si puo' riprovare dopo il login.
+        assertTrue(vm.uiState.value.contribution!!.canSend)
     }
 
     @Test

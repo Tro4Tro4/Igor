@@ -29,6 +29,8 @@ class FoodRepository(
 
     suspend fun findByUuid(uuid: String): FoodItem? = dao.findByUuid(uuid)
 
+    suspend fun all(): List<FoodItem> = dao.all()
+
     suspend fun findLastByBarcode(barcode: String): FoodItem? = dao.findLastByBarcode(barcode)
 
     suspend fun findLastByName(name: String): FoodItem? = dao.findLastByNameKey(nameKeyOf(name))

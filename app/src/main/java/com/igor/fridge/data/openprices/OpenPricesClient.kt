@@ -1,6 +1,9 @@
 package com.igor.fridge.data.openprices
 
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.IOException
+import java.math.BigDecimal
 import java.net.URLEncoder
 import java.time.LocalDate
 import java.util.Locale
@@ -103,19 +106,17 @@ class OpenPricesClient(
         priceCents: Long,
         quantity: Int,
     ): Long {
-        // Pochi campi, tutti noti: un oggetto JSON scritto a mano non ha bisogno di una
-        // libreria di serializzazione. Il codice a barre e il tipo OSM sono gia' validati.
-        val body = buildString {
-            append("{\"product_code\":\"").append(barcode).append('"')
-            append(",\"price\":").append(amount(priceCents))
-            append(",\"currency\":\"").append(CURRENCY).append('"')
-            append(",\"date\":\"").append(date).append('"')
-            append(",\"location_osm_id\":").append(location.osmId)
-            append(",\"location_osm_type\":\"").append(location.osmType).append('"')
-            append(",\"proof_id\":").append(proofId)
-            append(",\"receipt_quantity\":").append(quantity)
-            append('}')
-        }
+        // buildJsonObject fa l'escape di ogni valore: nessun testo puo' alterare il corpo.
+        val body = buildJsonObject {
+            put("product_code", barcode)
+            put("price", BigDecimal(amount(priceCents)))
+            put("currency", CURRENCY)
+            put("date", date.toString())
+            put("location_osm_id", location.osmId)
+            put("location_osm_type", location.osmType)
+            put("proof_id", proofId)
+            put("receipt_quantity", quantity)
+        }.toString()
         val response = send(
             HttpRequest(
                 method = "POST",
