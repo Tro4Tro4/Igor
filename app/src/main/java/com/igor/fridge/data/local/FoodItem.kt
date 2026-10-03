@@ -38,4 +38,5 @@ data class FoodItem(
     val updatedAt: Instant = Instant.now(),
     val removedAt: Instant? = null,
     val removalReason: RemovalReason? = null,
+    val brand: String? = null,
 )

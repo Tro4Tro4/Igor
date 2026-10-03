@@ -23,7 +23,9 @@ import androidx.navigation.navArgument
 import com.igor.fridge.ui.edit.EditItemScreen
 import com.igor.fridge.ui.edit.NEW_ITEM_UUID
 import com.igor.fridge.ui.inventory.InventoryScreen
+import com.igor.fridge.ui.receipt.ReceiptScreen
 import com.igor.fridge.ui.scanner.BarcodeScannerScreen
+import com.igor.fridge.ui.settings.AisleOrderScreen
 import com.igor.fridge.ui.settings.SettingsScreen
 import com.igor.fridge.ui.shopping.SavedListsScreen
 import com.igor.fridge.ui.shopping.ShoppingItemEditScreen
@@ -36,6 +38,8 @@ object Routes {
     const val SHOPPING = "shopping"
     const val SHOPPING_ITEM = "shopping/item/{uuid}"
     const val SAVED_LISTS = "shopping/saved"
+    const val AISLE_ORDER = "shopping/aisles"
+    const val RECEIPT = "receipt"
     const val SETTINGS = "settings"
 
     fun edit(uuid: String): String = "edit/$uuid"
@@ -65,6 +69,7 @@ fun IgorApp(
                 onEditItem = { uuid -> navController.navigate(Routes.edit(uuid)) },
                 onOpenShoppingList = { navController.navigate(Routes.SHOPPING) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenReceipt = { navController.navigate(Routes.RECEIPT) },
             )
         }
 
@@ -102,6 +107,8 @@ fun IgorApp(
                 onBack = { navController.popBackStack() },
                 onOpenItem = { uuid -> navController.navigate(Routes.shoppingItem(uuid)) },
                 onOpenSavedLists = { navController.navigate(Routes.SAVED_LISTS) },
+                onOpenAisleOrder = { navController.navigate(Routes.AISLE_ORDER) },
+                onOpenReceipt = { navController.navigate(Routes.RECEIPT) },
             )
         }
 
@@ -119,8 +126,19 @@ fun IgorApp(
             SavedListsScreen(onBack = { navController.popBackStack() })
         }
 
+        composable(Routes.AISLE_ORDER) {
+            AisleOrderScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.RECEIPT) {
+            ReceiptScreen(onDone = { navController.popBackStack() })
+        }
+
         composable(Routes.SETTINGS) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAisleOrder = { navController.navigate(Routes.AISLE_ORDER) },
+            )
         }
     }
 }

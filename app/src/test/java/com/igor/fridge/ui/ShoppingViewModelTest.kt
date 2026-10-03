@@ -28,6 +28,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Instant
+import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShoppingViewModelTest {
@@ -371,5 +372,65 @@ class ShoppingViewModelTest {
             "2 prodotti messi in frigo, 2 tolti dalla lista; 2 restano in lista per la parte mancante",
             ShoppingViewModel.moveMessage(listOf(latte, pane), listOf(sapone, spugne), 2),
         )
+    }
+
+    @Test
+    fun `l'aggiunta rapida capisce quantita' e unita'`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.add("2 kg mele")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val mele = shoppingDao.items.single()
+        assertEquals("mele", mele.name)
+        assertEquals(2.0, mele.quantity, 0.001)
+        assertEquals(QuantityUnit.KG, mele.unit)
+        assertEquals(FoodCategory.FRUTTA, mele.category)
+    }
+
+    @Test
+    fun `con un negozio scelto la voce nuova nasce per quel negozio`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte", store = "Esselunga")
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+
+        vm.setStoreFilter("Esselunga")
+        vm.uiState.first { it.activeStore == "Esselunga" }
+        vm.add("Pane")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Esselunga", shoppingDao.items.single { it.name == "Pane" }.store)
+    }
+
+    @Test
+    fun `scadenza e marca arrivano in frigo`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte", brand = "Granarolo")
+        val latte = shoppingDao.items.single()
+        shoppingRepository.setChecked(latte, checked = true)
+        val expiry = LocalDate.of(2026, 10, 10)
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+        vm.moveCheckedToInventory(mapOf(latte.uuid to expiry))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val created = foodDao.items.single()
+        assertEquals(expiry, created.expiryDate)
+        assertEquals("Granarolo", created.brand)
+    }
+
+    @Test
+    fun `l'ordine delle corsie arriva dalle impostazioni`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte")
+        shoppingRepository.addIfAbsent("Mele")
+        val order = listOf(FoodCategory.LATTICINI) + FoodCategory.entries.filterNot { it == FoodCategory.LATTICINI }
+        val vm = ShoppingViewModel(shoppingRepository, foodRepository, FakePhotoStore(), kotlinx.coroutines.flow.flowOf(order))
+
+        backgroundScope.launch { vm.uiState.collect {} }
+        val state = vm.uiState.first { !it.isLoading }
+
+        assertEquals(listOf(FoodCategory.LATTICINI, FoodCategory.FRUTTA), state.toBuy.map { it.category })
+        assertTrue(vm.shareText().indexOf("Latte") < vm.shareText().indexOf("Mele"))
     }
 }

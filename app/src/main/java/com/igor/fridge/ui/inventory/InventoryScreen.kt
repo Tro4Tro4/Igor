@@ -14,6 +14,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,6 +52,7 @@ fun InventoryScreen(
     onEditItem: (String) -> Unit,
     onOpenShoppingList: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenReceipt: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: InventoryViewModel = viewModel(factory = InventoryViewModel.Factory),
 ) {
@@ -74,6 +76,12 @@ fun InventoryScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
                             contentDescription = stringResource(R.string.action_add_expiring),
+                        )
+                    }
+                    IconButton(onClick = onOpenReceipt) {
+                        Icon(
+                            imageVector = Icons.Filled.Receipt,
+                            contentDescription = stringResource(R.string.receipt_title),
                         )
                     }
                     IconButton(onClick = onOpenShoppingList) {

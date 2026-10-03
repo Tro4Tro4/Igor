@@ -52,6 +52,8 @@ class SavedListRepository(
                     brand = item.brand,
                     notes = item.notes,
                     photoPath = item.photoPath,
+                    unitPriceCents = item.unitPriceCents,
+                    store = item.store,
                 )
             },
         )

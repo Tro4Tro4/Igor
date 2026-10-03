@@ -7,55 +7,28 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.FoodItem
+import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.RemovalReason
 import com.igor.fridge.data.local.ShoppingItem
 import com.igor.fridge.data.local.remainingAfterPurchase
 import com.igor.fridge.data.photos.PhotoStore
 import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.ShoppingRepository
+import com.igor.fridge.domain.parseQuickEntry
 import com.igor.fridge.ui.igorApplication
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-
-/** Le voci ancora da comprare di una categoria, cioe' di una corsia del negozio. */
-data class ShoppingSection(
-    val category: FoodCategory,
-    val items: List<ShoppingItem>,
-)
-
-data class ShoppingUiState(
-    val items: List<ShoppingItem> = emptyList(),
-    val isLoading: Boolean = true,
-    val message: String? = null,
-    val canUndo: Boolean = false,
-) {
-    val checkedCount: Int get() = items.count { it.isChecked }
-
-    /** Da comprare, raggruppate per categoria nell'ordine delle corsie. */
-    val toBuy: List<ShoppingSection> = items.filterNot { it.isChecked }.groupedByCategory()
-
-    /** Gia' nel carrello, nell'ordine della lista. */
-    val inCart: List<ShoppingItem> = items.filter { it.isChecked }
-}
-
-/**
- * Raggruppa per categoria nell'ordine di [FoodCategory], che e' quello delle corsie;
- * dentro ogni gruppo resta l'ordine della lista. Le categorie vuote non compaiono.
- */
-fun List<ShoppingItem>.groupedByCategory(): List<ShoppingSection> {
-    val byCategory = groupBy { it.category }
-    return FoodCategory.entries.mapNotNull { category ->
-        byCategory[category]?.let { ShoppingSection(category, it) }
-    }
-}
+import java.time.LocalDate
 
 /** Cosa serve per annullare l'ultimo spostamento in frigo. */
 private data class LastMove(
@@ -67,7 +40,10 @@ class ShoppingViewModel(
     private val shoppingRepository: ShoppingRepository,
     private val foodRepository: FoodRepository,
     private val photoStore: PhotoStore,
+    categoryOrder: Flow<List<FoodCategory>> = flowOf(FoodCategory.entries),
 ) : ViewModel() {
+
+    private val storeFilter = MutableStateFlow<String?>(null)
 
     // Vive in memoria quanto lo snackbar: un annullamento che sopravvive alla schermata
     // non e' quello che l'utente si aspetta, e non vale una colonna in database.
@@ -82,12 +58,19 @@ class ShoppingViewModel(
     private var moveInProgress = false
 
     val uiState: StateFlow<ShoppingUiState> =
-        combine(shoppingRepository.observeAll(), feedback) { items, feedback ->
+        combine(
+            shoppingRepository.observeAll(),
+            feedback,
+            categoryOrder,
+            storeFilter,
+        ) { items, feedback, order, store ->
             ShoppingUiState(
                 items = items,
                 isLoading = false,
                 message = feedback.message,
                 canUndo = feedback.canUndo,
+                categoryOrder = order,
+                storeFilter = store,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -96,18 +79,34 @@ class ShoppingViewModel(
         )
 
     /**
-     * Aggiunge una voce col solo nome. La categoria e' quella che il prodotto ha avuto per
-     * ultimo in inventario, se c'e' passato e non era "Altro"; altrimenti la propone il
-     * repository a partire dal nome.
+     * Aggiunge una voce dalla riga rapida: "2 kg mele" diventa mele, 2 kg. La categoria e'
+     * quella che il prodotto ha avuto per ultimo in inventario, se c'e' passato e non era
+     * "Altro"; altrimenti la propone il repository a partire dal nome. Con un negozio
+     * scelto nel filtro, la voce nasce per quel negozio: e' li' che la si sta scrivendo.
      */
-    fun add(name: String) {
-        if (name.isBlank()) return
+    fun add(text: String) {
+        val entry = parseQuickEntry(text)
+        if (entry.name.isBlank()) return
+        val store = uiState.value.activeStore
         viewModelScope.launch {
-            val known = foodRepository.findLastByName(name)?.category
+            val known = foodRepository.findLastByName(entry.name)?.category
                 ?.takeIf { it != FoodCategory.ALTRO }
-            shoppingRepository.addIfAbsent(name, category = known)
+            shoppingRepository.addIfAbsent(
+                name = entry.name,
+                quantity = entry.quantity ?: 1.0,
+                unit = entry.unit ?: QuantityUnit.PZ,
+                category = known,
+                store = store,
+            )
         }
     }
+
+    /** Mostra solo le voci di [store] (e quelle senza negozio); null mostra tutto. */
+    fun setStoreFilter(store: String?) = storeFilter.update { store }
+
+    /** La lista da condividere, cosi' come la si vede (filtro compreso). */
+    fun shareText(): String =
+        uiState.value.let { com.igor.fridge.ui.shopping.shareText(it.toBuy, it.totals) }
 
     fun photoFile(name: String): File = photoStore.fileOf(name)
 
@@ -125,8 +124,11 @@ class ShoppingViewModel(
      * L'operazione e' legata a un'azione esplicita e non allo spunto: al supermercato si
      * spunta e si toglie la spunta mentre si prende, e far entrare un prodotto in frigo a
      * ogni tocco creerebbe record fantasma.
+     *
+     * [expiries] sono le scadenze indicate dall'utente per i prodotti freschi, per uuid
+     * della voce; chi non ne ha una entra senza data, come prima.
      */
-    fun moveCheckedToInventory() {
+    fun moveCheckedToInventory(expiries: Map<String, LocalDate> = emptyMap()) {
         if (moveInProgress) return
         moveInProgress = true
         viewModelScope.launch {
@@ -152,6 +154,8 @@ class ShoppingViewModel(
                             quantity = item.purchasedQuantity ?: item.quantity,
                             unit = item.unit,
                             category = item.category,
+                            brand = item.brand,
+                            expiryDate = expiries[item.uuid],
                         )
                     }
                     // Dopo un acquisto parziale la voce resta, per la parte mancante.
@@ -252,6 +256,7 @@ class ShoppingViewModel(
                     shoppingRepository = container.shoppingRepository,
                     foodRepository = container.foodRepository,
                     photoStore = container.photoStore,
+                    categoryOrder = container.settingsStore.categoryOrder,
                 )
             }
         }

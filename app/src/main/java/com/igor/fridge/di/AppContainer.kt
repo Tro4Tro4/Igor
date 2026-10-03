@@ -5,6 +5,8 @@ import com.igor.fridge.data.local.IgorDatabase
 import com.igor.fridge.data.photos.FilePhotoStore
 import com.igor.fridge.data.photos.PhotoStore
 import com.igor.fridge.data.prefs.SettingsStore
+import com.igor.fridge.data.receipt.MlKitReceiptReader
+import com.igor.fridge.data.receipt.ReceiptReader
 import com.igor.fridge.data.prefs.settingsDataStore
 import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.SavedListRepository
@@ -32,6 +34,8 @@ class AppContainer(context: Context) {
     }
 
     val photoStore: PhotoStore by lazy { FilePhotoStore(appContext) }
+
+    val receiptReader: ReceiptReader by lazy { MlKitReceiptReader(appContext) }
 
     val settingsStore: SettingsStore by lazy { SettingsStore(appContext.settingsDataStore) }
 

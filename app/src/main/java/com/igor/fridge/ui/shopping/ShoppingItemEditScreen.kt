@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,6 +37,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -205,6 +207,44 @@ fun ShoppingItemEditScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            OutlinedTextField(
+                value = state.priceText,
+                onValueChange = viewModel::onPriceChange,
+                label = { Text(stringResource(R.string.shopping_price, state.unit.label())) },
+                singleLine = true,
+                isError = state.priceError,
+                supportingText = if (state.priceError) {
+                    { Text(stringResource(R.string.error_price_invalid)) }
+                } else {
+                    null
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = state.store,
+                onValueChange = viewModel::onStoreChange,
+                label = { Text(stringResource(R.string.shopping_store)) },
+                placeholder = { Text(stringResource(R.string.shopping_store_hint)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            val suggestions = state.knownStores.filterNot { it.equals(state.store.trim(), ignoreCase = true) }
+            if (suggestions.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    suggestions.forEach { store ->
+                        SuggestionChip(
+                            onClick = { viewModel.onStoreChange(store) },
+                            label = { Text(store) },
+                        )
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = state.notes,

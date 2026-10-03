@@ -20,8 +20,15 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
   di annullare lo spostamento finché lo snackbar è visibile; dopo un acquisto parziale il
   resto rimane in lista, e ciò che non si mangia (casa, igiene) esce dalla lista senza
   entrare in frigo.
+  L’aggiunta rapida capisce le quantità ("2 kg mele"); ogni voce può avere prezzo e
+  negozio, con totale stimato e filtro per negozio; la lista si condivide come testo e
+  l’ordine delle corsie si adatta al proprio supermercato. Entrando in frigo, per i
+  prodotti freschi viene chiesta la scadenza.
 - **Liste salvate**: la lista attuale si salva con un nome ("Spesa settimanale") e si
   ricarica quando serve, aggiungendo solo ciò che manca.
+- **Scontrino**: dalla foto di uno scontrino (OCR sul telefono, ML Kit) Igor propone i
+  prodotti con la categoria, chiede quantità e scadenza dove servono, li mette in
+  inventario e toglie dalla lista della spesa ciò che è stato comprato.
 
 ## Stack tecnico
 
@@ -34,6 +41,7 @@ cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun
 | Preferenze | DataStore (Preferences), osservabili tramite `Flow` |
 | Background | WorkManager |
 | Fotocamera | CameraX + ML Kit Barcode Scanning |
+| Scontrini | ML Kit Text Recognition (modello incluso, offline) |
 | DI | container manuale (`AppContainer`), senza annotation processor |
 | minSdk / targetSdk | 26 / 35 |
 
@@ -47,15 +55,17 @@ app/src/main/java/com/igor/fridge/
 │   ├── local/        # entità Room (UUID, cancellazione logica), DAO, database, migrazioni
 │   ├── photos/       # foto delle voci della spesa (file privati dell’app)
 │   ├── prefs/        # preferenze utente (DataStore, osservabili)
+│   ├── receipt/      # riconoscimento del testo degli scontrini (ML Kit)
 │   └── repository/   # FoodRepository, ShoppingRepository, SavedListRepository
 ├── di/               # AppContainer
-├── domain/           # scadenze e proposta di categoria, indipendenti da Android
+├── domain/           # scadenze, categorie, aggiunta rapida, lettura scontrini (senza Android)
 ├── notification/     # notifica riepilogativa, worker e pianificazione
 └── ui/               # tema, navigazione e schermate Compose
     ├── inventory/    # elenco, filtri, ricerca
     ├── edit/         # inserimento e modifica
     ├── scanner/      # lettura codice a barre
-    ├── settings/     # impostazioni: soglia, ora della notifica, attivazione
+    ├── receipt/      # dallo scontrino all'inventario
+    ├── settings/     # impostazioni: soglia, ora della notifica, ordine delle corsie
     └── shopping/     # lista della spesa, dettagli della voce, liste salvate
 ```
 
@@ -73,10 +83,10 @@ Serve JDK 17+ e l’Android SDK con `platform-35` e i build-tools corrispondenti
 ## Stato
 
 Fino alla Fase 2 il progetto compilava e la suite di test JVM passava. Le modifiche alla
-lista della spesa (dettagli, categorie, foto, liste salvate; vedi
+lista della spesa e lo scontrino (vedi
 `docs/superpowers/specs/2026-10-03-lista-spesa-dettagli-design.md`) sono state scritte
 senza poter eseguire `./gradlew`: la logica è stata compilata e provata sulla JVM, ma
-schermate Compose, KSP di Room e test Robolectric attendono la prima build.
+schermate Compose, KSP di Room, ML Kit e test Robolectric attendono la prima build.
 
 `FoodItem` e `ShoppingItem` usano come chiave primaria un UUID `String` generato sul
 dispositivo, non un id autoincrementale di SQLite che collide fra dispositivi diversi, e
@@ -112,16 +122,16 @@ Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi 
 corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
 "3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-I test coprono 117 casi su 19 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
+I test coprono 168 casi su 27 classi, tutti sulla JVM; Room gira sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
-**Database: versione 2.** La lista della spesa ha cambiato schema, e da qui in poi ogni
-cambio di schema alza la versione e porta la sua migrazione (`IgorDatabase.MIGRATION_1_2`
-è la prima): a versione invariata Room rifiuterebbe di aprire il database. La migrazione è
+**Database: versione 3.** Ogni cambio di schema alza la versione e porta la sua migrazione
+(`MIGRATION_1_2`, `MIGRATION_2_3`): a versione invariata Room rifiuterebbe di aprire il
+database. La migrazione è
 provata da `MigrationTest`, che apre con `IgorDatabase.build` un database della versione 1
 scritto a mano. `fallbackToDestructiveMigration()` è ancora presente e copre solo un salto
 di versione senza migrazione, cancellando i dati: va tolto quando si decide come gestire
-quel caso. Lo schema esportato della versione 2 (`app/schemas/.../2.json`) viene generato
+quel caso. Lo schema esportato della versione 3 (`app/schemas/.../3.json`) viene generato
 dalla prima build e va committato.
 
 ### Difetti noti

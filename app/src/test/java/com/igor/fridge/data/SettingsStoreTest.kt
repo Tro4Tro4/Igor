@@ -2,6 +2,7 @@ package com.igor.fridge.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -94,5 +95,16 @@ class SettingsStoreTest {
         assertEquals(5, settings.warningDays)
         assertEquals(SettingsStore.DEFAULT_NOTIFICATION_HOUR, settings.notificationHour)
         assertFalse(settings.notificationsEnabled)
+    }
+
+    @Test
+    fun `l'ordine delle corsie parte da quello predefinito e si rilegge`() = runTest {
+        val store = newStore()
+        assertEquals(FoodCategory.entries, store.categoryOrder.first())
+
+        val order = FoodCategory.entries.reversed()
+        store.setCategoryOrder(order)
+
+        assertEquals(order, store.categoryOrder.first())
     }
 }

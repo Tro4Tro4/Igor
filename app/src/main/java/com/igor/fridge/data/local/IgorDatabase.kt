@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [FoodItem::class, ShoppingItem::class, SavedList::class, SavedListItem::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -64,6 +64,24 @@ abstract class IgorDatabase : RoomDatabase() {
         )
 
         /**
+         * Marca anche in inventario; prezzo e negozio sulle voci della spesa e delle liste
+         * salvate. Solo colonne nuove e facoltative: le righe esistenti restano valide.
+         */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_2_3_SQL.forEach(db::execSQL)
+            }
+        }
+
+        internal val MIGRATION_2_3_SQL: List<String> = listOf(
+            "ALTER TABLE `food_items` ADD COLUMN `brand` TEXT",
+            "ALTER TABLE `shopping_items` ADD COLUMN `unitPriceCents` INTEGER",
+            "ALTER TABLE `shopping_items` ADD COLUMN `store` TEXT",
+            "ALTER TABLE `saved_list_items` ADD COLUMN `unitPriceCents` INTEGER",
+            "ALTER TABLE `saved_list_items` ADD COLUMN `store` TEXT",
+        )
+
+        /**
          * DA RIMUOVERE il fallback distruttivo: ora che esiste una migrazione serve solo a
          * non far morire l'app su un salto di versione per cui manchi la migrazione, ma
          * in quel caso cancellerebbe l'inventario senza dire niente. Resta finche' non si
@@ -78,7 +96,7 @@ abstract class IgorDatabase : RoomDatabase() {
                 context.applicationContext,
                 IgorDatabase::class.java,
                 name,
-            ).addMigrations(MIGRATION_1_2)
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
     }

@@ -26,6 +26,41 @@ enum class FoodCategory(val isFood: Boolean = true) {
     ALTRO,
     ;
 
+    /**
+     * Prodotti che vanno a male in pochi giorni: per questi, entrando in frigo, l'app chiede
+     * la scadenza invece di lasciarla vuota.
+     */
+    val isPerishable: Boolean
+        get() = when (this) {
+            FRUTTA, VERDURA, PANE, CARNE, PESCE, LATTICINI -> true
+            else -> false
+        }
+
+    /**
+     * Si comprano a peso: se lo scontrino non dice quanto, la quantita' va chiesta, perche'
+     * "1 pezzo" di banane non significa nulla.
+     */
+    val isSoldByWeight: Boolean
+        get() = when (this) {
+            FRUTTA, VERDURA, CARNE, PESCE -> true
+            else -> false
+        }
+
+    /**
+     * Giorni di conservazione tipici di un prodotto fresco, usati solo come data da cui
+     * parte il calendario quando si sceglie la scadenza: non diventano mai una scadenza
+     * senza che l'utente la confermi.
+     */
+    val typicalShelfLifeDays: Long
+        get() = when (this) {
+            PESCE -> 2
+            CARNE, PANE -> 3
+            VERDURA -> 5
+            FRUTTA, LATTICINI -> 7
+            SURGELATI -> 90
+            else -> 30
+        }
+
     /** Dove finisce di solito un prodotto appena comprato di questa categoria. */
     val defaultLocation: StorageLocation
         get() = when (this) {

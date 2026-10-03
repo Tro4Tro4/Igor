@@ -31,6 +31,24 @@ fun formatNumber(quantity: Double): String =
 fun parseQuantity(text: String): Double? =
     text.replace(',', '.').trim().toDoubleOrNull()?.takeIf { it > 0.0 && it.isFinite() }
 
+/**
+ * Legge un prezzo scritto dall'utente ("1,29", "1.29 €", "2") in centesimi.
+ * @return null se il testo non e' un importo maggiore o uguale a zero.
+ */
+fun parsePriceCents(text: String): Long? {
+    val value = text.replace("€", "").replace(',', '.').trim().toDoubleOrNull() ?: return null
+    if (!value.isFinite() || value < 0.0) return null
+    return Math.round(value * 100)
+}
+
+/** 1290 diventa "12,90 €". */
+fun formatEuro(cents: Long): String =
+    String.format(Locale.ITALY, "%d,%02d €", cents / 100, kotlin.math.abs(cents % 100))
+
+/** Il prezzo nel campo di testo, senza simbolo: 129 diventa "1,29". */
+fun formatPriceInput(cents: Long): String =
+    String.format(Locale.ITALY, "%d,%02d", cents / 100, cents % 100)
+
 fun QuantityUnit.label(): String = when (this) {
     QuantityUnit.PZ -> "pz"
     QuantityUnit.G -> "g"

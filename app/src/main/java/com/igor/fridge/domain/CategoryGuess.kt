@@ -14,11 +14,15 @@ import java.util.Locale
  * "petto di pollo" carne anche se "petto" da solo non dice nulla. Fanno eccezione le
  * parole come "surgelato", che cambiano la corsia qualunque sia il prodotto.
  *
+ * Se nessuna parola e' riconosciuta per intero, si prova con le abbreviazioni degli
+ * scontrini: "MOZZ" e "PARMIG" sono l'inizio di una sola parola nota, e valgono quella.
+ * Un'abbreviazione ambigua (inizio di parole di categorie diverse) non decide nulla.
+ *
  * E' un aiuto, non un classificatore: cio' che non riconosce finisce in [FoodCategory.ALTRO]
  * e l'utente lo sposta a mano.
  */
 fun guessCategory(name: String): FoodCategory {
-    val words = normalize(name).split(' ').filter { it.isNotEmpty() }
+    val words = nameWords(name)
     if (words.isEmpty()) return FoodCategory.ALTRO
     if (words.any { it in FROZEN_MARKERS }) return FoodCategory.SURGELATI
 
@@ -28,8 +32,20 @@ fun guessCategory(name: String): FoodCategory {
         }
         KEYWORDS[words[index]]?.let { return it }
     }
+    for (word in words) {
+        if (word.length < MIN_ABBREVIATION) continue
+        val categories = KEYWORDS.filterKeys { it.startsWith(word) }.values.toSet()
+        if (categories.size == 1) return categories.single()
+    }
     return FoodCategory.ALTRO
 }
+
+/** Sotto questa lunghezza un inizio di parola e' troppo vago ("pa" e' pane o pasta?). */
+private const val MIN_ABBREVIATION = 4
+
+/** Le parole di un nome, normalizzate: "Caffè d'orzo" diventa [caffe, d, orzo]. */
+internal fun nameWords(text: String): List<String> =
+    normalize(text).split(' ').filter { it.isNotEmpty() }
 
 /** Minuscole, senza accenti e senza punteggiatura: "Caffè d'orzo" diventa "caffe d orzo". */
 private fun normalize(text: String): String =

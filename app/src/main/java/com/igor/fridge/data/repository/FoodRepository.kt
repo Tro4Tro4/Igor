@@ -51,14 +51,17 @@ class FoodRepository(
      * quell'articolo e' gia' stato consumato. La posizione si eredita allo stesso modo, e
      * per un prodotto mai visto prima dipende dalla categoria (un surgelato va in freezer).
      *
-     * La scadenza resta assente perche' la lista della spesa non puo' conoscerla, e il
-     * codice a barre non si eredita perche' identifica una confezione, non un prodotto.
+     * La scadenza arriva solo se l'utente l'ha indicata entrando in frigo: la lista della
+     * spesa non puo' conoscerla. Il codice a barre non si eredita perche' identifica una
+     * confezione, non un prodotto; la marca invece segue il prodotto dalla lista al frigo.
      */
     suspend fun addFromShopping(
         name: String,
         quantity: Double,
         unit: QuantityUnit,
         category: FoodCategory = FoodCategory.ALTRO,
+        brand: String? = null,
+        expiryDate: LocalDate? = null,
     ): FoodItem {
         val trimmed = name.trim()
         val previous = dao.findLastByName(trimmed)
@@ -75,6 +78,8 @@ class FoodRepository(
                 location = previous?.location ?: resolvedCategory.defaultLocation,
                 quantity = quantity,
                 unit = unit,
+                brand = brand,
+                expiryDate = expiryDate,
             ),
         )
     }

@@ -149,4 +149,20 @@ class EditItemViewModelTest {
         assertFalse(vm.uiState.value.isSaved)
         assertTrue(dao.items.isEmpty())
     }
+
+    @Test
+    fun `la marca si salva e si rilegge`() = runTest(dispatcher) {
+        val vm = viewModel(NEW_ITEM_UUID)
+        vm.onNameChange("Latte")
+        vm.onBrandChange("  Granarolo ")
+        vm.save()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val stored = dao.items.single()
+        assertEquals("Granarolo", stored.brand)
+
+        val reopened = viewModel(stored.uuid)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("Granarolo", reopened.uiState.value.brand)
+    }
 }

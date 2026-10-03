@@ -6,7 +6,11 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.igor.fridge.data.local.FoodCategory
+import com.igor.fridge.domain.categoryOrderFrom
+import com.igor.fridge.domain.toStoredOrder
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -55,6 +59,17 @@ class SettingsStore(private val store: DataStore<Preferences>) {
 
     val notificationsEnabled: Flow<Boolean> = settings.map { it.notificationsEnabled }
 
+    /**
+     * Ordine delle corsie della lista della spesa. Sta fuori da [Settings], che raccoglie
+     * cio' che serve alle notifiche.
+     */
+    val categoryOrder: Flow<List<FoodCategory>> =
+        store.data.map { categoryOrderFrom(it[KEY_CATEGORY_ORDER]) }
+
+    suspend fun setCategoryOrder(order: List<FoodCategory>) {
+        store.edit { it[KEY_CATEGORY_ORDER] = order.toStoredOrder() }
+    }
+
     suspend fun setWarningDays(value: Int) {
         store.edit { it[KEY_WARNING_DAYS] = value.coerceIn(0, 30) }
     }
@@ -75,5 +90,6 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         private val KEY_WARNING_DAYS = intPreferencesKey("warning_days")
         private val KEY_NOTIFICATION_HOUR = intPreferencesKey("notification_hour")
         private val KEY_NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
+        private val KEY_CATEGORY_ORDER = stringPreferencesKey("category_order")
     }
 }

@@ -68,8 +68,10 @@ class InventoryViewModel(
         ) { items, criteria, warningDays, today ->
             val statuses = items.associateBy({ it.uuid }, { it.expiryStatus(today, warningDays) })
             val visible = items.filter { item ->
-                val matchesQuery = criteria.query.isBlank() ||
-                    item.name.contains(criteria.query.trim(), ignoreCase = true)
+                val needle = criteria.query.trim()
+                val matchesQuery = needle.isEmpty() ||
+                    item.name.contains(needle, ignoreCase = true) ||
+                    item.brand?.contains(needle, ignoreCase = true) == true
                 val matchesLocation = criteria.location == null || item.location == criteria.location
                 val matchesFilter = when (criteria.filter) {
                     InventoryFilter.TUTTI -> true

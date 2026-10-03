@@ -11,7 +11,9 @@ import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.photos.PhotoStore
 import com.igor.fridge.data.repository.ShoppingRepository
 import com.igor.fridge.ui.formatNumber
+import com.igor.fridge.ui.formatPriceInput
 import com.igor.fridge.ui.igorApplication
+import com.igor.fridge.ui.parsePriceCents
 import com.igor.fridge.ui.parseQuantity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,17 +32,22 @@ data class ShoppingItemEditUiState(
     val notes: String = "",
     val purchasedText: String = "",
     val photoName: String? = null,
+    val priceText: String = "",
+    val store: String = "",
+    /** Negozi gia' usati nella lista, da proporre. */
+    val knownStores: List<String> = emptyList(),
     val isImportingPhoto: Boolean = false,
     val nameError: Boolean = false,
     val quantityError: Boolean = false,
     val purchasedError: Boolean = false,
+    val priceError: Boolean = false,
     val message: String? = null,
     val isDone: Boolean = false,
 )
 
 /**
  * Modifica i dettagli di una voce della lista: quanto e cosa comprare (quantita', unita',
- * marca, note, foto, categoria) e quanto e' stato preso.
+ * marca, note, foto, categoria, prezzo, negozio) e quanto e' stato preso.
  */
 class ShoppingItemEditViewModel(
     private val itemUuid: String,
@@ -69,6 +76,12 @@ class ShoppingItemEditViewModel(
                 notes = item.notes.orEmpty(),
                 purchasedText = item.purchasedQuantity?.let(::formatQuantityInput).orEmpty(),
                 photoName = item.photoPath,
+                priceText = item.unitPriceCents?.let(::formatPriceInput).orEmpty(),
+                store = item.store.orEmpty(),
+                knownStores = repository.currentItems()
+                    .mapNotNull { it.store?.trim()?.takeIf(String::isNotEmpty) }
+                    .distinctBy { it.lowercase() }
+                    .sortedWith(String.CASE_INSENSITIVE_ORDER),
             )
         }
     }
@@ -92,6 +105,10 @@ class ShoppingItemEditViewModel(
     fun onBrandChange(value: String) = _uiState.update { it.copy(brand = value) }
 
     fun onNotesChange(value: String) = _uiState.update { it.copy(notes = value) }
+
+    fun onPriceChange(value: String) = _uiState.update { it.copy(priceText = value, priceError = false) }
+
+    fun onStoreChange(value: String) = _uiState.update { it.copy(store = value) }
 
     fun onPurchasedChange(value: String) =
         _uiState.update { it.copy(purchasedText = value, purchasedError = false) }
@@ -135,13 +152,17 @@ class ShoppingItemEditViewModel(
         val purchasedBlank = state.purchasedText.isBlank()
         val purchased = if (purchasedBlank) null else parseQuantity(state.purchasedText)
         val purchasedInvalid = !purchasedBlank && purchased == null
+        val priceBlank = state.priceText.isBlank()
+        val price = if (priceBlank) null else parsePriceCents(state.priceText)
+        val priceInvalid = !priceBlank && price == null
 
-        if (name.isEmpty() || quantity == null || purchasedInvalid) {
+        if (name.isEmpty() || quantity == null || purchasedInvalid || priceInvalid) {
             _uiState.update {
                 it.copy(
                     nameError = name.isEmpty(),
                     quantityError = quantity == null,
                     purchasedError = purchasedInvalid,
+                    priceError = priceInvalid,
                 )
             }
             return
@@ -162,6 +183,8 @@ class ShoppingItemEditViewModel(
                         notes = state.notes.trim().ifEmpty { null },
                         photoPath = state.photoName,
                         purchasedQuantity = purchased,
+                        unitPriceCents = price,
+                        store = state.store.trim().ifEmpty { null },
                         // Indicare quanto si e' preso vuol dire che il prodotto e' nel carrello.
                         isChecked = base.isChecked || purchased != null,
                     ),

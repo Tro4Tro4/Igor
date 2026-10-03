@@ -162,4 +162,32 @@ class ShoppingItemEditViewModelTest {
 
         assertTrue(vm.uiState.value.isDone)
     }
+
+    @Test
+    fun `prezzo e negozio si salvano, e i negozi gia' usati si propongono`() = runTest(dispatcher) {
+        repository.addIfAbsent("Pane", store = "Forno Rossi")
+        val vm = viewModelFor("Latte")
+
+        assertEquals(listOf("Forno Rossi"), vm.uiState.value.knownStores)
+        vm.onPriceChange("1,29")
+        vm.onStoreChange(" Esselunga ")
+        vm.save()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val saved = dao.items.single { it.name == "Latte" }
+        assertEquals(129L, saved.unitPriceCents)
+        assertEquals("Esselunga", saved.store)
+    }
+
+    @Test
+    fun `un prezzo non valido blocca il salvataggio`() = runTest(dispatcher) {
+        val vm = viewModelFor("Latte")
+
+        vm.onPriceChange("caro")
+        vm.save()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.priceError)
+        assertFalse(vm.uiState.value.isDone)
+    }
 }

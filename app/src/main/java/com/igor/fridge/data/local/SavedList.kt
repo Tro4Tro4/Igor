@@ -45,6 +45,8 @@ data class SavedListItem(
     val brand: String? = null,
     val notes: String? = null,
     val photoPath: String? = null,
+    val unitPriceCents: Long? = null,
+    val store: String? = null,
 )
 
 /** Riga dell'elenco delle liste salvate. */

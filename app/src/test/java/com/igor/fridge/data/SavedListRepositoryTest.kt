@@ -31,6 +31,8 @@ class SavedListRepositoryTest {
         brand = "Granarolo",
         notes = "senza lattosio",
         photoPath = "latte.jpg",
+        unitPriceCents = 129,
+        store = "Esselunga",
         isChecked = true,
         purchasedQuantity = 1.0,
     )
@@ -50,6 +52,8 @@ class SavedListRepositoryTest {
         assertEquals("Granarolo", savedLatte.brand)
         assertEquals("senza lattosio", savedLatte.notes)
         assertEquals("latte.jpg", savedLatte.photoPath)
+        assertEquals(129L, savedLatte.unitPriceCents)
+        assertEquals("Esselunga", savedLatte.store)
     }
 
     @Test

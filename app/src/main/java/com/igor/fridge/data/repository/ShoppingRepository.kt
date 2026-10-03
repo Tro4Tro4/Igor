@@ -33,8 +33,8 @@ class ShoppingRepository(
      * volta sparirebbe dall'inventario senza ricomparire in lista.
      *
      * [category] null significa "non la so": una voce nuova la riceve da [guessCategory],
-     * una voce ripristinata tiene la sua. Allo stesso modo marca, note e foto sostituiscono
-     * quelle di una voce ripristinata solo se indicate.
+     * una voce ripristinata tiene la sua. Allo stesso modo marca, note, foto, prezzo e
+     * negozio sostituiscono quelli di una voce ripristinata solo se indicati.
      *
      * @return true se la lista e' cambiata.
      */
@@ -46,6 +46,8 @@ class ShoppingRepository(
         brand: String? = null,
         notes: String? = null,
         photoPath: String? = null,
+        unitPriceCents: Long? = null,
+        store: String? = null,
     ): Boolean {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return false
@@ -63,6 +65,8 @@ class ShoppingRepository(
                         brand = brand,
                         notes = notes,
                         photoPath = photoPath,
+                        unitPriceCents = unitPriceCents,
+                        store = store,
                         updatedAt = clock(),
                     ),
                 )
@@ -80,6 +84,8 @@ class ShoppingRepository(
                         brand = brand ?: existing.brand,
                         notes = notes ?: existing.notes,
                         photoPath = photoPath ?: existing.photoPath,
+                        unitPriceCents = unitPriceCents ?: existing.unitPriceCents,
+                        store = store ?: existing.store,
                         updatedAt = clock(),
                     ),
                 )
@@ -105,6 +111,8 @@ class ShoppingRepository(
             brand = item.brand,
             notes = item.notes,
             photoPath = item.photoPath,
+            unitPriceCents = item.unitPriceCents,
+            store = item.store,
         )
     }
 

@@ -22,6 +22,7 @@ import java.time.LocalDate
 data class EditItemUiState(
     val uuid: String = NEW_ITEM_UUID,
     val name: String = "",
+    val brand: String = "",
     val barcode: String? = null,
     val category: FoodCategory = FoodCategory.ALTRO,
     val location: StorageLocation = StorageLocation.FRIGO,
@@ -56,6 +57,7 @@ class EditItemViewModel(
                     _uiState.value = EditItemUiState(
                         uuid = item.uuid,
                         name = item.name,
+                        brand = item.brand.orEmpty(),
                         barcode = item.barcode,
                         category = item.category,
                         location = item.location,
@@ -71,6 +73,8 @@ class EditItemViewModel(
     }
 
     fun onNameChange(value: String) = _uiState.update { it.copy(name = value, nameError = false) }
+
+    fun onBrandChange(value: String) = _uiState.update { it.copy(brand = value) }
 
     fun onCategoryChange(value: FoodCategory) = _uiState.update { it.copy(category = value) }
 
@@ -101,6 +105,7 @@ class EditItemViewModel(
                     state.copy(
                         barcode = barcode,
                         name = state.name.ifBlank { known.name },
+                        brand = state.brand.ifBlank { known.brand.orEmpty() },
                         category = known.category,
                         unit = known.unit,
                         location = known.location,
@@ -140,6 +145,7 @@ class EditItemViewModel(
             repository.save(
                 base.copy(
                     name = name,
+                    brand = state.brand.trim().ifEmpty { null },
                     barcode = state.barcode,
                     category = state.category,
                     location = state.location,

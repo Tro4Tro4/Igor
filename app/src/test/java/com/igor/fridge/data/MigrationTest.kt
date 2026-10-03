@@ -74,8 +74,10 @@ class MigrationTest {
 
         val migrated = IgorDatabase.build(context, TEST_DB).also { db = it }
 
+        // Le migrazioni 1->2 e 2->3 si applicano in fila.
         val food = migrated.foodItemDao().findByUuid("f1")
         assertEquals("Latte", food?.name)
+        assertNull(food?.brand)
 
         val shopping = migrated.shoppingItemDao().observeAll().first()
         assertEquals(2, shopping.size)
@@ -86,6 +88,8 @@ class MigrationTest {
         assertEquals(FoodCategory.LATTICINI, latte.category)
         assertNull(latte.brand)
         assertNull(latte.purchasedQuantity)
+        assertNull(latte.unitPriceCents)
+        assertNull(latte.store)
         assertEquals(FoodCategory.ALTRO, shopping.single { it.uuid == "s2" }.category)
 
         assertTrue(migrated.savedListDao().observeSummaries().first().isEmpty())

@@ -30,6 +30,7 @@ import com.igor.fridge.domain.daysUntilExpiry
 import com.igor.fridge.domain.expiryStatus
 import com.igor.fridge.ui.expiryLabel
 import com.igor.fridge.ui.formatQuantity
+import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
 import com.igor.fridge.ui.theme.expiryColors
 import java.time.LocalDate
@@ -77,8 +78,12 @@ fun FoodItemCard(
                     color = statusColor,
                 )
                 Text(
-                    text = "${formatQuantity(item.quantity, item.unit)} · " +
-                        "${item.location.label()} · ${item.category.label()}",
+                    text = listOfNotNull(
+                        formatQuantity(item.quantity, item.unit),
+                        item.brand,
+                        item.location.label(),
+                        "${item.category.icon()} ${item.category.label()}",
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

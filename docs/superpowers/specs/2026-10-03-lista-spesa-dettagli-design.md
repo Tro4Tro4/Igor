@@ -89,20 +89,85 @@ possibile installare l’Android SDK né eseguire `./gradlew`. È stato verifica
 
 **Da verificare con `./gradlew assembleDebug testDebugUnitTest`:** le schermate Compose,
 `FilePhotoStore`, l’elaborazione KSP di Room e i test Robolectric (`SavedListDaoTest`,
-`MigrationTest`, `ShoppingItemEditViewModelTest`). La prima build genera
-`app/schemas/com.igor.fridge.data.local.IgorDatabase/2.json`, che va committato.
+`MigrationTest`, `ShoppingItemEditViewModelTest`, `ReceiptViewModelTest`,
+`SettingsStoreTest`) e il riconoscimento ML Kit su scontrini veri. La prima build genera
+`app/schemas/com.igor.fridge.data.local.IgorDatabase/3.json`, che va committato.
+
+## Seconda tornata: i sei suggerimenti e lo scontrino
+
+| Funzione | Dove |
+| --- | --- |
+| Aggiunta rapida con quantità ("2 kg mele", "latte x2", "mezzo chilo di pane") | `domain/QuickEntry.kt` |
+| Condividere la lista come testo | menu ⋮ della lista, `shareText()` in `ShoppingListModel.kt` |
+| Prezzo per voce (€ per unità), totale stimato e spesa nel carrello | dettagli della voce, barra in fondo alla lista |
+| Negozio per voce, con filtro | dettagli della voce, chip sopra la lista |
+| Ordine delle corsie personalizzato | Impostazioni o menu ⋮ → "Ordine delle corsie" |
+| Marca anche in inventario | `FoodItem.brand`; segue la voce con "Metti in frigo" |
+| Scontrino fotografato → inventario | icona scontrino nell'inventario, menu ⋮ della lista |
+| Scadenza chiesta all'ingresso in frigo | "Metti in frigo" e scontrino, per i prodotti freschi |
+
+### Decisioni
+
+**Il prezzo è per unità di misura** (€/pz, €/kg), in centesimi interi. Il totale stimato
+moltiplica per la quantità da comprare; quello del carrello per la quantità presa. Le voci
+senza prezzo sono contate a parte, perché una stima parziale non sembri completa.
+
+**Il filtro per negozio mostra anche le voci senza negozio**, che si possono comprare
+dovunque. Con un negozio scelto, le voci aggiunte nascono per quel negozio. "Metti in
+frigo" sposta comunque tutte le voci spuntate, anche quelle nascoste dal filtro.
+
+**L'ordine delle corsie sta nelle preferenze (DataStore)**, non nel database: è una
+preferenza personale. Una categoria aggiunta in futuro si accoda da sola.
+
+**Scontrino: riconoscimento sul telefono.** ML Kit Text Recognition con modello incluso
+(circa 4 MB in più nell'APK): lo scontrino non lascia il dispositivo e funziona offline.
+Il testo passa da tre funzioni pure, provate sulla JVM:
+- `groupIntoRows` rimette insieme nome e prezzo, che l'OCR restituisce come blocchi
+  separati;
+- `parseReceipt` legge le righe dei documenti commerciali italiani, cioè nome e importo,
+  aliquota e reparto ignorati, dettagli "2 x 0,89" e "0,725 kg x 2,00 €/kg" attaccati al
+  prodotto il cui importo torna, formati "1L"/"500G" nel nome. Scarta sconti, pagamenti
+  e tutto ciò che sta dopo il totale;
+- `receiptMatches` abbina le righe alle voci della lista, anche abbreviate ("MOZZ." →
+  Mozzarella).
+
+**Categoria automatica, in quest'ordine:** quella dell'ultima volta che il prodotto è stato
+in casa; quella della voce di lista abbinata; la proposta dal nome, che ora capisce anche le
+abbreviazioni di cassa ("PARMIG", "PROSC") se portano a una sola categoria. Ogni conferma
+salva il prodotto in inventario, quindi la volta dopo la categoria arriva dallo storico.
+
+**Si chiede solo ciò che manca.** Nella revisione dello scontrino:
+- la quantità di un prodotto venduto a peso (frutta, verdura, carne, pesce) senza peso
+  stampato resta vuota ed evidenziata, e va compilata;
+- la scadenza dei prodotti freschi (frutta, verdura, pane, carne, pesce, latticini) è
+  evidenziata; se manca, prima di salvare si chiede conferma ("Aggiungi comunque" / "Indica
+  le date");
+- i prodotti non alimentari partono esclusi.
+
+Lo stesso vale per "Metti in frigo": se fra le voci spuntate ci sono prodotti freschi, una
+finestra ne chiede le scadenze, tutte facoltative. Il calendario si apre alla durata tipica
+della categoria (pesce 2 giorni, carne e pane 3, verdura 5, frutta e latticini 7), ma nessuna
+data entra senza essere scelta.
+
+**Confermando lo scontrino, le voci di lista abbinate escono dalla lista.** Il nome usato in
+inventario è quello della lista ("Mozzarella"), più leggibile di quello della cassa.
+
+**Database: versione 3** (`MIGRATION_2_3`): solo colonne nuove e facoltative.
+
+### Limiti noti dello scontrino
+
+- Il formato degli scontrini varia fra catene: righe su due colonne non allineate, nomi
+  troncati o OCR sporco producono bozze da correggere, non salvataggi sbagliati.
+- Il prezzo letto dallo scontrino si mostra nella revisione ma non si salva: l'inventario
+  non ha un campo prezzo.
+- L'abbinamento con la lista richiede che ogni parola della voce compaia nella riga
+  ("Latte di soia" non corrisponde a "LATTE PS").
 
 ## Suggerimenti per i passi successivi
 
-1. **Aggiunta rapida con quantità**: interpretare "2 kg mele" o "6 uova" nel campo di
-   aggiunta. Il parser è lo stesso che servirà all’inserimento vocale.
-2. **Condividere la lista** come testo (WhatsApp, SMS) dal menu della lista.
-3. **Prezzo** per voce e totale stimato della spesa; con la quantità presa diventa anche
-   la spesa reale.
-4. **Negozio** per voce, con filtro: chi fa la spesa in due posti vede solo cosa comprare lì.
-5. **Riordinare le corsie** secondo il proprio supermercato.
-6. **Marca verso l’inventario**: oggi la marca resta nella lista; aggiungerla a `FoodItem`
-   la conserverebbe anche dopo "Metti in frigo".
-7. **Suggerimenti** dai prodotti consumati più spesso ("di solito compri…").
-8. **Cancellazione logica** anche per `shopping_items`, come per l’inventario, prima di
-   qualunque sincronizzazione.
+1. **Inserimento vocale** (già nella spec della Fase 3): il parser di `QuickEntry` è pronto
+   per essere riusato.
+2. **Prezzo in inventario e storico dei prezzi**, a partire dagli scontrini: andamento del
+   costo di un prodotto e della spesa mensile.
+3. **Suggerimenti** dai prodotti consumati più spesso ("di solito compri…").
+4. **Cancellazione logica** anche per `shopping_items`, prima di qualunque sincronizzazione.

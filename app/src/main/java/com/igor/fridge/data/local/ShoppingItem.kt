@@ -14,6 +14,10 @@ import java.time.LocalDate
  *
  * [photoPath] e' il nome di un file nella cartella delle foto dell'app, non un percorso
  * assoluto: la cartella cambia fra installazioni e dopo un ripristino da backup.
+ *
+ * [unitPriceCents] e' il prezzo in centesimi per unita' di [unit] (al pezzo, al kg...): i
+ * centesimi interi non accumulano gli errori di arrotondamento di un Double. [store] e' il
+ * negozio in cui comprarlo; null vuol dire "dovunque".
  */
 @Entity(tableName = "shopping_items")
 data class ShoppingItem(
@@ -30,6 +34,8 @@ data class ShoppingItem(
     val notes: String? = null,
     val photoPath: String? = null,
     val purchasedQuantity: Double? = null,
+    val unitPriceCents: Long? = null,
+    val store: String? = null,
 )
 
 /** Le quantita' sono Double: 0.3 - 0.1 - 0.2 non fa esattamente zero. */

@@ -56,4 +56,17 @@ class FormattersTest {
         val icons = FoodCategory.entries.map { it.icon() }
         assertEquals(icons.size, icons.toSet().size)
     }
+
+    @Test
+    fun `i prezzi si leggono in centesimi e si scrivono in euro`() {
+        assertEquals(129L, parsePriceCents("1,29"))
+        assertEquals(129L, parsePriceCents(" 1.29 € "))
+        assertEquals(200L, parsePriceCents("2"))
+        assertEquals(0L, parsePriceCents("0"))
+        assertNull(parsePriceCents("-1"))
+        assertNull(parsePriceCents("gratis"))
+        assertEquals("12,90 €", formatEuro(1290))
+        assertEquals("0,05 €", formatEuro(5))
+        assertEquals("1,29", formatPriceInput(129))
+    }
 }
