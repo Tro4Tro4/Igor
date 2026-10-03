@@ -37,12 +37,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.igor.fridge.R
+import com.igor.fridge.domain.prices.Alternative
 import com.igor.fridge.domain.prices.ItemQuote
 import com.igor.fridge.domain.prices.PriceSource
 import com.igor.fridge.domain.prices.StoreEstimate
 import com.igor.fridge.ui.formatEuro
 import com.igor.fridge.ui.formatQuantity
 import com.igor.fridge.ui.formatShort
+import com.igor.fridge.ui.label
 
 /** La lista della spesa nei vari supermercati. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,7 +146,7 @@ fun CompareScreen(
                 )
             }
             items(items = comparison.quotes, key = { "item-${it.item.uuid}" }) { quote ->
-                QuoteCard(quote)
+                QuoteCard(quote, alternative = state.alternatives[quote.item.uuid])
             }
             item {
                 Text(
@@ -216,7 +218,7 @@ private fun CommunityBox(
 }
 
 @Composable
-private fun QuoteCard(quote: ItemQuote) {
+private fun QuoteCard(quote: ItemQuote, alternative: Alternative?) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -264,6 +266,19 @@ private fun QuoteCard(quote: ItemQuote) {
                         fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal,
                     )
                 }
+            }
+            if (alternative != null) {
+                Text(
+                    text = stringResource(
+                        R.string.compare_alternative,
+                        alternative.savingPercent,
+                        alternative.offer.referenceUnit.label(),
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                SimilarOfferRow(alternative.offer, cheaper = true)
             }
             SearchOnChains(product = quote.item.name, modifier = Modifier.padding(top = 4.dp))
         }

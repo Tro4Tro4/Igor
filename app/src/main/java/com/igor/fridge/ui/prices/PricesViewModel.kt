@@ -8,15 +8,19 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.igor.fridge.data.local.PriceRecord
 import com.igor.fridge.data.openprices.CommunityPrice
 import com.igor.fridge.data.openprices.OpenPricesException
+import com.igor.fridge.data.openprices.SimilarProductSearch
 import com.igor.fridge.data.prefs.OpenPricesSettings
 import com.igor.fridge.data.repository.PriceRepository
 import com.igor.fridge.domain.prices.ProductPriceSummary
+import com.igor.fridge.domain.prices.SimilarOffer
 import com.igor.fridge.domain.prices.StoreObservation
 import com.igor.fridge.domain.prices.latestByStore
 import com.igor.fridge.domain.prices.monthlySpending
+import com.igor.fridge.domain.prices.ownSimilarOffers
 import com.igor.fridge.domain.prices.summarize
 import com.igor.fridge.domain.prices.toObservation
 import com.igor.fridge.ui.compare.communityObservations
+import com.igor.fridge.ui.compare.communitySimilarOffers
 import com.igor.fridge.ui.igorApplication
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +101,11 @@ data class PriceHistoryUiState(
     /** Prezzi della comunita' in Italia, dal piu' recente; null se non ancora scaricati. */
     val community: List<CommunityPrice>? = null,
     val isLoadingCommunity: Boolean = false,
+    /** Prodotti simili dai tuoi scontrini, dal piu' conveniente. */
+    val similarMine: List<SimilarOffer> = emptyList(),
+    /** Prodotti simili dalla comunita'; null se non ancora cercati. */
+    val similarCommunity: List<SimilarOffer>? = null,
+    val isLoadingSimilar: Boolean = false,
     val message: String? = null,
 ) {
     // Calcolati una volta per stato, non a ogni lettura durante la ricomposizione.
@@ -119,7 +128,10 @@ class PriceHistoryViewModel(
     private val priceRepository: PriceRepository,
     openPrices: Flow<OpenPricesSettings> = flowOf(OpenPricesSettings()),
     private val fetchCommunity: suspend (String) -> List<CommunityPrice> = { emptyList() },
+    private val findSimilar: suspend (String, String?) -> SimilarProductSearch.Result =
+        { _, _ -> SimilarProductSearch.Result(emptyList(), byCategory = false) },
     private val today: () -> LocalDate = LocalDate::now,
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
     private val extra = MutableStateFlow(Extra())
@@ -128,8 +140,22 @@ class PriceHistoryViewModel(
         val barcode: String? = null,
         val community: List<CommunityPrice>? = null,
         val loadingCommunity: Boolean = false,
+        val similarCommunity: List<SimilarOffer>? = null,
+        val loadingSimilar: Boolean = false,
         val message: String? = null,
     )
+
+    /**
+     * Il prodotto e, fra tutti gli altri acquisti, quelli di prodotti simili: confrontare
+     * il nome con l'intero storico e' lento, quindi fuori dal thread dell'interfaccia.
+     */
+    private val productAndSimilar = combine(
+        priceRepository.observeProduct(productKey),
+        priceRepository.observeAll(),
+    ) { records, all ->
+        val name = records.firstOrNull()?.productName
+        records to name?.let { ownSimilarOffers(it, productKey, all) }.orEmpty()
+    }.flowOn(computeDispatcher)
 
     init {
         viewModelScope.launch {
@@ -139,7 +165,7 @@ class PriceHistoryViewModel(
     }
 
     val uiState: StateFlow<PriceHistoryUiState> =
-        combine(priceRepository.observeProduct(productKey), extra, openPrices) { records, extra, settings ->
+        combine(productAndSimilar, extra, openPrices) { (records, similarMine), extra, settings ->
             PriceHistoryUiState(
                 summary = summarize(records).firstOrNull(),
                 records = records,
@@ -148,6 +174,9 @@ class PriceHistoryViewModel(
                 communityEnabled = settings.enabled,
                 community = extra.community,
                 isLoadingCommunity = extra.loadingCommunity,
+                similarMine = similarMine,
+                similarCommunity = extra.similarCommunity,
+                isLoadingSimilar = extra.loadingSimilar,
                 message = extra.message,
             )
         }.stateIn(
@@ -169,7 +198,7 @@ class PriceHistoryViewModel(
                 if (saved == null) {
                     it.copy(message = "Codice a barre non valido")
                 } else {
-                    it.copy(barcode = saved, community = null, message = "Codice a barre associato")
+                    it.copy(barcode = saved, community = null, similarCommunity = null, message = "Codice a barre associato")
                 }
             }
         }
@@ -178,7 +207,7 @@ class PriceHistoryViewModel(
     fun clearBarcode() {
         viewModelScope.launch {
             priceRepository.clearBarcode(productKey)
-            extra.update { it.copy(barcode = null, community = null) }
+            extra.update { it.copy(barcode = null, community = null, similarCommunity = null) }
         }
     }
 
@@ -199,6 +228,25 @@ class PriceHistoryViewModel(
         }
     }
 
+    /**
+     * Cerca nella comunita' prodotti simili: per categoria se c'e' il codice a barre,
+     * altrimenti per nome. Funziona anche senza codice, a differenza dei prezzi identici.
+     */
+    fun loadSimilarProducts() {
+        val name = uiState.value.summary?.productName ?: return
+        if (extra.value.loadingSimilar) return
+        val code = extra.value.barcode
+        extra.update { it.copy(loadingSimilar = true, message = null) }
+        viewModelScope.launch {
+            try {
+                val offers = communitySimilarOffers(name, code, findSimilar(name, code), today())
+                extra.update { it.copy(similarCommunity = offers, loadingSimilar = false) }
+            } catch (e: OpenPricesException) {
+                extra.update { it.copy(loadingSimilar = false, message = e.message) }
+            }
+        }
+    }
+
     fun onMessageShown() = extra.update { it.copy(message = null) }
 
     companion object {
@@ -212,6 +260,7 @@ class PriceHistoryViewModel(
                     priceRepository = container.priceRepository,
                     openPrices = container.settingsStore.openPrices,
                     fetchCommunity = { code -> container.openPricesClient.productPrices(code) },
+                    findSimilar = { name, code -> container.similarProductSearch.find(name, code) },
                 )
             }
         }

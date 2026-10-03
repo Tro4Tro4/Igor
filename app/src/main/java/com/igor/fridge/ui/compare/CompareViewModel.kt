@@ -8,11 +8,16 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.igor.fridge.data.local.ShoppingItem
 import com.igor.fridge.data.openprices.CommunityPrice
 import com.igor.fridge.data.openprices.OpenPricesException
+import com.igor.fridge.data.openprices.SimilarProductSearch
 import com.igor.fridge.data.prefs.OpenPricesSettings
 import com.igor.fridge.data.repository.PriceRepository
 import com.igor.fridge.data.repository.ShoppingRepository
+import com.igor.fridge.data.local.QuantityUnit
+import com.igor.fridge.domain.prices.Alternative
 import com.igor.fridge.domain.prices.ListComparison
+import com.igor.fridge.domain.prices.cheaperAlternative
 import com.igor.fridge.domain.prices.compareList
+import com.igor.fridge.domain.prices.ownSimilarOffers
 import com.igor.fridge.domain.prices.productKey
 import com.igor.fridge.domain.prices.recordsFor
 import com.igor.fridge.domain.prices.toObservation
@@ -46,6 +51,8 @@ data class CompareUiState(
     val itemsWithBarcode: Int = 0,
     val communityLoaded: Boolean = false,
     val isLoadingCommunity: Boolean = false,
+    /** Voce (uuid) -> un prodotto simile che costa meno al kg o al litro. */
+    val alternatives: Map<String, Alternative> = emptyMap(),
     val message: String? = null,
     val isLoading: Boolean = true,
 )
@@ -62,12 +69,17 @@ class CompareViewModel(
     private val priceRepository: PriceRepository,
     openPrices: Flow<OpenPricesSettings> = flowOf(OpenPricesSettings()),
     private val fetchCommunity: suspend (String) -> List<CommunityPrice> = { emptyList() },
+    private val findSimilar: suspend (String, String?) -> SimilarProductSearch.Result =
+        { _, _ -> SimilarProductSearch.Result(emptyList(), byCategory = false) },
     private val today: () -> LocalDate = LocalDate::now,
     private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
     private val barcodes = MutableStateFlow<Map<String, String>>(emptyMap())
     private val community = MutableStateFlow<Map<String, List<CommunityPrice>>>(emptyMap())
+
+    /** Voce (uuid) -> prezzi di prodotti simili dalla comunita'. */
+    private val similar = MutableStateFlow<Map<String, SimilarProductSearch.Result>>(emptyMap())
     private val status = MutableStateFlow(Status())
 
     private data class Status(
@@ -90,12 +102,13 @@ class CompareViewModel(
     private val comparison: Flow<CompareUiState> = combine(
         toBuy,
         priceRepository.observeAll(),
-        combine(barcodes, community, ::Pair),
+        combine(barcodes, community, similar, ::Triple),
         openPrices,
-    ) { items, records, (codes, prices), settings ->
+    ) { items, records, (codes, prices, similarFound), settings ->
         val list = items.filterNot { it.isChecked }
+        val mineByItem = list.associate { it.uuid to recordsFor(it, records) }
         val comparison = compareList(list) { item ->
-            val mine = recordsFor(item, records).mapNotNull { it.toObservation() }
+            val mine = mineByItem.getValue(item.uuid).mapNotNull { it.toObservation() }
             val code = codes[productKey(item.name)]
             val theirs = if (settings.enabled && code != null) {
                 communityObservations(prices[code].orEmpty(), today())
@@ -104,8 +117,32 @@ class CompareViewModel(
             }
             mine + theirs
         }
+        val alternatives = list.mapNotNull { item ->
+            val mine = mineByItem.getValue(item.uuid)
+            val code = codes[productKey(item.name)]
+            // Quanto costa oggi al kg o al litro: dai propri scontrini e, se il formato e'
+            // noto, dai prezzi della comunita' dello stesso prodotto.
+            val baselines = mine.filter { it.referenceUnit.isPerWeightOrVolume() }
+                .map { it.unitPriceCents to it.referenceUnit } +
+                if (settings.enabled && code != null) {
+                    prices[code].orEmpty()
+                        .filter { communityObservations(listOf(it), today()).isNotEmpty() }
+                        .mapNotNull(::communityUnitPrice)
+                } else {
+                    emptyList()
+                }
+            val own = mine.toHashSet()
+            val offers = ownSimilarOffers(item.name, productKey(item.name), records.filterNot { it in own }) +
+                if (settings.enabled) {
+                    similarFound[item.uuid]?.let { communitySimilarOffers(item.name, code, it, today()) }.orEmpty()
+                } else {
+                    emptyList()
+                }
+            cheaperAlternative(offers, baselines)?.let { item.uuid to it }
+        }.toMap()
         CompareUiState(
             comparison = comparison,
+            alternatives = alternatives,
             itemCount = list.size,
             communityEnabled = settings.enabled,
             itemsWithBarcode = list.count { codes.containsKey(productKey(it.name)) },
@@ -138,24 +175,31 @@ class CompareViewModel(
             val items = uiState.first { !it.isLoading }.comparison?.quotes?.map { it.item }.orEmpty()
             val wanted = items.mapNotNull { codes[productKey(it.name)] }.distinct()
             val fetched = ConcurrentHashMap<String, List<CommunityPrice>>()
+            val found = ConcurrentHashMap<String, SimilarProductSearch.Result>()
             val errors = ConcurrentLinkedQueue<String>()
             val gate = Semaphore(PARALLEL_REQUESTS)
+            suspend fun guarded(request: suspend () -> Unit) = gate.withPermit {
+                try {
+                    request()
+                } catch (e: OpenPricesException) {
+                    errors += e.message ?: "Open Prices non disponibile"
+                }
+            }
             val completed = withTimeoutOrNull(COMMUNITY_TIMEOUT_MS) {
                 coroutineScope {
-                    wanted.forEach { code ->
+                    // Prima i prezzi dei prodotti identici, poi i simili: il semaforo serve
+                    // le richieste in ordine, e se il tempo non basta si perdono i
+                    // suggerimenti, non il confronto.
+                    wanted.forEach { code -> launch { guarded { fetched[code] = fetchCommunity(code) } } }
+                    items.forEach { item ->
                         launch {
-                            gate.withPermit {
-                                try {
-                                    fetched[code] = fetchCommunity(code)
-                                } catch (e: OpenPricesException) {
-                                    errors += e.message ?: "Open Prices non disponibile"
-                                }
-                            }
+                            guarded { found[item.uuid] = findSimilar(item.name, codes[productKey(item.name)]) }
                         }
                     }
                 }
             } != null
             community.update { it + fetched }
+            similar.update { it + found }
             val error = errors.peek()
                 ?: if (completed) null else "Open Prices risponde troppo lentamente: riprova più tardi"
             status.update {
@@ -163,7 +207,7 @@ class CompareViewModel(
                     loading = false,
                     loaded = error == null,
                     message = error ?: when {
-                        wanted.isEmpty() -> "Nessuna voce ha un codice a barre: associalo dalla scheda prezzi del prodotto"
+                        wanted.isEmpty() -> "Nessuna voce ha un codice a barre: cercati solo prodotti simili per nome"
                         else -> null
                     },
                 )
@@ -186,8 +230,11 @@ class CompareViewModel(
                     priceRepository = container.priceRepository,
                     openPrices = container.settingsStore.openPrices,
                     fetchCommunity = { code -> container.openPricesClient.productPrices(code) },
+                    findSimilar = { name, code -> container.similarProductSearch.find(name, code) },
                 )
             }
         }
     }
 }
+
+private fun QuantityUnit.isPerWeightOrVolume(): Boolean = this == QuantityUnit.KG || this == QuantityUnit.L

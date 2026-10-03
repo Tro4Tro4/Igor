@@ -7,6 +7,7 @@ import com.igor.fridge.data.export.ExportContent
 import com.igor.fridge.data.export.exportJson
 import com.igor.fridge.data.local.IgorDatabase
 import com.igor.fridge.data.openprices.OpenPricesClient
+import com.igor.fridge.data.openprices.SimilarProductSearch
 import com.igor.fridge.data.openprices.UrlConnectionTransport
 import com.igor.fridge.data.photos.FilePhotoStore
 import com.igor.fridge.data.photos.PhotoStore
@@ -58,6 +59,8 @@ class AppContainer(context: Context) {
         }.getOrNull() ?: "?"
         OpenPricesClient(UrlConnectionTransport(), userAgent = "Igor/$version (Android)")
     }
+
+    val similarProductSearch: SimilarProductSearch by lazy { SimilarProductSearch(openPricesClient) }
 
     val photoStore: PhotoStore by lazy { FilePhotoStore(appContext) }
 

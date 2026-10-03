@@ -168,7 +168,7 @@
     <string name="compare_search_on">Cerca su %1$s</string>
     <string name="compare_community_title">Prezzi della comunità (Open Prices)</string>
     <string name="compare_community_off">Open Prices è spento. Attivandolo puoi aggiungere al confronto i prezzi raccolti da altri utenti, per i prodotti con codice a barre.</string>
-    <string name="compare_community_help">%1$d voci hanno un codice a barre e possono essere confrontate con i prezzi della comunità in Italia. Richiede Internet.</string>
+    <string name="compare_community_help">%1$d voci hanno un codice a barre e possono essere confrontate con i prezzi della comunità in Italia. Per ogni voce si cercano anche prodotti simili più convenienti, come quelli a marca del supermercato. Richiede Internet.</string>
     <string name="compare_community_load">Scarica i prezzi della comunità</string>
     <string name="compare_community_reload">Aggiorna i prezzi della comunità</string>
     <string name="compare_community_loading">Prezzi della comunità in arrivo…</string>
@@ -181,6 +181,17 @@
     <string name="prices_barcode_remove">Rimuovi</string>
     <string name="prices_community_needs_barcode">Associa il codice a barre del prodotto per vedere i prezzi della comunità.</string>
     <string name="prices_community_empty">Nessun prezzo recente in Italia per questo prodotto. Puoi essere il primo a condividerlo!</string>
+    <string name="similar_title">Prodotti simili</string>
+    <string name="similar_help">Lo stesso tipo di prodotto di altre marche, compresa quella del supermercato. Si confronta il prezzo al kg o al litro.</string>
+    <string name="similar_mine_none">Nei tuoi scontrini non ci sono prodotti simili.</string>
+    <string name="similar_search">Cerca prodotti simili nella comunità</string>
+    <string name="similar_search_again">Cerca di nuovo</string>
+    <string name="similar_community_none">Nessun prodotto simile con prezzi recenti in Italia.</string>
+    <string name="similar_from_community">Dalla comunità</string>
+    <string name="similar_from_mine">Dai tuoi scontrini</string>
+    <string name="similar_private_label">marca %1$s</string>
+    <string name="similar_pack_only">prezzo a confezione, formato sconosciuto</string>
+    <string name="compare_alternative">Un prodotto simile costa il %1$d%% in meno al %2$s:</string>
     <string name="open_prices_title">Open Prices</string>
     <string name="open_prices_intro">Open Prices è un database aperto di prezzi raccolti dalla comunità di Open Food Facts. Igor può leggere i prezzi degli altri per confrontarli con i tuoi e, se vuoi, condividere i prezzi dei tuoi scontrini.</string>
     <string name="open_prices_enable">Usa Open Prices</string>

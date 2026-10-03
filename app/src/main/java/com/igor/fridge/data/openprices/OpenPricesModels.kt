@@ -1,5 +1,6 @@
 package com.igor.fridge.data.openprices
 
+import com.igor.fridge.data.local.QuantityUnit
 import java.time.LocalDate
 
 /** Un negozio conosciuto da Open Prices, identificato come oggetto OpenStreetMap. */
@@ -24,6 +25,22 @@ data class CommunityPrice(
     val isDiscounted: Boolean,
     val location: CommunityLocation?,
     val productName: String?,
+    /** Il prodotto come lo descrive Open Food Facts, se la risposta lo include. */
+    val product: CommunityProduct? = null,
+)
+
+/**
+ * Un prodotto di Open Food Facts noto a Open Prices. [quantity] e' il contenuto netto in
+ * [quantityUnit] (grammi o millilitri): permette il prezzo al kg o al litro.
+ * [categories] sono i tag di categoria ("en:semi-skimmed-milks"), dal generico allo specifico.
+ */
+data class CommunityProduct(
+    val code: String,
+    val name: String?,
+    val brands: String?,
+    val quantity: Double? = null,
+    val quantityUnit: QuantityUnit? = null,
+    val categories: List<String> = emptyList(),
 )
 
 data class OpenPricesSession(val userId: String, val token: String)

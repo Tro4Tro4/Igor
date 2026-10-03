@@ -179,4 +179,51 @@ class CompareViewModelTest {
 
         assertEquals(1, communityObservations(list, today).size)
     }
+
+    @Test
+    fun `per ogni voce propone un simile che costa meno al litro`() = runTest(dispatcher) {
+        shopping.addIfAbsent("Latte PS Granarolo")
+        prices.record(listOf(Purchase("Latte PS Granarolo", 1.0, QuantityUnit.L, 179)), "Coop", today.minusDays(3))
+        prices.record(listOf(Purchase("Latte PS Esselunga", 1.0, QuantityUnit.L, 165)), "Esselunga", today.minusDays(5))
+        settings.value = OpenPricesSettings(enabled = true)
+        val vm = CompareViewModel(
+            shopping,
+            prices,
+            settings,
+            findSimilar = { name, _ ->
+                com.igor.fridge.data.openprices.SimilarProductSearch.Result(
+                    listOf(
+                        communityPrice(99, "Lidl").copy(
+                            productName = "Latte parzialmente scremato",
+                            product = com.igor.fridge.data.openprices.CommunityProduct(
+                                code = "4056489",
+                                name = "Latte parzialmente scremato",
+                                brands = "Milbona",
+                                quantity = 1000.0,
+                                quantityUnit = QuantityUnit.ML,
+                            ),
+                        ),
+                    ),
+                    byCategory = name == "Latte PS Granarolo",
+                )
+            },
+            today = { today },
+            computeDispatcher = dispatcher,
+        )
+        backgroundScope.launch { vm.uiState.collect {} }
+        val item = vm.uiState.first { !it.isLoading }.comparison!!.quotes.single().item
+
+        // Senza rete, il simile viene dai tuoi scontrini.
+        val offline = vm.uiState.value.alternatives.getValue(item.uuid)
+        assertEquals("Latte PS Esselunga", offline.offer.productName)
+        assertEquals(7, offline.savingPercent)
+
+        vm.loadCommunityPrices()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val online = vm.uiState.value.alternatives.getValue(item.uuid)
+        assertEquals("Latte parzialmente scremato", online.offer.productName)
+        assertEquals("Lidl", online.offer.privateLabel)
+        assertEquals(44, online.savingPercent)
+    }
 }

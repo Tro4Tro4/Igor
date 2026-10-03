@@ -1,5 +1,6 @@
 package com.igor.fridge.data.openprices
 
+import com.igor.fridge.data.local.QuantityUnit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -24,6 +25,12 @@ internal object OpenPricesJson {
 
     fun parsePrices(body: String): List<CommunityPrice> =
         items(body).mapNotNull { (it as? JsonObject)?.let(::price) }
+
+    fun parseProducts(body: String): List<CommunityProduct> =
+        items(body).mapNotNull { (it as? JsonObject)?.let(::product) }
+
+    /** Un singolo prodotto (api/v1/products/code/...), non una pagina. */
+    fun parseProduct(body: String): CommunityProduct? = (root(body) as? JsonObject)?.let(::product)
 
     fun parseLocations(body: String): List<CommunityLocation> =
         items(body).mapNotNull { (it as? JsonObject)?.let(::location) }
@@ -88,7 +95,38 @@ internal object OpenPricesJson {
             isDiscounted = (obj["price_is_discounted"] as? JsonPrimitive)?.booleanOrNull ?: false,
             location = (obj["location"] as? JsonObject)?.let(::location),
             productName = product?.string("product_name") ?: obj.string("product_name"),
+            product = product?.let(::product),
         )
+    }
+
+    private fun product(obj: JsonObject): CommunityProduct? {
+        val code = obj.string("code") ?: return null
+        val (quantity, unit) = netQuantity(obj.double("product_quantity"), obj.string("product_quantity_unit"))
+        return CommunityProduct(
+            code = code,
+            name = obj.string("product_name"),
+            brands = obj.string("brands"),
+            quantity = quantity,
+            quantityUnit = unit,
+            categories = (obj["categories_tags"] as? JsonArray).orEmpty()
+                .mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content },
+        )
+    }
+
+    /**
+     * Il contenuto netto in grammi o millilitri. Open Food Facts lo da' quasi sempre in
+     * "g" o "ml"; le altre unita' di peso e volume si convertono, il resto si ignora.
+     */
+    private fun netQuantity(value: Double?, unit: String?): Pair<Double?, QuantityUnit?> {
+        if (value == null || value <= 0.0 || !value.isFinite()) return null to null
+        return when (unit?.trim()?.lowercase()) {
+            null, "", "g" -> value to QuantityUnit.G
+            "kg" -> value * 1000 to QuantityUnit.G
+            "ml" -> value to QuantityUnit.ML
+            "cl" -> value * 10 to QuantityUnit.ML
+            "l" -> value * 1000 to QuantityUnit.ML
+            else -> null to null
+        }
     }
 
     private fun location(obj: JsonObject): CommunityLocation? {

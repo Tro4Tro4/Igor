@@ -47,7 +47,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.igor.fridge.R
 import com.igor.fridge.data.local.PriceRecord
 import com.igor.fridge.domain.prices.ProductPriceSummary
+import com.igor.fridge.domain.prices.SimilarOffer
 import com.igor.fridge.ui.compare.SearchOnChains
+import com.igor.fridge.ui.compare.SimilarOfferRow
 import com.igor.fridge.ui.components.ConfirmDeleteDialog
 import com.igor.fridge.ui.formatChange
 import com.igor.fridge.ui.formatEuro
@@ -334,6 +336,13 @@ fun PriceHistoryScreen(
                     onOpenSettings = onOpenOpenPrices,
                 )
             }
+            item {
+                SimilarSection(
+                    state = state,
+                    onSearch = viewModel::loadSimilarProducts,
+                    onOpenSettings = onOpenOpenPrices,
+                )
+            }
             item { Text(stringResource(R.string.prices_purchases), style = MaterialTheme.typography.titleSmall) }
             items(items = state.records, key = { it.uuid }) { record ->
                 PurchaseRow(record = record, onDelete = { pendingDelete = record })
@@ -371,6 +380,56 @@ private fun BarcodeSection(
             TextButton(onClick = onType) { Text(stringResource(R.string.prices_barcode_type)) }
             if (barcode != null) {
                 TextButton(onClick = onClear) { Text(stringResource(R.string.prices_barcode_remove)) }
+            }
+        }
+    }
+}
+
+/**
+ * Prodotti dello stesso tipo: dai propri scontrini sempre, dalla comunita' su richiesta
+ * (serve la rete). Evidenziati quelli che costano meno al kg o al litro di quanto si paga.
+ */
+@Composable
+private fun SimilarSection(
+    state: PriceHistoryUiState,
+    onSearch: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    val summary = state.summary ?: return
+    fun cheaper(offer: SimilarOffer) =
+        offer.isComparable && offer.referenceUnit == summary.referenceUnit && offer.unitPriceCents < summary.lastCents
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.similar_title), style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = stringResource(R.string.similar_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(stringResource(R.string.similar_from_mine), style = MaterialTheme.typography.labelLarge)
+            if (state.similarMine.isEmpty()) {
+                Text(stringResource(R.string.similar_mine_none), style = MaterialTheme.typography.bodySmall)
+            }
+            state.similarMine.take(SIMILAR_SHOWN).forEach { SimilarOfferRow(it, cheaper = cheaper(it)) }
+
+            Text(stringResource(R.string.similar_from_community), style = MaterialTheme.typography.labelLarge)
+            val community = state.similarCommunity
+            when {
+                !state.communityEnabled -> {
+                    Text(stringResource(R.string.compare_community_off), style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_prices_title)) }
+                }
+                state.isLoadingSimilar -> CircularProgressIndicator()
+                community == null -> OutlinedButton(onClick = onSearch) {
+                    Text(stringResource(R.string.similar_search))
+                }
+                else -> {
+                    if (community.isEmpty()) {
+                        Text(stringResource(R.string.similar_community_none), style = MaterialTheme.typography.bodySmall)
+                    }
+                    community.take(SIMILAR_SHOWN).forEach { SimilarOfferRow(it, cheaper = cheaper(it)) }
+                    TextButton(onClick = onSearch) { Text(stringResource(R.string.similar_search_again)) }
+                }
             }
         }
     }
@@ -430,6 +489,7 @@ private fun CommunitySection(
 
 /** I prezzi della comunita' piu' recenti bastano a farsi un'idea. */
 private const val COMMUNITY_SHOWN = 15
+private const val SIMILAR_SHOWN = 8
 
 @Composable
 private fun BarcodeDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {

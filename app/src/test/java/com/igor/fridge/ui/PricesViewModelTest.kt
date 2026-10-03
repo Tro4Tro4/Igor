@@ -77,7 +77,7 @@ class PricesViewModelTest {
     @Test
     fun `la storia di un prodotto ha i punti in ordine di tempo e si puo' correggere`() = runTest(dispatcher) {
         seed()
-        val vm = PriceHistoryViewModel("latte", repository)
+        val vm = PriceHistoryViewModel("latte", repository, computeDispatcher = dispatcher)
         backgroundScope.launch { vm.uiState.collect {} }
 
         val state = vm.uiState.first { !it.isLoading }
@@ -96,7 +96,7 @@ class PricesViewModelTest {
     fun `la scheda mostra i negozi dal piu' conveniente e gestisce il codice a barre`() = runTest(dispatcher) {
         repository.record(listOf(Purchase("Pane", 1.0, QuantityUnit.PZ, 220)), "TIGROS SPA", LocalDate.of(2026, 9, 1))
         repository.record(listOf(Purchase("Pane", 1.0, QuantityUnit.PZ, 180)), "Lidl", LocalDate.of(2026, 9, 2))
-        val vm = PriceHistoryViewModel("pane", repository)
+        val vm = PriceHistoryViewModel("pane", repository, computeDispatcher = dispatcher)
         backgroundScope.launch { vm.uiState.collect {} }
 
         val state = vm.uiState.first { !it.isLoading }
@@ -135,6 +135,7 @@ class PricesViewModelTest {
                 )
             },
             today = { LocalDate.of(2026, 10, 3) },
+            computeDispatcher = dispatcher,
         )
         backgroundScope.launch { vm.uiState.collect {} }
         vm.uiState.first { it.barcode != null }
@@ -144,5 +145,55 @@ class PricesViewModelTest {
 
         assertEquals(listOf("4006381333931"), asked)
         assertEquals(listOf(199L), vm.uiState.value.community?.map { it.priceCents })
+    }
+
+    @Test
+    fun `la scheda propone i prodotti simili, dai tuoi scontrini e dalla comunita'`() = runTest(dispatcher) {
+        repository.record(listOf(Purchase("Latte PS Granarolo", 1.0, QuantityUnit.L, 179)), "Coop", LocalDate.of(2026, 9, 1))
+        repository.record(listOf(Purchase("Latte PS Esselunga", 1.0, QuantityUnit.L, 125)), "Esselunga", LocalDate.of(2026, 9, 2))
+        repository.setBarcode("latte ps granarolo", "8000500310427")
+        val asked = mutableListOf<Pair<String, String?>>()
+        val vm = PriceHistoryViewModel(
+            productKey = "latte ps granarolo",
+            priceRepository = repository,
+            openPrices = kotlinx.coroutines.flow.flowOf(com.igor.fridge.data.prefs.OpenPricesSettings(enabled = true)),
+            findSimilar = { name, code ->
+                asked += name to code
+                com.igor.fridge.data.openprices.SimilarProductSearch.Result(
+                    listOf(
+                        com.igor.fridge.data.openprices.CommunityPrice(
+                            priceCents = 99,
+                            currency = "EUR",
+                            date = LocalDate.of(2026, 9, 20),
+                            isDiscounted = false,
+                            location = com.igor.fridge.data.openprices.CommunityLocation(1, "NODE", "Lidl", countryCode = "IT"),
+                            productName = "Latte parzialmente scremato",
+                            product = com.igor.fridge.data.openprices.CommunityProduct(
+                                code = "4056489",
+                                name = "Latte parzialmente scremato",
+                                brands = "Milbona",
+                                quantity = 1000.0,
+                                quantityUnit = QuantityUnit.ML,
+                            ),
+                        ),
+                    ),
+                    byCategory = true,
+                )
+            },
+            today = { LocalDate.of(2026, 10, 3) },
+            computeDispatcher = dispatcher,
+        )
+        backgroundScope.launch { vm.uiState.collect {} }
+        val ready = vm.uiState.first { it.summary != null && it.barcode != null }
+        assertEquals(listOf("Latte PS Esselunga"), ready.similarMine.map { it.productName })
+        assertNull(ready.similarCommunity)
+
+        vm.loadSimilarProducts()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("Latte PS Granarolo" to "8000500310427"), asked)
+        val community = vm.uiState.value.similarCommunity!!.single()
+        assertEquals("Lidl", community.privateLabel)
+        assertEquals(99L, community.unitPriceCents)
     }
 }

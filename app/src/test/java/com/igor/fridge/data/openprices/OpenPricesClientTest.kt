@@ -193,4 +193,73 @@ class OpenPricesClientTest {
             }
         }
     }
+
+    @Test
+    fun `un prodotto si legge con formato e categorie, e se manca e' null`() = runTest {
+        transport.respond(
+            "GET",
+            "/products/code/8001234567890",
+            HttpResponse(
+                200,
+                """{"id":5,"code":"8001234567890","product_name":"Latte PS","brands":"Granarolo",
+                   "product_quantity":1000,"product_quantity_unit":"ml",
+                   "categories_tags":["en:dairies","en:milks","en:semi-skimmed-milks"],"price_count":12}""",
+            ),
+        )
+
+        val product = client.product("8001234567890")!!
+
+        assertEquals("Latte PS", product.name)
+        assertEquals("Granarolo", product.brands)
+        assertEquals(1000.0, product.quantity!!, 0.001)
+        assertEquals(com.igor.fridge.data.local.QuantityUnit.ML, product.quantityUnit)
+        assertEquals("en:semi-skimmed-milks", product.categories.last())
+        assertNull(client.product("0000000000000"))
+    }
+
+    @Test
+    fun `la ricerca di simili chiede prodotti prezzati e prezzi attorno all'Italia`() = runTest {
+        transport.respond("GET", "/products", HttpResponse(200, """{"items":[{"code":"1","product_name":"Latte"}]}"""))
+        transport.respond("GET", "/prices", HttpResponse(200, """{"items":[]}"""))
+
+        assertEquals(listOf("1"), client.productsNamed("latte").map { it.code })
+        client.pricesOf(listOf("1", "2"))
+        client.pricesInCategory("en:milks")
+        assertTrue(client.pricesOf(emptyList()).isEmpty())
+
+        val urls = transport.requests.map { it.url.substringAfter("/api/v1") }
+        assertEquals(
+            listOf(
+                "/products?product_name__like=latte&price_count__gte=1&order_by=-price_count&size=50",
+                "/prices?product_code__in=1%2C2&currency=EUR&lat=42.5&lon=12.5&radius_km=800&order_by=-date&size=100",
+                "/prices?product__categories_tags__contains=en%3Amilks&currency=EUR&lat=42.5&lon=12.5&radius_km=800&order_by=-date&size=100",
+            ),
+            urls,
+        )
+    }
+
+    @Test
+    fun `il formato in chili o centilitri diventa grammi o millilitri`() = runTest {
+        transport.respond(
+            "GET",
+            "/products",
+            HttpResponse(
+                200,
+                """{"items":[
+                  {"code":"1","product_quantity":1,"product_quantity_unit":"kg"},
+                  {"code":"2","product_quantity":75,"product_quantity_unit":"cl"},
+                  {"code":"3","product_quantity":6,"product_quantity_unit":"pz"},
+                  {"code":"4","product_quantity":0}
+                ]}""",
+            ),
+        )
+
+        val products = client.productsNamed("x")
+
+        assertEquals(listOf(1000.0, 750.0, null, null), products.map { it.quantity })
+        assertEquals(
+            listOf(com.igor.fridge.data.local.QuantityUnit.G, com.igor.fridge.data.local.QuantityUnit.ML, null, null),
+            products.map { it.quantityUnit },
+        )
+    }
 }

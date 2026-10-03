@@ -32,6 +32,41 @@ class OpenPricesClient(
         return OpenPricesJson.parsePrices(send(HttpRequest("GET", url, baseHeaders())).body)
     }
 
+    /** Un prodotto per codice a barre; null se Open Prices non lo conosce. */
+    suspend fun product(barcode: String): CommunityProduct? = try {
+        OpenPricesJson.parseProduct(send(HttpRequest("GET", "$baseUrl/products/code/${encode(barcode)}", baseHeaders())).body)
+    } catch (e: OpenPricesException) {
+        if (e.code == 404) null else throw e
+    }
+
+    /**
+     * I prodotti con almeno un prezzo il cui nome contiene [name], dai piu' prezzati: i
+     * candidati a "prodotto simile" quando non se ne conosce la categoria.
+     */
+    suspend fun productsNamed(name: String, size: Int = 50): List<CommunityProduct> {
+        val url = "$baseUrl/products?product_name__like=${encode(name.trim())}" +
+            "&price_count__gte=1&order_by=-price_count&size=$size"
+        return OpenPricesJson.parseProducts(send(HttpRequest("GET", url, baseHeaders())).body)
+    }
+
+    /**
+     * Gli ultimi prezzi in euro di piu' prodotti insieme, dal piu' recente, nei negozi
+     * attorno all'Italia: senza il raggio la pagina si riempirebbe di prezzi francesi.
+     */
+    suspend fun pricesOf(barcodes: List<String>, size: Int = 100): List<CommunityPrice> {
+        if (barcodes.isEmpty()) return emptyList()
+        val codes = encode(barcodes.joinToString(","))
+        val url = "$baseUrl/prices?product_code__in=$codes&currency=$CURRENCY&$AROUND_ITALY&order_by=-date&size=$size"
+        return OpenPricesJson.parsePrices(send(HttpRequest("GET", url, baseHeaders())).body)
+    }
+
+    /** Gli ultimi prezzi in euro dei prodotti di una categoria ("en:semi-skimmed-milks"), attorno all'Italia. */
+    suspend fun pricesInCategory(category: String, size: Int = 100): List<CommunityPrice> {
+        val url = "$baseUrl/prices?product__categories_tags__contains=${encode(category)}" +
+            "&currency=$CURRENCY&$AROUND_ITALY&order_by=-date&size=$size"
+        return OpenPricesJson.parsePrices(send(HttpRequest("GET", url, baseHeaders())).body)
+    }
+
     /** Accesso con utente (non l'email) e password di Open Food Facts. */
     suspend fun login(username: String, password: String): OpenPricesSession {
         val form = "username=${encode(username.trim())}&password=${encode(password)}"
@@ -155,6 +190,12 @@ class OpenPricesClient(
     companion object {
         private const val CURRENCY = "EUR"
         private const val APP_PARAMS = "app_name=Igor&app_platform=android"
+
+        /**
+         * Un cerchio dal centro dell'Italia che arriva a Lampedusa e ad Aosta. Prende anche
+         * un po' di Francia, Svizzera e Austria: il paese del negozio si controlla dopo.
+         */
+        private const val AROUND_ITALY = "lat=42.5&lon=12.5&radius_km=800"
 
         private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
 

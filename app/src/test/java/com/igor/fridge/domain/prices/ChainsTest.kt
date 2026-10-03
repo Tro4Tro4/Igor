@@ -17,6 +17,18 @@ class ChainsTest {
     }
 
     @Test
+    fun `riconosce la marca del supermercato, anche senza il nome della catena`() {
+        assertEquals("Esselunga", privateLabelChain("Esselunga Bio")?.name)
+        assertEquals("Lidl", privateLabelChain("Milbona")?.name)
+        assertEquals("Conad", privateLabelChain("Sapori & Dintorni Conad")?.name)
+        assertEquals("Coop", privateLabelChain("Fior Fiore")?.name)
+        assertNull(privateLabelChain("Granarolo"))
+        assertNull(privateLabelChain(null))
+        // Una marca non e' il nome di un negozio.
+        assertNull(chainOf("Milbona"))
+    }
+
+    @Test
     fun `il nome da confrontare e' la catena, oppure il negozio com'e'`() {
         assertEquals("Tigros", storeLabel("TIGROS SPA"))
         assertEquals("Bottega di Mario", storeLabel(" Bottega di Mario "))
