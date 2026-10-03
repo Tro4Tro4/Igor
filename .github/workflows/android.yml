@@ -1,0 +1,51 @@
+# Compila l'app ed esegue tutti i test JVM (Robolectric compreso) a ogni push.
+# E' la prima verifica reale del codice Android: genera anche gli schemi Room
+# esportati, che si scaricano dall'artifact "room-schemas" e vanno committati.
+name: Android
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build e test
+        run: ./gradlew assembleDebug testDebugUnitTest --stacktrace --console=plain
+
+      - name: Report dei test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Schemi Room
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-schemas
+          path: app/schemas/
+          if-no-files-found: ignore
