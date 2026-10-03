@@ -15,6 +15,7 @@ import com.igor.fridge.domain.prices.PriceSource
 import com.igor.fridge.ui.compare.CompareViewModel
 import com.igor.fridge.ui.compare.communityObservations
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -71,7 +72,7 @@ class CompareViewModelTest {
     @Test
     fun `senza rete confronta i negozi dai propri scontrini`() = runTest(dispatcher) {
         seed()
-        val vm = CompareViewModel(shopping, prices, settings, today = { today })
+        val vm = CompareViewModel(shopping, prices, settings, today = { today }, computeDispatcher = dispatcher)
         backgroundScope.launch { vm.uiState.collect {} }
 
         val state = vm.uiState.first { !it.isLoading }
@@ -97,6 +98,7 @@ class CompareViewModelTest {
                 listOf(communityPrice(249, "Tigros"), communityPrice(199, "Eurospin", country = "FR"))
             },
             today = { today },
+            computeDispatcher = dispatcher,
         )
         backgroundScope.launch { vm.uiState.collect {} }
         assertEquals(1, vm.uiState.first { !it.isLoading && it.itemsWithBarcode == 1 }.itemsWithBarcode)
@@ -124,6 +126,7 @@ class CompareViewModelTest {
             settings,
             fetchCommunity = { throw OpenPricesException("Open Prices non raggiungibile: controlla la connessione") },
             today = { today },
+            computeDispatcher = dispatcher,
         )
         backgroundScope.launch { vm.uiState.collect {} }
         vm.uiState.first { !it.isLoading }
@@ -133,6 +136,35 @@ class CompareViewModelTest {
 
         assertEquals("Open Prices non raggiungibile: controlla la connessione", vm.uiState.value.message)
         assertEquals(2, vm.uiState.value.comparison!!.stores.size)
+    }
+
+    @Test
+    fun `se Open Prices non risponde l'attesa finisce e i prezzi arrivati restano`() = runTest(dispatcher) {
+        seed()
+        prices.setBarcode("latte", "4006381333931")
+        prices.setBarcode("biscotti", "8000500310427")
+        settings.value = OpenPricesSettings(enabled = true)
+        val vm = CompareViewModel(
+            shopping,
+            prices,
+            settings,
+            fetchCommunity = { code ->
+                if (code == "8000500310427") awaitCancellation()
+                listOf(communityPrice(249, "Tigros"))
+            },
+            today = { today },
+            computeDispatcher = dispatcher,
+        )
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+
+        vm.loadCommunityPrices()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertFalse(state.isLoadingCommunity)
+        assertEquals("Open Prices risponde troppo lentamente: riprova più tardi", state.message)
+        assertTrue(state.comparison!!.stores.any { it.store == "Tigros" })
     }
 
     @Test

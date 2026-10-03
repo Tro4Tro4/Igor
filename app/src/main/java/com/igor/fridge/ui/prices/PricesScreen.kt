@@ -66,6 +66,9 @@ fun PricesScreen(
     viewModel: PricesViewModel = viewModel(factory = PricesViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // Il testo vive qui, aggiornato in modo sincrono: passando dallo stato del ViewModel,
+    // che arriva con un giro di coroutine, una digitazione veloce perde lettere.
+    var query by rememberSaveable { mutableStateOf(state.query) }
 
     Scaffold(
         modifier = modifier,
@@ -112,8 +115,11 @@ fun PricesScreen(
             }
             item {
                 OutlinedTextField(
-                    value = state.query,
-                    onValueChange = viewModel::onQueryChange,
+                    value = query,
+                    onValueChange = {
+                        query = it
+                        viewModel.onQueryChange(it)
+                    },
                     label = { Text(stringResource(R.string.inventory_search)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),

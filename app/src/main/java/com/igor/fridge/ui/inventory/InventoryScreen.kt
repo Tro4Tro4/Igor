@@ -32,7 +32,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -57,6 +60,9 @@ fun InventoryScreen(
     viewModel: InventoryViewModel = viewModel(factory = InventoryViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // Il testo vive qui, aggiornato in modo sincrono: passando dallo stato del ViewModel,
+    // che arriva con un giro di coroutine, una digitazione veloce perde lettere.
+    var query by rememberSaveable { mutableStateOf(state.query) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.message) {
@@ -111,8 +117,11 @@ fun InventoryScreen(
                 .padding(padding),
         ) {
             OutlinedTextField(
-                value = state.query,
-                onValueChange = viewModel::onQueryChange,
+                value = query,
+                onValueChange = {
+                    query = it
+                    viewModel.onQueryChange(it)
+                },
                 label = { Text(stringResource(R.string.inventory_search)) },
                 singleLine = true,
                 modifier = Modifier

@@ -55,7 +55,7 @@ class PricesViewModelTest {
     @Test
     fun `elenca i prodotti, filtra per nome e somma la spesa per mese`() = runTest(dispatcher) {
         seed()
-        val vm = PricesViewModel(repository)
+        val vm = PricesViewModel(repository, dispatcher)
         backgroundScope.launch { vm.uiState.collect {} }
 
         val state = vm.uiState.first { !it.isLoading }
@@ -68,7 +68,7 @@ class PricesViewModelTest {
 
     @Test
     fun `senza scontrini lo dice`() = runTest(dispatcher) {
-        val vm = PricesViewModel(repository)
+        val vm = PricesViewModel(repository, dispatcher)
         backgroundScope.launch { vm.uiState.collect {} }
 
         assertTrue(vm.uiState.first { !it.isLoading }.isEmpty)

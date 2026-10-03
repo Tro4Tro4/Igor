@@ -38,6 +38,8 @@ import com.igor.fridge.ui.igorApplication
 import com.igor.fridge.ui.parsePriceCents
 import com.igor.fridge.ui.parseQuantity
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -157,6 +159,7 @@ class ReceiptViewModel(
     openPrices: Flow<OpenPricesSettings> = flowOf(OpenPricesSettings()),
     private val openPricesClient: OpenPricesClient? = null,
     private val transactor: Transactor = Transactor.Direct,
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReceiptUiState(purchaseDate = today()))
@@ -184,8 +187,12 @@ class ReceiptViewModel(
                 }
                 return@launch
             }
-            val rows = groupIntoRows(fragments)
-            val entries = parseReceipt(rows)
+            // Riordinare il testo e abbinarlo alla lista sono calcoli lunghi su uno scontrino
+            // fitto: fuori dal thread dell'interfaccia.
+            val (rows, entries) = withContext(computeDispatcher) {
+                val rows = groupIntoRows(fragments)
+                rows to parseReceipt(rows)
+            }
             if (entries.isEmpty()) {
                 _uiState.update {
                     it.copy(
@@ -195,8 +202,8 @@ class ReceiptViewModel(
                 }
                 return@launch
             }
-            val drafts = buildDrafts(entries)
-            val meta = parseReceiptMeta(rows, today())
+            val drafts = withContext(computeDispatcher) { buildDrafts(entries) }
+            val meta = withContext(computeDispatcher) { parseReceiptMeta(rows, today()) }
             _uiState.update {
                 it.copy(
                     phase = ReceiptPhase.REVIEW,

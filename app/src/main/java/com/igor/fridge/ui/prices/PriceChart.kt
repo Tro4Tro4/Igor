@@ -120,9 +120,12 @@ fun PriceChart(
             fun label(cents: Long, above: Boolean) {
                 val index = points.indexOfFirst { it.unitPriceCents == cents }
                 val text = measurer.measure(formatUnitPrice(cents, points[index].referenceUnit), labelStyle)
-                val x = (xs[index] - text.size.width / 2f).coerceIn(0f, size.width - text.size.width)
+                // maxOf: in una misura intermedia il grafico puo' essere piu' stretto
+                // dell'etichetta, e coerceIn con il massimo sotto il minimo lancia.
+                val x = (xs[index] - text.size.width / 2f)
+                    .coerceIn(0f, maxOf(0f, size.width - text.size.width))
                 val yPos = y(cents) + if (above) -text.size.height - 6.dp.toPx() else 6.dp.toPx()
-                drawText(text, topLeft = Offset(x, yPos.coerceIn(0f, size.height - text.size.height)))
+                drawText(text, topLeft = Offset(x, yPos.coerceIn(0f, maxOf(0f, size.height - text.size.height))))
             }
             label(maxPrice, above = true)
             if (minPrice != maxPrice) label(minPrice, above = false)

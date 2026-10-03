@@ -18,12 +18,16 @@ import com.igor.fridge.domain.prices.summarize
 import com.igor.fridge.domain.prices.toObservation
 import com.igor.fridge.ui.compare.communityObservations
 import com.igor.fridge.ui.igorApplication
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -40,18 +44,29 @@ data class PricesUiState(
 }
 
 /** Elenco dei prodotti con il loro prezzo e la spesa di ogni mese. */
-class PricesViewModel(priceRepository: PriceRepository) : ViewModel() {
+class PricesViewModel(
+    priceRepository: PriceRepository,
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
+) : ViewModel() {
 
     private val query = MutableStateFlow("")
 
+    /**
+     * Riepiloghi e spesa mensile scorrono tutto lo storico: si ricalcolano quando cambiano
+     * i prezzi, fuori dal thread dell'interfaccia, e non a ogni lettera digitata.
+     */
+    private val summaries = priceRepository.observeAll()
+        .map { records -> summarize(records) to monthlySpending(records) }
+        .flowOn(computeDispatcher)
+
     val uiState: StateFlow<PricesUiState> =
-        combine(priceRepository.observeAll(), query) { records, query ->
+        combine(summaries, query) { (products, monthly), query ->
             val needle = query.trim()
             PricesUiState(
-                products = summarize(records).filter {
+                products = products.filter {
                     needle.isEmpty() || it.productName.contains(needle, ignoreCase = true)
                 },
-                monthly = monthlySpending(records),
+                monthly = monthly,
                 query = query,
                 isLoading = false,
             )
@@ -84,15 +99,16 @@ data class PriceHistoryUiState(
     val isLoadingCommunity: Boolean = false,
     val message: String? = null,
 ) {
+    // Calcolati una volta per stato, non a ogni lettura durante la ricomposizione.
+
     /** Gli acquisti confrontabili con l'ultimo, dal piu' vecchio: i punti del grafico. */
-    val chartPoints: List<PriceRecord>
-        get() = summary?.let { s -> records.filter { it.referenceUnit == s.referenceUnit }.reversed() }.orEmpty()
+    val chartPoints: List<PriceRecord> =
+        summary?.let { s -> records.filter { it.referenceUnit == s.referenceUnit }.reversed() }.orEmpty()
 
     /** L'ultimo prezzo pagato in ogni negozio, dal piu' conveniente. */
-    val byStore: List<StoreObservation>
-        get() = latestByStore(
-            records.filter { it.referenceUnit == summary?.referenceUnit }.mapNotNull { it.toObservation() },
-        )
+    val byStore: List<StoreObservation> = latestByStore(
+        records.filter { it.referenceUnit == summary?.referenceUnit }.mapNotNull { it.toObservation() },
+    )
 }
 
 /**

@@ -65,7 +65,15 @@ class ReceiptViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun viewModel() =
-        ReceiptViewModel(reader, FakePhotoStore(), foodRepository, shoppingRepository, priceRepository, today = { today })
+        ReceiptViewModel(
+            reader,
+            FakePhotoStore(),
+            foodRepository,
+            shoppingRepository,
+            priceRepository,
+            today = { today },
+            computeDispatcher = dispatcher,
+        )
 
     private fun ReceiptViewModel.read(vararg lines: String) {
         reader.lines = lines.toList()
@@ -347,6 +355,7 @@ class ReceiptViewModelTest {
             shoppingRepository,
             priceRepository,
             today = { today },
+            computeDispatcher = dispatcher,
             openPrices = kotlinx.coroutines.flow.flowOf(
                 com.igor.fridge.data.prefs.OpenPricesSettings(enabled = true, userId = "mario", token = "tok"),
             ),
@@ -448,6 +457,7 @@ class ReceiptViewModelTest {
             shoppingRepository,
             failing,
             today = { today },
+            computeDispatcher = dispatcher,
             transactor = object : com.igor.fridge.data.Transactor {
                 override suspend fun <T> run(block: suspend () -> T): T {
                     transactions += "inizio"
