@@ -51,33 +51,35 @@ fun CategoryPickerSheet(
     val visible = options.filter { labels.getValue(it).contains(query.trim(), ignoreCase = true) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f).imePadding()) {
-            Text(stringResource(R.string.edit_category),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(horizontal = 16.dp))
-            OutlinedTextField(
-                value = query, onValueChange = { query = it }, singleLine = true,
-                label = { Text(stringResource(R.string.category_search)) },
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-            )
-            LazyColumn(Modifier.fillMaxWidth().weight(1f).selectableGroup(),
-                contentPadding = PaddingValues(bottom = 16.dp)) {
-                if (allowAll) item(key = "all") {
-                    CategoryOption(stringResource(R.string.category_all), null, selected == null) {
-                        onSelect(null)
-                        onDismiss()
-                    }
+        LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.85f).imePadding().selectableGroup(),
+            contentPadding = PaddingValues(bottom = 16.dp)) {
+            item(key = "search") {
+                Column {
+                    Text(stringResource(R.string.edit_category),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(horizontal = 16.dp))
+                    OutlinedTextField(
+                        value = query, onValueChange = { query = it }, singleLine = true,
+                        label = { Text(stringResource(R.string.category_search)) },
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    )
                 }
-                items(visible, key = { it.name }) { category ->
-                    CategoryOption(labels.getValue(category), category.icon(), category == selected) {
-                        onSelect(category)
-                        onDismiss()
-                    }
+            }
+            if (allowAll) item(key = "all") {
+                CategoryOption(stringResource(R.string.category_all), null, selected == null) {
+                    onSelect(null)
+                    onDismiss()
                 }
-                if (visible.isEmpty()) item(key = "empty") {
-                    Text(stringResource(R.string.category_no_results),
-                        modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            items(visible, key = { it.name }) { category ->
+                CategoryOption(labels.getValue(category), category.icon(), category == selected) {
+                    onSelect(category)
+                    onDismiss()
                 }
+            }
+            if (visible.isEmpty()) item(key = "empty") {
+                Text(stringResource(R.string.category_no_results),
+                    modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

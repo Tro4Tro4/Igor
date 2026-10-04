@@ -28,18 +28,18 @@ fun guessCategory(name: String): FoodCategory {
     if (words.isEmpty()) return FoodCategory.ALTRO
     if (words.any { it in FROZEN_MARKERS }) return FoodCategory.SURGELATI
 
-    // Il confezionamento esplicito distingue una conserva dal pesce fresco.
-    if (words.any { it in PRESERVED_FISH } && words.any { it in PRESERVED_MARKERS }) {
-        return FoodCategory.CONSERVE_PESCE_CARNE
-    }
-
     // "fiocchi di latte" e' l'espressione "fiocchi latte": le preposizioni non contano.
     val content = words.filterNot { it in STOPWORDS }
     for (index in content.indices) {
         if (index + 1 < content.size) {
             PHRASES["${content[index]} ${content[index + 1]}"]?.let { return it }
         }
-        KEYWORDS[content[index]]?.let { return it }
+        KEYWORDS[content[index]]?.let { category ->
+            // Il confezionamento cambia solo il pesce riconosciuto come prodotto principale.
+            return if (content[index] in PRESERVED_FISH && words.any { it in PRESERVED_MARKERS }) {
+                FoodCategory.CONSERVE_PESCE_CARNE
+            } else category
+        }
     }
     // "fette" decide solo se nient'altro lo fa: "fette di salmone" e' pesce.
     content.firstNotNullOfOrNull { WEAK_KEYWORDS[it] }?.let { return it }

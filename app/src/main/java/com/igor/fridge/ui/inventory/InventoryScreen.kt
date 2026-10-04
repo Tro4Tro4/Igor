@@ -156,75 +156,79 @@ fun InventoryScreen(
             }
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
+        // Anche i filtri scorrono: font grandi e altezza ridotta non nascondono le azioni.
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = {
-                    query = it
-                    viewModel.onQueryChange(it)
-                },
-                label = { Text(stringResource(R.string.inventory_search)) },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+            item(key = "controls") {
+                Column {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = {
+                            query = it
+                            viewModel.onQueryChange(it)
+                        },
+                        label = { Text(stringResource(R.string.inventory_search)) },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
 
-            FilterRow(state, viewModel::onFilterChange, viewModel::onLocationChange) {
-                categoryOpen = true
+                    FilterRow(state, viewModel::onFilterChange, viewModel::onLocationChange) {
+                        categoryOpen = true
+                    }
+                    Text(stringResource(R.string.inventory_shown_count, state.items.size, state.totalCount),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+
+                }
             }
-            Text(stringResource(R.string.inventory_shown_count, state.items.size, state.totalCount),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-
             when {
-                state.isLoading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Text(stringResource(R.string.inventory_loading), Modifier.padding(top = 12.dp))
+                state.isLoading -> item(key = "loading") {
+                    Box(Modifier.fillParentMaxHeight(0.5f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Text(stringResource(R.string.inventory_loading), Modifier.padding(top = 12.dp))
+                        }
                     }
                 }
-                state.items.isEmpty() -> EmptyState(
-                    filtered = state.query.isNotBlank() || state.filter != InventoryFilter.TUTTI ||
-                        state.category != null || state.location != null,
-                    onAdd = onAddItem,
-                    onReset = { query = ""; viewModel.resetFilters() },
-                    modifier = Modifier.weight(1f),
-                )
-                else -> LazyColumn(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    state.sections.forEach { section ->
-                        stickyHeader(key = "category:${section.category.name}") {
-                            Surface(color = MaterialTheme.colorScheme.surface) {
-                                Row(Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically) {
-                                    Text(section.category.icon(), Modifier.clearAndSetSemantics {})
-                                    Text(stringResource(section.category.labelRes()),
-                                        modifier = Modifier.weight(1f).padding(start = 8.dp).semantics { heading() },
-                                        style = MaterialTheme.typography.titleSmall)
-                                    Text(section.items.size.toString(), style = MaterialTheme.typography.labelLarge)
-                                }
+                state.items.isEmpty() -> item(key = "empty") {
+                    EmptyState(
+                        filtered = state.query.isNotBlank() || state.filter != InventoryFilter.TUTTI ||
+                            state.category != null || state.location != null,
+                        onAdd = onAddItem,
+                        onReset = { query = ""; viewModel.resetFilters() },
+                    )
+                }
+                else -> state.sections.forEach { section ->
+                    stickyHeader(key = "category:${section.category.name}") {
+                        Surface(color = MaterialTheme.colorScheme.surface) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Text(section.category.icon(), Modifier.clearAndSetSemantics {})
+                                Text(stringResource(section.category.labelRes()),
+                                    modifier = Modifier.weight(1f).padding(start = 8.dp).semantics { heading() },
+                                    style = MaterialTheme.typography.titleSmall)
+                                Text(section.items.size.toString(), style = MaterialTheme.typography.labelLarge)
                             }
                         }
-                        items(section.items, key = { "food:${it.uuid}" }) { item ->
-                            FoodItemCard(item, state.today, state.warningDays,
-                                onClick = { onEditItem(item.uuid) },
-                                onConsume = { viewModel.consume(item) },
-                                onDelete = { viewModel.delete(item) })
-                        }
+                    }
+                    items(section.items, key = { "food:${it.uuid}" }) { item ->
+                        FoodItemCard(item, state.today, state.warningDays,
+                            onClick = { onEditItem(item.uuid) },
+                            onConsume = { viewModel.consume(item) },
+                            onDelete = { viewModel.delete(item) },
+                            modifier = Modifier.padding(horizontal = 16.dp))
                     }
                 }
             }
         }
     }
+
     if (categoryOpen) {
         CategoryPickerSheet(state.category, state.availableCategories, true,
             onSelect = viewModel::onCategoryChange, onDismiss = { categoryOpen = false })

@@ -6,6 +6,14 @@ import org.junit.Test
 
 class CategoryGuessTest {
 
+    @Test fun `conserve di pesce non scavalcano il prodotto principale`() {
+        assertEquals(FoodCategory.VERDURA, guessCategory("insalata con tonno in scatola"))
+        assertEquals(FoodCategory.SUGHI_PASSATE, guessCategory("sugo al tonno sottolio"))
+        assertEquals(FoodCategory.CONSERVE_PESCE_CARNE, guessCategory("tonno in scatola"))
+        assertEquals(FoodCategory.CONSERVE_PESCE_CARNE, guessCategory("sgombro sottolio"))
+        assertEquals(FoodCategory.SURGELATI, guessCategory("insalata con tonno in scatola surgelata"))
+    }
+
     @Test fun `distingue prodotti dettagliati e conserva le ambiguita'`() {
         val cases = mapOf(
             "prosciutto cotto" to FoodCategory.SALUMI,
