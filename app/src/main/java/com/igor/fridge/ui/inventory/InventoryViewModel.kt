@@ -1,6 +1,8 @@
 package com.igor.fridge.ui.inventory
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -13,11 +15,12 @@ import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.data.prefs.SettingsStore
 import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.ShoppingRepository
-import com.igor.fridge.domain.ExpiryStatus
 import com.igor.fridge.domain.currentDateFlow
-import com.igor.fridge.domain.expiryStatus
 import com.igor.fridge.ui.igorApplication
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -31,6 +34,10 @@ import java.time.LocalDate
 
 data class InventoryUiState(
     val items: List<FoodItem> = emptyList(),
+    val sections: List<InventorySection> = emptyList(),
+    val availableCategories: List<FoodCategory> = emptyList(),
+    val category: FoodCategory? = null,
+    val matchingCount: Int = 0,
     val query: String = "",
     val filter: InventoryFilter = InventoryFilter.TUTTI,
     val location: StorageLocation? = null,
@@ -47,10 +54,7 @@ data class InventoryUiState(
     val canUndo: Boolean = false,
 )
 
-private data class Criteria(
-    val query: String = "",
-    val filter: InventoryFilter = InventoryFilter.TUTTI,
-    val location: StorageLocation? = null,
+private data class Feedback(
     val message: String? = null,
     val messageId: Long = 0,
     val canUndo: Boolean = false,
@@ -62,9 +66,23 @@ class InventoryViewModel(
     warningDays: Flow<Int>,
     today: Flow<LocalDate>,
     private val transactor: Transactor = Transactor.Direct,
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
-    private val criteria = MutableStateFlow(Criteria())
+    private val selection = MutableStateFlow(InventoryCriteria(
+        query = savedStateHandle["inventory.query"] ?: "",
+        filter = InventoryFilter.entries.firstOrNull {
+            it.name == savedStateHandle.get<String>("inventory.filter")
+        } ?: InventoryFilter.TUTTI,
+        location = StorageLocation.entries.firstOrNull {
+            it.name == savedStateHandle.get<String>("inventory.location")
+        },
+        category = FoodCategory.entries.firstOrNull {
+            it.name == savedStateHandle.get<String>("inventory.category")
+        },
+    ))
+    private val feedback = MutableStateFlow(Feedback())
 
     /** Come disfare l'ultima eliminazione o consumazione: vive quanto lo snackbar. */
     private var pendingUndo: (suspend () -> Unit)? = null
@@ -73,62 +91,62 @@ class InventoryViewModel(
     private fun show(message: String, undo: (suspend () -> Unit)? = null) {
         pendingUndo = undo
         val id = ++nextMessageId
-        criteria.update { it.copy(message = message, messageId = id, canUndo = undo != null) }
+        feedback.update { it.copy(message = message, messageId = id, canUndo = undo != null) }
     }
 
-    val uiState: StateFlow<InventoryUiState> =
-        combine(
-            foodRepository.observeAll(),
-            criteria,
-            warningDays,
-            today,
-        ) { items, criteria, warningDays, today ->
-            val statuses = items.associateBy({ it.uuid }, { it.expiryStatus(today, warningDays) })
-            val visible = items.filter { item ->
-                val needle = criteria.query.trim()
-                val matchesQuery = needle.isEmpty() ||
-                    item.name.contains(needle, ignoreCase = true) ||
-                    item.brand?.contains(needle, ignoreCase = true) == true
-                val matchesLocation = criteria.location == null || item.location == criteria.location
-                val matchesFilter = when (criteria.filter) {
-                    InventoryFilter.TUTTI -> true
-                    InventoryFilter.IN_SCADENZA -> statuses[item.uuid] == ExpiryStatus.IN_SCADENZA
-                    InventoryFilter.SCADUTI -> statuses[item.uuid] == ExpiryStatus.SCADUTO
-                    InventoryFilter.SENZA_DATA -> statuses[item.uuid] == ExpiryStatus.SENZA_DATA
-                }
-                matchesQuery && matchesLocation && matchesFilter
-            }
-            InventoryUiState(
-                items = visible,
-                query = criteria.query,
-                filter = criteria.filter,
-                location = criteria.location,
-                warningDays = warningDays,
-                today = today,
-                totalCount = items.size,
-                expiringCount = statuses.values.count { it == ExpiryStatus.IN_SCADENZA },
-                expiredCount = statuses.values.count { it == ExpiryStatus.SCADUTO },
-                noDateCount = statuses.values.count { it == ExpiryStatus.SENZA_DATA },
-                isLoading = false,
-                message = criteria.message,
-                messageId = criteria.messageId,
-                canUndo = criteria.canUndo,
-            )
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-            initialValue = InventoryUiState(),
+    private val projected = combine(
+        foodRepository.observeAll(), selection, warningDays, today,
+    ) { items, criteria, warningDays, today ->
+        val model = inventoryListOf(items, criteria, today, warningDays)
+        InventoryUiState(
+            items = model.items,
+            sections = model.sections,
+            availableCategories = model.availableCategories,
+            category = criteria.category,
+            query = criteria.query,
+            filter = criteria.filter,
+            location = criteria.location,
+            warningDays = warningDays,
+            today = today,
+            totalCount = model.totalCount,
+            matchingCount = model.matchingCount,
+            expiringCount = model.expiringCount,
+            expiredCount = model.expiredCount,
+            noDateCount = model.noDateCount,
+            isLoading = false,
         )
+    }.flowOn(computeDispatcher)
 
-    fun onQueryChange(value: String) = criteria.update { it.copy(query = value) }
+    val uiState: StateFlow<InventoryUiState> = combine(projected, feedback) { state, feedback ->
+        state.copy(message = feedback.message, messageId = feedback.messageId, canUndo = feedback.canUndo)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        initialValue = InventoryUiState(
+            query = selection.value.query,
+            filter = selection.value.filter,
+            location = selection.value.location,
+            category = selection.value.category,
+        ),
+    )
 
-    fun onFilterChange(value: InventoryFilter) = criteria.update { it.copy(filter = value) }
+    private fun select(value: InventoryCriteria) {
+        savedStateHandle["inventory.query"] = value.query
+        savedStateHandle["inventory.filter"] = value.filter.name
+        savedStateHandle["inventory.location"] = value.location?.name
+        savedStateHandle["inventory.category"] = value.category?.name
+        selection.value = value
+    }
 
-    fun onLocationChange(value: StorageLocation?) = criteria.update { it.copy(location = value) }
+    fun onQueryChange(value: String) = select(selection.value.copy(query = value))
+    fun onFilterChange(value: InventoryFilter) = select(selection.value.copy(filter = value))
+    fun onLocationChange(value: StorageLocation?) = select(selection.value.copy(location = value))
+    fun onCategoryChange(value: FoodCategory?) = select(selection.value.copy(category = value))
+    fun resetFilters() = select(InventoryCriteria())
 
     fun onMessageShown() {
         pendingUndo = null
-        criteria.update { it.copy(message = null, canUndo = false) }
+        feedback.update { it.copy(message = null, canUndo = false) }
     }
 
     /** Un tocco accidentale sul cestino si annulla dallo snackbar. */
@@ -169,7 +187,7 @@ class InventoryViewModel(
     fun undo() {
         val undo = pendingUndo ?: return
         pendingUndo = null
-        criteria.update { it.copy(message = null, canUndo = false) }
+        feedback.update { it.copy(message = null, canUndo = false) }
         viewModelScope.launch {
             withContext(NonCancellable) { transactor.run { undo() } }
             show("Annullato")
@@ -206,6 +224,7 @@ class InventoryViewModel(
                     warningDays = container.settingsStore.warningDays,
                     today = currentDateFlow(),
                     transactor = container.transactor,
+                    savedStateHandle = createSavedStateHandle(),
                 )
             }
         }

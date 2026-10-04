@@ -1,5 +1,7 @@
 package com.igor.fridge.ui
 
+import androidx.lifecycle.SavedStateHandle
+import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.FakeFoodItemDao
 import com.igor.fridge.data.FakeShoppingItemDao
 import com.igor.fridge.data.local.FoodItem
@@ -12,12 +14,14 @@ import com.igor.fridge.ui.inventory.InventoryViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -52,12 +56,90 @@ class InventoryViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = InventoryViewModel(
+    private fun viewModel(handle: SavedStateHandle = SavedStateHandle(), dateFlow: Flow<LocalDate> = flowOf(today)) = InventoryViewModel(
         foodRepository = foodRepository,
         shoppingRepository = shoppingRepository,
         warningDays = warningDays,
-        today = flowOf(today),
+        today = dateFlow,
+        savedStateHandle = handle,
+        computeDispatcher = dispatcher,
     )
+
+    @Test fun `il ripristino mantiene i criteri dal primo stato e non lo snackbar`() = runTest(dispatcher) {
+        val handle = SavedStateHandle(mapOf("inventory.query" to "prosciutto",
+            "inventory.filter" to "IN_SCADENZA", "inventory.location" to "FRIGO",
+            "inventory.category" to "SALUMI"))
+        val vm = viewModel(handle)
+        assertEquals("prosciutto", vm.uiState.value.query)
+        val state = vm.uiState.first { !it.isLoading }
+        assertEquals(FoodCategory.SALUMI, state.category)
+        assertEquals(StorageLocation.FRIGO, state.location)
+        assertEquals(InventoryFilter.IN_SCADENZA, state.filter)
+        assertNull(state.message)
+        vm.resetFilters()
+        val reset = vm.uiState.first { it.query.isEmpty() && it.category == null }
+        assertEquals(InventoryFilter.TUTTI, reset.filter)
+        assertNull(reset.location)
+        assertEquals("", handle.get<String>("inventory.query"))
+    }
+
+    @Test fun `cambiare criteri li salva per una nuova istanza`() = runTest(dispatcher) {
+        val handle = SavedStateHandle()
+        val vm = viewModel(handle)
+        vm.onQueryChange("marca")
+        vm.onCategoryChange(FoodCategory.BISCOTTI)
+        vm.onLocationChange(StorageLocation.DISPENSA)
+        vm.onFilterChange(InventoryFilter.SENZA_DATA)
+        val restored = viewModel(SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) }))
+        val state = restored.uiState.first { !it.isLoading }
+        assertEquals("marca", state.query)
+        assertEquals(FoodCategory.BISCOTTI, state.category)
+        assertEquals(StorageLocation.DISPENSA, state.location)
+        assertEquals(InventoryFilter.SENZA_DATA, state.filter)
+    }
+
+    @Test fun `codici sconosciuti nello stato salvato usano i filtri predefiniti`() = runTest(dispatcher) {
+        val vm = viewModel(SavedStateHandle(mapOf("inventory.filter" to "futuro",
+            "inventory.category" to "futuro", "inventory.location" to "futuro")))
+        val state = vm.uiState.first { !it.isLoading }
+        assertNull(state.category)
+        assertNull(state.location)
+        assertEquals(InventoryFilter.TUTTI, state.filter)
+    }
+
+    @Test fun `la categoria rimane selezionata dopo la rimozione e osserva nuovi dati`() = runTest(dispatcher) {
+        val item = foodRepository.save(FoodItem("", "Prosciutto", category=FoodCategory.SALUMI))
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.onCategoryChange(FoodCategory.SALUMI)
+        vm.uiState.first { !it.isLoading && it.items.size == 1 }
+        vm.delete(item)
+        runCurrent()
+        assertEquals(FoodCategory.SALUMI, vm.uiState.value.category)
+        assertTrue(vm.uiState.value.items.isEmpty())
+        assertEquals(listOf(FoodCategory.SALUMI), vm.uiState.value.availableCategories)
+        foodRepository.save(FoodItem("", "Speck", category=FoodCategory.SALUMI))
+        runCurrent()
+        assertEquals(listOf("Speck"), vm.uiState.value.items.map { it.name })
+    }
+
+    @Test fun `il giorno e la soglia aggiornano sezioni e conteggi filtrati`() = runTest(dispatcher) {
+        val dates = MutableStateFlow(today)
+        foodRepository.save(FoodItem("", "Salame", category=FoodCategory.SALUMI,
+            brand="Marca", expiryDate=today))
+        foodRepository.save(FoodItem("", "Biscotti", category=FoodCategory.BISCOTTI))
+        val vm = viewModel(dateFlow=dates)
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.onQueryChange("marca")
+        vm.uiState.first { !it.isLoading && it.query == "marca" }
+        assertEquals(1, vm.uiState.value.matchingCount)
+        assertEquals(1, vm.uiState.value.expiringCount)
+        assertEquals(0, vm.uiState.value.noDateCount)
+        dates.value = today.plusDays(1)
+        runCurrent()
+        assertEquals(1, vm.uiState.value.expiredCount)
+        assertEquals(0, vm.uiState.value.expiringCount)
+    }
 
     private suspend fun seed() {
         foodRepository.save(FoodItem(uuid = "", name = "Scaduto", expiryDate = today.minusDays(1)))
