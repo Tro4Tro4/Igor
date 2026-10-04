@@ -386,10 +386,10 @@ fun ShoppingItemEditScreen(
 
             Button(
                 onClick = { viewModel.save() },
-                enabled = !state.isImportingPhoto,
+                enabled = !state.isImportingPhoto && !state.isSaving && !state.isDone,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(R.string.edit_save))
+                Text(stringResource(if (state.isSaving) R.string.edit_saving else R.string.edit_save))
             }
         }
     }

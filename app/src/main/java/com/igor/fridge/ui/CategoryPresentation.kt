@@ -109,3 +109,11 @@ fun FoodCategory.icon(): String = when (this) {
     FoodCategory.IGIENE -> "\uD83D\uDEC1"
     FoodCategory.ALTRO -> "\uD83D\uDED2"
 }
+
+/** Normalizza solo il confronto del selettore, senza modificare etichette o chiavi salvate. */
+fun categoryMatchesQuery(label: String, query: String): Boolean {
+    fun folded(value: String) = java.text.Normalizer.normalize(value,
+        java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+        .lowercase(java.util.Locale.ITALIAN)
+    return folded(label).contains(folded(query.trim()))
+}

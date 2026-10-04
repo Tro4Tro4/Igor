@@ -277,4 +277,5 @@
     <string name="inventory_loading">Caricamento inventario</string>
     <string name="inventory_category_filter">Categoria: %1$s</string>
     <string name="inventory_location_filter">Luogo: %1$s</string>
+    <string name="edit_saving">Salvataggio in corso…</string>
 </resources>

@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import com.igor.fridge.R
 import com.igor.fridge.data.local.FoodCategory
+import com.igor.fridge.ui.categoryMatchesQuery
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.labelRes
 
@@ -48,7 +49,7 @@ fun CategoryPickerSheet(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val labels = options.associateWith { stringResource(it.labelRes()) }
-    val visible = options.filter { labels.getValue(it).contains(query.trim(), ignoreCase = true) }
+    val visible = options.filter { categoryMatchesQuery(labels.getValue(it), query) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.85f).imePadding().selectableGroup(),

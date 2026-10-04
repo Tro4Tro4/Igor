@@ -21,4 +21,10 @@ class CategoryPresentationTest {
         assertEquals("Salumi e affettati", context.getString(FoodCategory.valueOf("SALUMI").labelRes()))
         assertEquals("Formaggi freschi", context.getString(FoodCategory.valueOf("FORMAGGI_FRESCHI").labelRes()))
     }
+    @Test fun `ricerca categorie ignora accenti e spazi senza cambiare le etichette`() {
+        assertTrue(categoryMatchesQuery("Caffè, tè e infusi", " caffe "))
+        assertTrue(categoryMatchesQuery("Caffè, tè e infusi", "TE"))
+        assertTrue(categoryMatchesQuery("Caffè, tè e infusi", "caffe\u0300"))
+        assertFalse(categoryMatchesQuery("Formaggi freschi", "caffe"))
+    }
 }

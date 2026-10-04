@@ -165,4 +165,44 @@ class EditItemViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals("Granarolo", reopened.uiState.value.brand)
     }
+
+    @Test fun `due salvataggi ravvicinati creano un solo articolo`() = runTest(dispatcher) {
+        val vm = viewModel(NEW_ITEM_UUID); vm.onNameChange("Pane")
+        vm.save(); vm.save(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, dao.items.size)
+        vm.save(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, dao.items.size)
+    }
+    @Test fun `quantita non finita viene rifiutata`() = runTest(dispatcher) {
+        val vm = viewModel(NEW_ITEM_UUID); vm.onNameChange("Pane"); vm.onQuantityChange("NaN")
+        vm.save(); dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.quantityError); assertTrue(dao.items.isEmpty())
+    }
+    @Test fun `scanner rispetta categoria unita e posizione scelte manualmente`() = runTest(dispatcher) {
+        repository.save(FoodItem(uuid = "", name = "Latte", barcode = "123", category = FoodCategory.LATTICINI))
+        val vm = viewModel(NEW_ITEM_UUID)
+        vm.onCategoryChange(FoodCategory.ALTERNATIVE_VEGETALI)
+        vm.onUnitChange(com.igor.fridge.data.local.QuantityUnit.L)
+        vm.onLocationChange(com.igor.fridge.data.local.StorageLocation.DISPENSA)
+        vm.onBarcodeScanned("123"); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(FoodCategory.ALTERNATIVE_VEGETALI, vm.uiState.value.category)
+        assertEquals(com.igor.fridge.data.local.QuantityUnit.L, vm.uiState.value.unit)
+        assertEquals(com.igor.fridge.data.local.StorageLocation.DISPENSA, vm.uiState.value.location)
+    }
+
+
+    @Test fun `errore salvataggio nuovo conserva il modulo e non duplica al retry`() = runTest(dispatcher) {
+        var fail = true
+        val failing = object : com.igor.fridge.data.local.FoodItemDao by dao {
+            override suspend fun upsert(item: FoodItem) {
+                if (fail) error("disco") else dao.upsert(item)
+            }
+        }
+        val vm = EditItemViewModel(NEW_ITEM_UUID, FoodRepository(failing))
+        vm.onNameChange("Pane"); vm.save(); dispatcher.scheduler.advanceUntilIdle()
+        assertFalse(vm.uiState.value.isSaved); assertTrue(vm.uiState.value.message!!.contains("riprova"))
+        fail = false; vm.save(); vm.save(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, dao.items.size)
+    }
+
 }

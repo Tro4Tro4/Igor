@@ -563,4 +563,86 @@ class ShoppingViewModelTest {
         assertEquals("Spostamento non riuscito: riprova", vm.uiState.value.message)
         assertFalse(vm.uiState.value.canUndo)
     }
+
+    @Test fun `undo acquisto parziale non sovrascrive modifiche successive`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte", quantity = 3.0)
+        shoppingRepository.update(shoppingDao.items.single().copy(isChecked = true, purchasedQuantity = 1.0))
+        val vm = viewModel(); backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }
+        vm.moveCheckedToInventory(); dispatcher.scheduler.advanceUntilIdle()
+        val edited = shoppingRepository.update(shoppingDao.items.single().copy(notes = "successiva"))
+        vm.undoLastMove(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(listOf(edited), shoppingDao.items)
+        assertNull(foodDao.items.single().removedAt)
+        assertTrue(vm.uiState.value.message!!.contains("modificat"))
+    }
+
+
+    @Test fun `lista resta aggiornata anche mentre si modificano i dettagli a lungo`() = runTest(dispatcher) {
+        val vm = viewModel(); val observer = backgroundScope.launch { vm.uiState.collect {} }
+        dispatcher.scheduler.runCurrent(); observer.cancel()
+        dispatcher.scheduler.advanceTimeBy(6000); dispatcher.scheduler.runCurrent()
+        shoppingRepository.addIfAbsent("Latte"); dispatcher.scheduler.runCurrent()
+        assertEquals(listOf("Latte"), vm.uiState.value.items.map { it.name })
+    }
+    @Test fun `errore aggiunta e recuperabile senza terminare la schermata`() = runTest(dispatcher) {
+        var fail = true
+        val failing = object : com.igor.fridge.data.local.ShoppingItemDao by shoppingDao {
+            override suspend fun upsert(item: ShoppingItem) {
+                if (fail) error("disco non disponibile") else shoppingDao.upsert(item)
+            }
+        }
+        val vm = ShoppingViewModel(ShoppingRepository(failing), foodRepository, FakePhotoStore())
+        backgroundScope.launch { vm.uiState.collect {} }; vm.uiState.first { !it.isLoading }
+        vm.add("Latte"); dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.message!!.contains("riprova")); assertTrue(shoppingDao.items.isEmpty())
+        fail = false; vm.add("Latte"); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, shoppingDao.items.size)
+    }
+
+
+    @Test fun `errore temporaneo di undo mantiene la possibilita di riprovare`() = runTest(dispatcher) {
+        var fail = false
+        val tx = object : com.igor.fridge.data.Transactor {
+            override suspend fun <T> run(block: suspend () -> T): T {
+                if (fail) error("disco")
+                return block()
+            }
+        }
+        shoppingRepository.addIfAbsent("Latte"); shoppingRepository.setChecked(shoppingDao.items.single(), true)
+        val vm = ShoppingViewModel(shoppingRepository, foodRepository, FakePhotoStore(), transactor = tx)
+        backgroundScope.launch { vm.uiState.collect {} }; vm.uiState.first { !it.isLoading }
+        vm.moveCheckedToInventory(); dispatcher.scheduler.advanceUntilIdle()
+        fail = true; vm.undoLastMove(); dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.canUndo)
+        fail = false; vm.undoLastMove(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, shoppingDao.items.size)
+        assertEquals(RemovalReason.ERRORE, foodDao.items.single().removalReason)
+    }
+    @Test fun `undo cestino ripristina i dati correnti non la copia vecchia della riga`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte"); val old = shoppingDao.items.single()
+        val current = shoppingRepository.update(old.copy(notes = "aggiornata"))
+        val vm = viewModel(); backgroundScope.launch { vm.uiState.collect {} }
+        vm.uiState.first { !it.isLoading }; vm.delete(old); dispatcher.scheduler.advanceUntilIdle()
+        vm.undoLastMove(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(listOf(current), shoppingDao.items)
+    }
+
+    @Test fun `annullamento viene offerto solo dopo il commit completato`() = runTest(dispatcher) {
+        shoppingRepository.addIfAbsent("Latte")
+        lateinit var vm: ShoppingViewModel
+        var offeredBeforeCommit = false
+        val tx = object : com.igor.fridge.data.Transactor {
+            override suspend fun <T> run(block: suspend () -> T): T {
+                val result = block()
+                kotlinx.coroutines.delay(1)
+                offeredBeforeCommit = vm.uiState.value.canUndo
+                return result
+            }
+        }
+        vm = ShoppingViewModel(shoppingRepository, foodRepository, FakePhotoStore(), transactor = tx)
+        backgroundScope.launch { vm.uiState.collect {} }; vm.uiState.first { !it.isLoading }
+        vm.delete(shoppingDao.items.single()); dispatcher.scheduler.advanceUntilIdle()
+        assertFalse(offeredBeforeCommit); assertTrue(vm.uiState.value.canUndo)
+    }
 }

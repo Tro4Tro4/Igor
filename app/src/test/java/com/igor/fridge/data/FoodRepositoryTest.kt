@@ -173,4 +173,12 @@ class FoodRepositoryTest {
 
         assertEquals(StorageLocation.FREEZER, created.location)
     }
+
+    @Test fun `categoria diversa scelta nella spesa usa la conservazione coerente`() = runTest {
+        repository.save(FoodItem(uuid = "", name = "Piselli", category = FoodCategory.VERDURA,
+            location = StorageLocation.FRIGO))
+        val frozen = repository.addFromShopping("Piselli", 1.0, QuantityUnit.CONF,
+            category = FoodCategory.SURGELATI)
+        assertEquals(StorageLocation.FREEZER, frozen.location)
+    }
 }

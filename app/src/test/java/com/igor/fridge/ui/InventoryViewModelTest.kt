@@ -269,4 +269,62 @@ class InventoryViewModelTest {
         assertNull(foodDao.items.single { it.uuid == item.uuid }.removedAt)
         assertEquals(4, vm.uiState.value.totalCount)
     }
+
+    @Test fun `annullare consumo ripristina la voce gia spuntata senza perderne dettagli`() = runTest(dispatcher) {
+        seed()
+        shoppingRepository.addIfAbsent("Fresco", notes = "originale", brand = "Marca", quantity = 4.0)
+        shoppingRepository.setChecked(shoppingDao.items.single(), true)
+        val original = shoppingDao.items.single()
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        val item = vm.uiState.first { !it.isLoading }.items.first { it.name == "Fresco" }
+        vm.consume(item); dispatcher.scheduler.advanceUntilIdle()
+        vm.undo(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(listOf(original), shoppingDao.items)
+        assertNull(foodDao.items.first { it.uuid == item.uuid }.removedAt)
+    }
+    @Test fun `undo consumo non elimina una voce modificata dopo il consumo`() = runTest(dispatcher) {
+        seed(); val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        val item = vm.uiState.first { !it.isLoading }.items.first { it.name == "Fresco" }
+        vm.consume(item); dispatcher.scheduler.advanceUntilIdle()
+        val edited = shoppingRepository.update(shoppingDao.items.single().copy(notes = "successiva"))
+        vm.undo(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(listOf(edited), shoppingDao.items)
+        assertNotNull(foodDao.items.first { it.uuid == item.uuid }.removedAt)
+        assertTrue(vm.uiState.value.message!!.contains("modificat"))
+    }
+    @Test fun `secondo consumo della stessa copia non annulla la prima operazione`() = runTest(dispatcher) {
+        seed(); val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+        val item = vm.uiState.first { !it.isLoading }.items.first { it.name == "Fresco" }
+        vm.consume(item); dispatcher.scheduler.advanceUntilIdle()
+        vm.consume(item); dispatcher.scheduler.advanceUntilIdle()
+        vm.undo(); dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(shoppingDao.items.isEmpty())
+        assertNull(foodDao.items.first { it.uuid == item.uuid }.removedAt)
+    }
+
+
+    @Test fun `ritorno dopo pausa lunga trova gia il nuovo inventario senza stato obsoleto`() = runTest(dispatcher) {
+        seed(); val vm = viewModel()
+        val observer = backgroundScope.launch { vm.uiState.collect {} }
+        runCurrent(); assertEquals(4, vm.uiState.value.totalCount)
+        observer.cancel(); dispatcher.scheduler.advanceTimeBy(6000); runCurrent()
+        foodRepository.save(FoodItem("", "Nuovo")); runCurrent()
+        assertEquals(5, vm.uiState.value.totalCount)
+    }
+    @Test fun `chiusura di vecchio snackbar non cancella ultimo undo`() = runTest(dispatcher) {
+        seed(); val vm = viewModel(); backgroundScope.launch { vm.uiState.collect {} }
+        val items = vm.uiState.first { !it.isLoading }.items
+        vm.delete(items[0]); dispatcher.scheduler.advanceUntilIdle(); val first = vm.uiState.value.messageId
+        vm.delete(items[1]); dispatcher.scheduler.advanceUntilIdle()
+        vm.onMessageShown(first); dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.canUndo)
+        vm.undo(first); dispatcher.scheduler.advanceUntilIdle()
+        assertNotNull(foodDao.items.first { it.uuid == items[1].uuid }.removedAt)
+        vm.undo(); dispatcher.scheduler.advanceUntilIdle()
+        assertNull(foodDao.items.first { it.uuid == items[1].uuid }.removedAt)
+    }
+
 }

@@ -238,4 +238,21 @@ class ShoppingItemEditViewModelTest {
         assertEquals("0,5", vm.uiState.value.quantityText)
         assertEquals(QuantityUnit.KG, vm.uiState.value.unit)
     }
+
+    @Test fun `errore salvataggio conserva i campi e permette di riprovare`() = runTest(dispatcher) {
+        repository.addIfAbsent("Latte"); var fail = true
+        val failing = object : com.igor.fridge.data.local.ShoppingItemDao by dao {
+            override suspend fun upsert(item: com.igor.fridge.data.local.ShoppingItem) {
+                if (fail) error("disco") else dao.upsert(item)
+            }
+        }
+        val vm = ShoppingItemEditViewModel(dao.items.single().uuid, ShoppingRepository(failing), photos)
+        dispatcher.scheduler.advanceUntilIdle(); vm.onNotesChange("da conservare")
+        vm.save(); dispatcher.scheduler.advanceUntilIdle()
+        assertFalse(vm.uiState.value.isDone); assertTrue(vm.uiState.value.message!!.contains("riprova"))
+        assertEquals("da conservare", vm.uiState.value.notes)
+        fail = false; vm.save(); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("da conservare", dao.items.single().notes); assertTrue(vm.uiState.value.isDone)
+    }
+
 }

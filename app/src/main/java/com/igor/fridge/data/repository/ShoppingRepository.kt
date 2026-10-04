@@ -28,6 +28,22 @@ class ShoppingRepository(
 
     suspend fun findByUuid(uuid: String): ShoppingItem? = dao.findByUuid(uuid)
 
+    suspend fun findByName(name: String): ShoppingItem? = dao.findByNameKey(nameKeyOf(name))
+
+    /** Da chiamare dentro la transazione di Undo, prima di qualsiasi scrittura. */
+    suspend fun checkUndo(before: ShoppingItem?, after: ShoppingItem?) {
+        val uuid = after?.uuid ?: requireNotNull(before).uuid
+        if (dao.findByUuid(uuid) != after ||
+            (after == null && before != null && dao.findByNameKey(before.nameKey) != null)) {
+            throw UndoConflictException()
+        }
+    }
+
+    /** Ripristina soltanto la riga identificata dal token, mai un omonimo. */
+    suspend fun undoChange(before: ShoppingItem?, after: ShoppingItem?) {
+        if (before != null) restore(before) else after?.let { dao.delete(it) }
+    }
+
     suspend fun checkedItems(): List<ShoppingItem> = dao.checkedItems()
 
     /**

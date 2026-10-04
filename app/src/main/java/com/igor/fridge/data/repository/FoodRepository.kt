@@ -31,6 +31,10 @@ class FoodRepository(
 
     suspend fun all(): List<FoodItem> = dao.all()
 
+    suspend fun checkUndo(expected: FoodItem) {
+        if (dao.findByUuid(expected.uuid) != expected) throw UndoConflictException()
+    }
+
     suspend fun findLastByBarcode(barcode: String): FoodItem? = dao.findLastByBarcode(barcode)
 
     suspend fun findLastByName(name: String): FoodItem? = dao.findLastByNameKey(nameKeyOf(name))
@@ -51,8 +55,8 @@ class FoodRepository(
      * Nome, quantita', unita' e categoria arrivano dalla lista: sono dati che l'utente ha
      * inserito, e prevalgono. Solo una categoria [FoodCategory.ALTRO], cioe' non scelta,
      * cede a quella dell'ultima volta che quel nome e' stato in casa — anche se
-     * quell'articolo e' gia' stato consumato. La posizione si eredita allo stesso modo, e
-     * per un prodotto mai visto prima dipende dalla categoria (un surgelato va in freezer).
+     * quell'articolo e' gia' stato consumato. La posizione si eredita se la categoria resta
+     * la stessa; altrimenti segue la nuova categoria (un surgelato va in freezer).
      *
      * La scadenza arriva solo se l'utente l'ha indicata entrando in frigo: la lista della
      * spesa non puo' conoscerla. Il codice a barre non si eredita perche' identifica una
@@ -78,7 +82,8 @@ class FoodRepository(
                 uuid = "",
                 name = trimmed,
                 category = resolvedCategory,
-                location = previous?.location ?: resolvedCategory.defaultLocation,
+                location = previous?.takeIf { it.category == resolvedCategory }?.location
+                    ?: resolvedCategory.defaultLocation,
                 quantity = quantity,
                 unit = unit,
                 brand = brand,

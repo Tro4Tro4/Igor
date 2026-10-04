@@ -6,6 +6,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.igor.fridge.data.Transactor
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.PriceRecord
 import com.igor.fridge.data.local.QuantityUnit
@@ -46,6 +50,7 @@ data class ShoppingItemEditUiState(
     val priceError: Boolean = false,
     val message: String? = null,
     val isDone: Boolean = false,
+    val isSaving: Boolean = false,
 )
 
 /**
@@ -56,6 +61,7 @@ class ShoppingItemEditViewModel(
     private val itemUuid: String,
     private val repository: ShoppingRepository,
     private val photoStore: PhotoStore,
+    private val transactor: Transactor = Transactor.Direct,
     private val lastPrice: suspend (String) -> PriceRecord? = { null },
 ) : ViewModel() {
 
@@ -185,8 +191,22 @@ class ShoppingItemEditViewModel(
      */
     fun removePhoto() = _uiState.update { it.copy(photoName = null) }
 
+    private fun commit(block: suspend () -> Unit) {
+        if (_uiState.value.isSaving || _uiState.value.isDone || !_uiState.value.isLoaded) return
+        _uiState.update { it.copy(isSaving = true) }
+        viewModelScope.launch {
+            try {
+                withContext(NonCancellable) { transactor.run { block() } }
+                _uiState.update { it.copy(isDone = true, isSaving = false) }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { _uiState.update { it.copy(isSaving = false,
+                message = "Salvataggio non riuscito: riprova") } }
+        }
+    }
+
     fun save() {
         val state = _uiState.value
+        if (state.isSaving || state.isDone || !state.isLoaded) return
         val name = state.name.trim()
         val quantity = parseQuantity(state.quantityText)
         val purchasedBlank = state.purchasedText.isBlank()
@@ -208,11 +228,11 @@ class ShoppingItemEditViewModel(
             return
         }
 
-        viewModelScope.launch {
+        commit {
             // Si parte dalla riga in database, come per l'inventario: cio' che la schermata
             // non mostra (spunta, data di creazione) non deve tornare al default.
-            val base = repository.findByUuid(itemUuid)
-            if (base != null) {
+            val base = repository.findByUuid(itemUuid) ?: error("Voce non piu' disponibile")
+            run {
                 repository.update(
                     base.copy(
                         name = name,
@@ -230,15 +250,11 @@ class ShoppingItemEditViewModel(
                     ),
                 )
             }
-            _uiState.update { it.copy(isDone = true) }
         }
     }
 
     fun delete() {
-        viewModelScope.launch {
-            repository.findByUuid(itemUuid)?.let { repository.delete(it) }
-            _uiState.update { it.copy(isDone = true) }
-        }
+        commit { repository.findByUuid(itemUuid)?.let { repository.delete(it) } }
     }
 
     companion object {
@@ -250,6 +266,7 @@ class ShoppingItemEditViewModel(
                     repository = container.shoppingRepository,
                     photoStore = container.photoStore,
                     lastPrice = container.priceRepository::latest,
+                    transactor = container.transactor,
                 )
             }
         }

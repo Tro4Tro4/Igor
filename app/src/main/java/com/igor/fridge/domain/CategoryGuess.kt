@@ -29,14 +29,16 @@ fun guessCategory(name: String): FoodCategory {
     if (words.any { it in FROZEN_MARKERS }) return FoodCategory.SURGELATI
 
     // "fiocchi di latte" e' l'espressione "fiocchi latte": le preposizioni non contano.
-    val content = words.filterNot { it in STOPWORDS }
+    val content = words.filterNot { it in STOPWORDS || it in COMMERCIAL_MODIFIERS }
+    val preserved = words.any { it in PRESERVED_MARKERS } ||
+        words.zipWithNext().any { (a, b) -> a == "sott" && b == "olio" }
     for (index in content.indices) {
         if (index + 1 < content.size) {
             PHRASES["${content[index]} ${content[index + 1]}"]?.let { return it }
         }
         KEYWORDS[content[index]]?.let { category ->
             // Il confezionamento cambia solo il pesce riconosciuto come prodotto principale.
-            return if (content[index] in PRESERVED_FISH && words.any { it in PRESERVED_MARKERS }) {
+            return if (content[index] in PRESERVED_FISH && preserved) {
                 FoodCategory.CONSERVE_PESCE_CARNE
             } else category
         }
@@ -92,6 +94,8 @@ private val FROZEN_MARKERS = setOf(
     "surgelato", "surgelata", "surgelati", "surgelate", "congelato", "congelata", "congelati",
     "congelate", "surg", "surgel",
 )
+
+private val COMMERCIAL_MODIFIERS = setOf("bio", "biologico", "biologica", "biologici", "biologiche")
 
 private val PRESERVED_FISH = setOf("tonno", "sgombro", "sardine", "acciughe")
 private val PRESERVED_MARKERS = setOf("scatola", "scatole", "conserva", "conserve", "sottolio")

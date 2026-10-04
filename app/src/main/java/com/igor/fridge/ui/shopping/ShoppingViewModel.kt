@@ -91,9 +91,20 @@ class ShoppingViewModel(
             )
         }.stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            started = SharingStarted.Eagerly,
             initialValue = ShoppingUiState(),
         )
+
+    private fun operation(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try { block() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { show("Operazione non riuscita: riprova") }
+        }
+    }
+
+    private suspend fun <T> write(block: suspend () -> T): T =
+        withContext(NonCancellable) { transactor.run { block() } }
 
     /**
      * Aggiunge una voce dalla riga rapida: "2 kg mele" diventa mele, 2 kg. La categoria e'
@@ -106,19 +117,21 @@ class ShoppingViewModel(
         val entry = parseQuickEntry(text)
         if (entry.name.isBlank()) return
         val store = uiState.value.activeStore
-        viewModelScope.launch {
-            val known = foodRepository.findLastByName(entry.name)?.category
-                ?.takeIf { it != FoodCategory.ALTRO }
-            val paid = lastPrice(entry.name)
-            val unit = entry.unit ?: paid?.referenceUnit ?: QuantityUnit.PZ
-            shoppingRepository.addIfAbsent(
-                name = entry.name,
-                quantity = entry.quantity ?: 1.0,
-                unit = unit,
-                category = known,
-                unitPriceCents = paid?.takeIf { it.referenceUnit == unit }?.unitPriceCents,
-                store = store,
-            )
+        operation {
+            write {
+                val known = foodRepository.findLastByName(entry.name)?.category
+                    ?.takeIf { it != FoodCategory.ALTRO }
+                val paid = lastPrice(entry.name)
+                val unit = entry.unit ?: paid?.referenceUnit ?: QuantityUnit.PZ
+                shoppingRepository.addIfAbsent(
+                    name = entry.name,
+                    quantity = entry.quantity ?: 1.0,
+                    unit = unit,
+                    category = known,
+                    unitPriceCents = paid?.takeIf { it.referenceUnit == unit }?.unitPriceCents,
+                    store = store,
+                )
+            }
         }
     }
 
@@ -132,16 +145,23 @@ class ShoppingViewModel(
     fun photoFile(name: String): File = photoStore.fileOf(name)
 
     fun setChecked(item: ShoppingItem, checked: Boolean) {
-        viewModelScope.launch { shoppingRepository.setChecked(item, checked) }
+        operation { write { shoppingRepository.setChecked(item, checked) } }
     }
 
     /** Un tocco accidentale sul cestino si annulla dallo snackbar. */
     fun delete(item: ShoppingItem) {
-        viewModelScope.launch {
-            shoppingRepository.delete(item)
+        operation {
+            val current = write {
+                val current = shoppingRepository.findByUuid(item.uuid) ?: return@write null
+                shoppingRepository.delete(current)
+                current
+            } ?: return@operation
             show(
                 "Eliminato: ${item.name}",
-                PendingUndo(done = "Ripristinato: ${item.name}") { shoppingRepository.restore(item) },
+                PendingUndo(done = "Ripristinato: ${item.name}") {
+                    shoppingRepository.checkUndo(current, null)
+                    shoppingRepository.restore(current)
+                },
             )
         }
     }
@@ -212,8 +232,13 @@ class ShoppingViewModel(
                 shoppingRepository.delete(item)
             }
         }
+        // Room normalizza i timestamp ai millisecondi: il confronto usa il record persistito.
+        val createdSnapshots = created.map { requireNotNull(foodRepository.findByUuid(it.uuid)) }
+        val after = checked.associate { it.uuid to shoppingRepository.findByUuid(it.uuid) }
         return MoveOutcome(
             undo = PendingUndo(done = "Spostamento annullato") {
+                checked.forEach { shoppingRepository.checkUndo(it, after[it.uuid]) }
+                createdSnapshots.forEach { foodRepository.checkUndo(it) }
                 checked.forEach { shoppingRepository.restore(it) }
                 created.forEach { foodRepository.remove(it, RemovalReason.ERRORE) }
             },
@@ -225,7 +250,8 @@ class ShoppingViewModel(
      * Disfa l'ultima operazione annullabile: uno spostamento in frigo (le voci tornano in
      * lista e gli articoli escono dall'inventario) o un'eliminazione.
      */
-    fun undoLastMove() {
+    fun undoLastMove(messageId: Long = feedback.value.id) {
+        if (messageId != feedback.value.id) return
         val undo = pendingUndo
         // Il messaggio che offriva l'annullamento ha finito il suo turno, comunque vada:
         // consumandolo qui la schermata non deve accoppiare questa chiamata a
@@ -242,7 +268,8 @@ class ShoppingViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                show("Annullamento non riuscito")
+                if (e is com.igor.fridge.data.repository.UndoConflictException) show(e.message!!)
+                else show("Annullamento non riuscito: riprova", undo)
             }
         }
     }
@@ -251,13 +278,13 @@ class ShoppingViewModel(
      * Il messaggio e' stato mostrato: con lui scade anche l'annullamento, che vive quanto
      * lo snackbar e non quanto il ViewModel.
      */
-    fun onMessageShown() {
+    fun onMessageShown(messageId: Long = feedback.value.id) {
+        if (messageId != feedback.value.id) return
         pendingUndo = null
         feedback.update { Feedback() }
     }
 
     companion object {
-        private const val STOP_TIMEOUT_MS = 5_000L
 
         /** "Aggiunto in frigo: Latte", "2 prodotti messi in frigo, 1 tolto dalla lista"... */
         internal fun moveMessage(

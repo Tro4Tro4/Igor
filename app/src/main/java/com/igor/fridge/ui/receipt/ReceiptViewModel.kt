@@ -235,8 +235,8 @@ class ReceiptViewModel(
             // Il nome scelto dall'utente per la lista e' piu' leggibile di quello della cassa.
             val name = match?.name ?: entry.name
             val known = foodRepository.findLastByName(name)
-            val category = known?.category?.takeIf { it != FoodCategory.ALTRO }
-                ?: match?.category?.takeIf { it != FoodCategory.ALTRO }
+            val category = match?.category?.takeIf { it != FoodCategory.ALTRO }
+                ?: known?.category?.takeIf { it != FoodCategory.ALTRO }
                 ?: guessCategory(entry.name)
             val toConfirm = entry.quantity == null && category.isSoldByWeight
             ReceiptDraft(

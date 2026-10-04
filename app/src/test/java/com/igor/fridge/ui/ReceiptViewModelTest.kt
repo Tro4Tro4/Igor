@@ -528,4 +528,12 @@ class ReceiptViewModelTest {
         assertEquals(ReceiptPhase.REVIEW, vm.uiState.value.phase)
         assertEquals("Salvataggio non riuscito: nulla è stato registrato, riprova", vm.uiState.value.message)
     }
+
+    @Test fun `categoria della spesa corrente prevale sullo storico dello scontrino`() = runTest(dispatcher) {
+        foodRepository.save(FoodItem(uuid = "", name = "Latte", category = FoodCategory.LATTICINI))
+        shoppingRepository.addIfAbsent("Latte", category = FoodCategory.ALTERNATIVE_VEGETALI)
+        val vm = viewModel(); vm.read("LATTE  4%  1,29", "TOTALE  1,29")
+        assertEquals(FoodCategory.ALTERNATIVE_VEGETALI, vm.uiState.value.drafts.single().category)
+    }
+
 }

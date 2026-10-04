@@ -257,9 +257,10 @@ fun EditItemScreen(
 
             Button(
                 onClick = { viewModel.save() },
+                enabled = state.isLoaded && !state.isSaving && !state.isSaved,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(R.string.edit_save))
+                Text(stringResource(if (state.isSaving) R.string.edit_saving else R.string.edit_save))
             }
         }
     }

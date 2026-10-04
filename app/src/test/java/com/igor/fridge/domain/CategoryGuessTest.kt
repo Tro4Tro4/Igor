@@ -118,4 +118,13 @@ class CategoryGuessTest {
         assertEquals(FoodCategory.CEREALI_COLAZIONE, guessCategory("GRAN CEREALE"))
         assertEquals(FoodCategory.ALTRO, guessCategory("MINI"))
     }
+
+    @Test fun `varianti commerciali non cambiano conserva o latte vegetale`() {
+        assertEquals(FoodCategory.CONSERVE_PESCE_CARNE, guessCategory("tonno sott'olio"))
+        assertEquals(FoodCategory.CONSERVE_PESCE_CARNE, guessCategory("TONNO SOTT’OLIO"))
+        assertEquals(FoodCategory.ALTERNATIVE_VEGETALI, guessCategory("latte bio di soia"))
+        assertEquals(FoodCategory.ALTERNATIVE_VEGETALI, guessCategory("latte biologico di avena"))
+        assertEquals(FoodCategory.SUGHI_PASSATE, guessCategory("sugo al tonno sott'olio"))
+    }
+
 }

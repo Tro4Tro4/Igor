@@ -102,6 +102,7 @@ fun ShoppingScreen(
 
     LaunchedEffect(state.messageId) {
         val message = state.message ?: return@LaunchedEffect
+        val messageId = state.messageId
         val result = snackbarHostState.showSnackbar(
             message = message,
             actionLabel = if (state.canUndo) undoLabel else null,
@@ -112,9 +113,9 @@ fun ShoppingScreen(
         // anche onMessageShown() dopo di lui renderebbe il risultato dipendente dal fatto
         // che l'annullamento sospenda prima di annunciarsi.
         if (result == SnackbarResult.ActionPerformed) {
-            viewModel.undoLastMove()
+            viewModel.undoLastMove(messageId)
         } else {
-            viewModel.onMessageShown()
+            viewModel.onMessageShown(messageId)
         }
     }
 

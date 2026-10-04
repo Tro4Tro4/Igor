@@ -90,12 +90,13 @@ fun InventoryScreen(
 
     LaunchedEffect(state.messageId) {
         val message = state.message ?: return@LaunchedEffect
+        val messageId = state.messageId
         val result = snackbarHostState.showSnackbar(
             message = message,
             actionLabel = if (state.canUndo) undoLabel else null,
             duration = if (state.canUndo) SnackbarDuration.Long else SnackbarDuration.Short,
         )
-        if (result == SnackbarResult.ActionPerformed) viewModel.undo() else viewModel.onMessageShown()
+        if (result == SnackbarResult.ActionPerformed) viewModel.undo(messageId) else viewModel.onMessageShown(messageId)
     }
 
     Scaffold(

@@ -17,6 +17,7 @@ import com.igor.fridge.data.repository.FoodRepository
 import com.igor.fridge.data.repository.ShoppingRepository
 import com.igor.fridge.domain.currentDateFlow
 import com.igor.fridge.ui.igorApplication
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineDispatcher
@@ -121,7 +122,7 @@ class InventoryViewModel(
         state.copy(message = feedback.message, messageId = feedback.messageId, canUndo = feedback.canUndo)
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        started = SharingStarted.Eagerly,
         initialValue = InventoryUiState(
             query = selection.value.query,
             filter = selection.value.filter,
@@ -144,16 +145,36 @@ class InventoryViewModel(
     fun onCategoryChange(value: FoodCategory?) = select(selection.value.copy(category = value))
     fun resetFilters() = select(InventoryCriteria())
 
-    fun onMessageShown() {
+    fun onMessageShown(messageId: Long = feedback.value.messageId) {
+        if (messageId != feedback.value.messageId) return
         pendingUndo = null
         feedback.update { it.copy(message = null, canUndo = false) }
     }
 
     /** Un tocco accidentale sul cestino si annulla dallo snackbar. */
-    fun delete(item: FoodItem) {
+    private fun operation(block: suspend () -> Unit) {
         viewModelScope.launch {
-            foodRepository.remove(item, RemovalReason.ERRORE)
-            show("${item.name} eliminato") { foodRepository.restore(item) }
+            try { block() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                show(if (e is com.igor.fridge.data.repository.UndoConflictException) e.message!!
+                    else "Operazione non riuscita: riprova")
+            }
+        }
+    }
+
+    fun delete(item: FoodItem) {
+        operation {
+            val removed = withContext(NonCancellable) { transactor.run {
+                val current = foodRepository.findByUuid(item.uuid)?.takeIf { it.removedAt == null }
+                    ?: return@run null
+                foodRepository.remove(current, RemovalReason.ERRORE)
+                foodRepository.findByUuid(current.uuid)
+            } } ?: return@operation
+            show("${item.name} eliminato") {
+                foodRepository.checkUndo(removed)
+                foodRepository.restore(removed)
+            }
         }
     }
 
@@ -163,45 +184,53 @@ class InventoryViewModel(
      * e assente dalla lista.
      */
     fun consume(item: FoodItem) {
-        viewModelScope.launch {
-            val added = withContext(NonCancellable) {
-                transactor.run {
-                    foodRepository.remove(item, RemovalReason.CONSUMATO)
-                    shoppingRepository.addIfAbsent(
-                        item.name,
-                        item.quantity,
-                        item.unit,
-                        item.knownCategory(),
-                    )
+        operation {
+            val outcome = withContext(NonCancellable) { transactor.run {
+                val current = foodRepository.findByUuid(item.uuid)?.takeIf { it.removedAt == null }
+                    ?: return@run null
+                val before = shoppingRepository.findByName(current.name)
+                foodRepository.remove(current, RemovalReason.CONSUMATO)
+                val changed = shoppingRepository.addIfAbsent(current.name, current.quantity,
+                    current.unit, current.knownCategory(), brand = current.brand)
+                val after = shoppingRepository.findByName(current.name)
+                val removed = requireNotNull(foodRepository.findByUuid(current.uuid))
+                suspend {
+                    foodRepository.checkUndo(removed)
+                    if (changed) shoppingRepository.checkUndo(before, after)
+                    foodRepository.restore(removed)
+                    if (changed) shoppingRepository.undoChange(before, after)
                 }
-            }
-            show("${item.name} spostato nella lista della spesa") {
-                foodRepository.restore(item)
-                // La voce si toglie solo se l'ha creata questa consumazione.
-                if (added) shoppingRepository.removeUnchecked(item.name)
-            }
+            } } ?: return@operation
+            show("${item.name} spostato nella lista della spesa", outcome)
         }
     }
 
     /** Disfa l'ultima eliminazione o consumazione. */
-    fun undo() {
+    fun undo(messageId: Long = feedback.value.messageId) {
+        if (messageId != feedback.value.messageId) return
         val undo = pendingUndo ?: return
         pendingUndo = null
         feedback.update { it.copy(message = null, canUndo = false) }
-        viewModelScope.launch {
-            withContext(NonCancellable) { transactor.run { undo() } }
-            show("Annullato")
+        operation {
+            try {
+                withContext(NonCancellable) { transactor.run { undo() } }
+                show("Annullato")
+            } catch (e: CancellationException) { throw e }
+            catch (e: com.igor.fridge.data.repository.UndoConflictException) { show(e.message!!) }
+            catch (e: Exception) { show("Annullamento non riuscito: riprova", undo) }
         }
     }
 
     /** Aggiunge alla spesa tutti i prodotti scaduti o in scadenza. */
     fun addExpiringToShoppingList() {
-        viewModelScope.launch {
+        operation {
             val state = uiState.value
-            val candidates = foodRepository.findExpiring(state.today, state.warningDays)
-            val added = candidates.count {
-                shoppingRepository.addIfAbsent(it.name, it.quantity, it.unit, it.knownCategory())
-            }
+            val (candidates, added) = withContext(NonCancellable) { transactor.run {
+                val candidates = foodRepository.findExpiring(state.today, state.warningDays)
+                candidates to candidates.count {
+                    shoppingRepository.addIfAbsent(it.name, it.quantity, it.unit, it.knownCategory())
+                }
+            } }
             val text = when {
                 candidates.isEmpty() -> "Nessun prodotto in scadenza"
                 added == 0 -> "Già presenti nella lista della spesa"
@@ -213,7 +242,6 @@ class InventoryViewModel(
     }
 
     companion object {
-        private const val STOP_TIMEOUT_MS = 5_000L
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
