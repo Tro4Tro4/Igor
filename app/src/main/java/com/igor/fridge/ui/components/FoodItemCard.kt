@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -15,15 +14,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.igor.fridge.R
 import com.igor.fridge.data.local.FoodItem
@@ -32,9 +27,7 @@ import com.igor.fridge.domain.daysUntilExpiry
 import com.igor.fridge.domain.expiryStatus
 import com.igor.fridge.ui.expiryLabel
 import com.igor.fridge.ui.formatQuantity
-import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
-import com.igor.fridge.ui.labelRes
 import com.igor.fridge.ui.theme.expiryColors
 import java.time.LocalDate
 
@@ -49,14 +42,13 @@ fun FoodItemCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val categoryLabel = stringResource(item.category.labelRes())
     val status = item.expiryStatus(today, warningDays)
     val colors = expiryColors()
     val statusColor = when (status) {
         ExpiryStatus.SCADUTO -> colors.expired
         ExpiryStatus.IN_SCADENZA -> colors.warning
         ExpiryStatus.FRESCO -> colors.fresh
-        ExpiryStatus.SENZA_DATA -> MaterialTheme.colorScheme.outline
+        ExpiryStatus.SENZA_DATA -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Card(
@@ -64,61 +56,44 @@ fun FoodItemCard(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            StatusDot(color = statusColor)
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.name,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    text = expiryLabel(item.daysUntilExpiry(today)),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = statusColor,
-                )
-                val details = listOfNotNull(
-                    formatQuantity(item.quantity, item.unit),
-                    item.brand,
-                    item.location.label(),
-                )
-                Text(
-                    text = (details + "${item.category.icon()} ${categoryLabel}")
-                        .joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    // A TalkBack la stessa riga senza l'emoji della categoria.
-                    modifier = Modifier.semantics {
-                        contentDescription = (details + categoryLabel).joinToString(", ")
-                    },
-                )
-            }
-
-            IconButton(onClick = onConsume) {
-                Icon(
-                    imageVector = Icons.Filled.AddShoppingCart,
-                    contentDescription = stringResource(R.string.action_consume),
-                )
-            }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Filled.DeleteOutline,
-                    contentDescription = stringResource(R.string.action_delete_item, item.name),
-                )
+            Text(
+                text = item.name,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = expiryLabel(item.daysUntilExpiry(today)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = statusColor,
+            )
+            val details = listOfNotNull(
+                item.brand?.takeIf { it.isNotBlank() },
+                item.location.label(),
+            )
+            Text(
+                text = details.joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(formatQuantity(item.quantity, item.unit), Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium)
+                IconButton(onClick = onConsume) {
+                    Icon(
+                        imageVector = Icons.Filled.AddShoppingCart,
+                        contentDescription = stringResource(R.string.action_consume),
+                    )
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Filled.DeleteOutline,
+                        contentDescription = stringResource(R.string.action_delete_item, item.name),
+                    )
+                }
             }
         }
     }
-}
-
-@Composable
-private fun StatusDot(color: Color) {
-    Surface(
-        color = color,
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.size(width = 6.dp, height = 44.dp),
-    ) {}
 }

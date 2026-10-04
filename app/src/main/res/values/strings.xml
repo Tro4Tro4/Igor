@@ -269,4 +269,12 @@
     <string name="category_bucato">Bucato</string>
     <string name="category_igiene">Igiene personale</string>
     <string name="category_altro">Altro</string>
+    <string name="category_search">Cerca una categoria</string>
+    <string name="category_all">Tutte le categorie</string>
+    <string name="category_no_results">Nessuna categoria trovata</string>
+    <string name="inventory_shown_count">%1$d di %2$d articoli</string>
+    <string name="inventory_reset_filters">Azzera ricerca e filtri</string>
+    <string name="inventory_loading">Caricamento inventario</string>
+    <string name="inventory_category_filter">Categoria: %1$s</string>
+    <string name="inventory_location_filter">Luogo: %1$s</string>
 </resources>

@@ -80,12 +80,12 @@ import com.igor.fridge.data.openprices.CommunityLocation
 import com.igor.fridge.data.photos.VerticalCrop
 import com.igor.fridge.data.photos.decodeUpright
 import com.igor.fridge.ui.components.EnumDropdown
+import com.igor.fridge.ui.components.CategoryPicker
 import com.igor.fridge.ui.components.ExpiryDatePickerDialog
 import com.igor.fridge.ui.formatEuro
 import com.igor.fridge.ui.formatShort
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
-import com.igor.fridge.ui.labelRes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -386,7 +386,6 @@ private fun DraftCard(
     onPickExpiry: () -> Unit,
     onClearExpiry: () -> Unit,
 ) {
-    val categoryContext = LocalContext.current
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.fillMaxWidth(),
@@ -421,14 +420,11 @@ private fun DraftCard(
                     )
                 }
 
-                EnumDropdown(
-                    label = stringResource(R.string.edit_category),
-                    value = draft.category,
-                    options = FoodCategory.entries,
-                    optionLabel = { "${it.icon()}  ${categoryContext.getString(it.labelRes())}" },
-                    onSelect = onCategory,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                CategoryPicker(
+                value = draft.category,
+                onSelect = onCategory,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(

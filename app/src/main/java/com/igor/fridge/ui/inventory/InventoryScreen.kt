@@ -53,8 +53,21 @@ import com.igor.fridge.R
 import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.ui.components.FoodItemCard
 import com.igor.fridge.ui.label
+import com.igor.fridge.ui.labelRes
+import com.igor.fridge.ui.icon
+import com.igor.fridge.ui.components.CategoryPickerSheet
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun InventoryScreen(
     onAddItem: () -> Unit,
@@ -73,6 +86,7 @@ fun InventoryScreen(
 
     val undoLabel = stringResource(R.string.action_undo)
     var menuOpen by remember { mutableStateOf(false) }
+    var categoryOpen by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.messageId) {
         val message = state.message ?: return@LaunchedEffect
@@ -160,104 +174,116 @@ fun InventoryScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
-            FilterRow(
-                state = state,
-                onFilterChange = viewModel::onFilterChange,
-                onLocationChange = viewModel::onLocationChange,
-            )
+            FilterRow(state, viewModel::onFilterChange, viewModel::onLocationChange) {
+                categoryOpen = true
+            }
+            Text(stringResource(R.string.inventory_shown_count, state.items.size, state.totalCount),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
 
-            if (state.items.isEmpty() && !state.isLoading) {
-                EmptyState(hasItems = state.totalCount > 0)
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+            when {
+                state.isLoading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Text(stringResource(R.string.inventory_loading), Modifier.padding(top = 12.dp))
+                    }
+                }
+                state.items.isEmpty() -> EmptyState(
+                    filtered = state.query.isNotBlank() || state.filter != InventoryFilter.TUTTI ||
+                        state.category != null || state.location != null,
+                    onAdd = onAddItem,
+                    onReset = { query = ""; viewModel.resetFilters() },
+                    modifier = Modifier.weight(1f),
+                )
+                else -> LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(items = state.items, key = { it.uuid }) { item ->
-                        FoodItemCard(
-                            item = item,
-                            today = state.today,
-                            warningDays = state.warningDays,
-                            onClick = { onEditItem(item.uuid) },
-                            onConsume = { viewModel.consume(item) },
-                            onDelete = { viewModel.delete(item) },
-                        )
+                    state.sections.forEach { section ->
+                        stickyHeader(key = "category:${section.category.name}") {
+                            Surface(color = MaterialTheme.colorScheme.surface) {
+                                Row(Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Text(section.category.icon(), Modifier.clearAndSetSemantics {})
+                                    Text(stringResource(section.category.labelRes()),
+                                        modifier = Modifier.weight(1f).padding(start = 8.dp).semantics { heading() },
+                                        style = MaterialTheme.typography.titleSmall)
+                                    Text(section.items.size.toString(), style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                        }
+                        items(section.items, key = { "food:${it.uuid}" }) { item ->
+                            FoodItemCard(item, state.today, state.warningDays,
+                                onClick = { onEditItem(item.uuid) },
+                                onConsume = { viewModel.consume(item) },
+                                onDelete = { viewModel.delete(item) })
+                        }
                     }
+                }
+            }
+        }
+    }
+    if (categoryOpen) {
+        CategoryPickerSheet(state.category, state.availableCategories, true,
+            onSelect = viewModel::onCategoryChange, onDismiss = { categoryOpen = false })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun FilterRow(
+    state: InventoryUiState,
+    onFilterChange: (InventoryFilter) -> Unit,
+    onLocationChange: (StorageLocation?) -> Unit,
+    onCategoryClick: () -> Unit,
+) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+        .padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(state.filter == InventoryFilter.TUTTI, { onFilterChange(InventoryFilter.TUTTI) },
+            label = { Text(stringResource(R.string.filter_all, state.matchingCount)) })
+        FilterChip(state.filter == InventoryFilter.IN_SCADENZA, { onFilterChange(InventoryFilter.IN_SCADENZA) },
+            label = { Text(stringResource(R.string.filter_expiring, state.expiringCount)) })
+        FilterChip(state.filter == InventoryFilter.SCADUTI, { onFilterChange(InventoryFilter.SCADUTI) },
+            label = { Text(stringResource(R.string.filter_expired, state.expiredCount)) })
+        FilterChip(state.filter == InventoryFilter.SENZA_DATA, { onFilterChange(InventoryFilter.SENZA_DATA) },
+            label = { Text(stringResource(R.string.filter_no_date, state.noDateCount)) })
+    }
+    var locationOpen by remember { mutableStateOf(false) }
+    FlowRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = onCategoryClick) {
+            val category = state.category
+            Text(stringResource(R.string.inventory_category_filter,
+                if (category == null) stringResource(R.string.category_all) else stringResource(category.labelRes())))
+        }
+        Box {
+            OutlinedButton(onClick = { locationOpen = true }) {
+                Text(stringResource(R.string.inventory_location_filter,
+                    state.location?.label() ?: stringResource(R.string.filter_anywhere)))
+            }
+            DropdownMenu(expanded = locationOpen, onDismissRequest = { locationOpen = false }) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.filter_anywhere)) },
+                    onClick = { onLocationChange(null); locationOpen = false })
+                StorageLocation.entries.forEach { location ->
+                    DropdownMenuItem(text = { Text(location.label()) },
+                        onClick = { onLocationChange(location); locationOpen = false })
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FilterRow(
-    state: InventoryUiState,
-    onFilterChange: (InventoryFilter) -> Unit,
-    onLocationChange: (StorageLocation?) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        FilterChip(
-            selected = state.filter == InventoryFilter.TUTTI,
-            onClick = { onFilterChange(InventoryFilter.TUTTI) },
-            label = { Text(stringResource(R.string.filter_all, state.totalCount)) },
-        )
-        FilterChip(
-            selected = state.filter == InventoryFilter.IN_SCADENZA,
-            onClick = { onFilterChange(InventoryFilter.IN_SCADENZA) },
-            label = { Text(stringResource(R.string.filter_expiring, state.expiringCount)) },
-        )
-        FilterChip(
-            selected = state.filter == InventoryFilter.SCADUTI,
-            onClick = { onFilterChange(InventoryFilter.SCADUTI) },
-            label = { Text(stringResource(R.string.filter_expired, state.expiredCount)) },
-        )
-        FilterChip(
-            selected = state.filter == InventoryFilter.SENZA_DATA,
-            onClick = { onFilterChange(InventoryFilter.SENZA_DATA) },
-            label = { Text(stringResource(R.string.filter_no_date, state.noDateCount)) },
-        )
-        FilterChip(
-            selected = state.location == null,
-            onClick = { onLocationChange(null) },
-            label = { Text(stringResource(R.string.filter_anywhere)) },
-        )
-        StorageLocation.entries.forEach { location ->
-            FilterChip(
-                selected = state.location == location,
-                onClick = { onLocationChange(location) },
-                label = { Text(location.label()) },
-            )
+private fun EmptyState(filtered: Boolean, onAdd: () -> Unit, onReset: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Text(stringResource(if (filtered) R.string.inventory_empty_filtered else R.string.inventory_empty),
+            style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = if (filtered) onReset else onAdd) {
+            Text(stringResource(if (filtered) R.string.inventory_reset_filters else R.string.action_add_item))
         }
-    }
-}
-
-@Composable
-private fun EmptyState(hasItems: Boolean) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = if (hasItems) {
-                stringResource(R.string.inventory_empty_filtered)
-            } else {
-                stringResource(R.string.inventory_empty)
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }

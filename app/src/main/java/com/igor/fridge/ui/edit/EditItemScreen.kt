@@ -45,11 +45,11 @@ import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.StorageLocation
 import com.igor.fridge.ui.components.ConfirmDeleteDialog
 import com.igor.fridge.ui.components.EnumDropdown
+import com.igor.fridge.ui.components.CategoryPicker
 import com.igor.fridge.ui.components.ExpiryDatePickerDialog
 import com.igor.fridge.ui.formatShort
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
-import com.igor.fridge.ui.labelRes
 import androidx.compose.ui.platform.LocalContext
 import java.time.LocalDate
 
@@ -67,7 +67,6 @@ fun EditItemScreen(
         factory = EditItemViewModel.factory(uuid),
     ),
 ) {
-    val categoryContext = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     if (confirmDelete) {
@@ -207,11 +206,8 @@ fun EditItemScreen(
                 )
             }
 
-            EnumDropdown(
-                label = stringResource(R.string.edit_category),
+            CategoryPicker(
                 value = state.category,
-                options = FoodCategory.entries,
-                optionLabel = { "${it.icon()}  ${categoryContext.getString(it.labelRes())}" },
                 onSelect = viewModel::onCategoryChange,
                 modifier = Modifier.fillMaxWidth(),
             )
