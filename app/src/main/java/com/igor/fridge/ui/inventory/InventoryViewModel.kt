@@ -29,8 +29,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
-enum class InventoryFilter { TUTTI, IN_SCADENZA, SCADUTI, SENZA_DATA }
-
 data class InventoryUiState(
     val items: List<FoodItem> = emptyList(),
     val query: String = "",
