@@ -856,4 +856,4 @@ come implementazione del servizio prezzi.
 
 ## Esito esecuzione Native
 
-I sei task sono implementati. Build e 321 test in 48 classi passano; schema Room invariato. La matrice Android e i suoi limiti effettivi sono riportati nel [rapporto di verifica](../../verification/2026-10-04-inventario-categorie.md): la spunta indica esecuzione del passo con esiti documentati, non certificazione delle prove manuali non svolte (in particolare TalkBack vocale). Revisione indipendente finale prevista prima della consegna.
+I sei task sono implementati. Build e 322 test in 48 classi passano; schema Room invariato. La matrice Android e i suoi limiti effettivi sono riportati nel [rapporto di verifica](../../verification/2026-10-04-inventario-categorie.md): la spunta indica esecuzione del passo con esiti documentati, non certificazione delle prove manuali non svolte (in particolare TalkBack vocale). Revisione indipendente completata: due Important corretti con regressioni RED->GREEN, minori e limiti nel rapporto.
