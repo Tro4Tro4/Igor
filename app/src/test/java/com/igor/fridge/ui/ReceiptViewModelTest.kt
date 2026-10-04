@@ -89,7 +89,7 @@ class ReceiptViewModelTest {
         val state = vm.uiState.value
         assertEquals(ReceiptPhase.REVIEW, state.phase)
         val (latte, detersivo) = state.drafts
-        assertEquals(FoodCategory.LATTICINI, latte.category)
+        assertEquals(FoodCategory.LATTE_PANNA, latte.category)
         assertEquals("1", latte.quantityText)
         assertEquals(QuantityUnit.L, latte.unit)
         assertEquals("1,29", latte.priceText)
@@ -175,6 +175,9 @@ class ReceiptViewModelTest {
         assertEquals("Mozzarella", draft.name)
         assertEquals("Mozzarella", draft.shoppingMatch?.name)
 
+        assertTrue(draft.quantityToConfirm)
+        vm.onQuantityChange(draft.id, "1")
+        vm.onUnitChange(draft.id, QuantityUnit.PZ)
         vm.onExpiryChange(draft.id, LocalDate.of(2026, 10, 8))
         vm.confirm()
         dispatcher.scheduler.advanceUntilIdle()

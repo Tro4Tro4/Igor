@@ -70,7 +70,7 @@ class ShoppingRepositoryTest {
     fun `senza categoria una voce nuova la riceve dal nome`() = runTest {
         repository.addIfAbsent("Mozzarella")
 
-        assertEquals(FoodCategory.LATTICINI, dao.items.single().category)
+        assertEquals(FoodCategory.FORMAGGI_FRESCHI, dao.items.single().category)
     }
 
     @Test
@@ -94,7 +94,7 @@ class ShoppingRepositoryTest {
         assertEquals("Lavazza", restored.brand)
         assertEquals("in grani", restored.notes)
         assertEquals("caffe.jpg", restored.photoPath)
-        assertEquals(FoodCategory.DISPENSA, restored.category)
+        assertEquals(FoodCategory.CAFFE_INFUSI, restored.category)
     }
 
     @Test

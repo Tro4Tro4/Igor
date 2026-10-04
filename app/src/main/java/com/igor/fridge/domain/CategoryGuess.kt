@@ -28,6 +28,11 @@ fun guessCategory(name: String): FoodCategory {
     if (words.isEmpty()) return FoodCategory.ALTRO
     if (words.any { it in FROZEN_MARKERS }) return FoodCategory.SURGELATI
 
+    // Il confezionamento esplicito distingue una conserva dal pesce fresco.
+    if (words.any { it in PRESERVED_FISH } && words.any { it in PRESERVED_MARKERS }) {
+        return FoodCategory.CONSERVE_PESCE_CARNE
+    }
+
     // "fiocchi di latte" e' l'espressione "fiocchi latte": le preposizioni non contano.
     val content = words.filterNot { it in STOPWORDS }
     for (index in content.indices) {
@@ -88,6 +93,9 @@ private val FROZEN_MARKERS = setOf(
     "congelate", "surg", "surgel",
 )
 
+private val PRESERVED_FISH = setOf("tonno", "sgombro", "sardine", "acciughe")
+private val PRESERVED_MARKERS = setOf("scatola", "scatole", "conserva", "conserve", "sottolio")
+
 /** Parole che dicono poco da sole: decidono solo se nessun'altra e' riconosciuta. */
 private val WEAK_KEYWORDS: Map<String, FoodCategory> = mapOf("fette" to FoodCategory.PANE)
 
@@ -116,6 +124,28 @@ private val PHRASES: Map<String, FoodCategory> = mapOf(
     "crema viso" to FoodCategory.IGIENE,
     "crema mani" to FoodCategory.IGIENE,
     "crema solare" to FoodCategory.IGIENE,
+    "fior latte" to FoodCategory.FORMAGGI_FRESCHI,
+    "latte soia" to FoodCategory.ALTERNATIVE_VEGETALI,
+    "latte avena" to FoodCategory.ALTERNATIVE_VEGETALI,
+    "latte mandorla" to FoodCategory.ALTERNATIVE_VEGETALI,
+    "latte mandorle" to FoodCategory.ALTERNATIVE_VEGETALI,
+    "bevanda vegetale" to FoodCategory.ALTERNATIVE_VEGETALI,
+    "burro arachidi" to FoodCategory.CONFETTURE_CREME,
+    "fiocchi latte" to FoodCategory.FORMAGGI_FRESCHI,
+    "crema latte" to FoodCategory.LATTE_PANNA,
+    "panna cotta" to FoodCategory.YOGURT,
+    "frutta secca" to FoodCategory.FRUTTA_SECCA,
+    "pane grattugiato" to FoodCategory.FARINE_DOLCI,
+    "pan grattato" to FoodCategory.FARINE_DOLCI,
+    "pasta fresca" to FoodCategory.PASTA_FRESCA,
+    "base pizza" to FoodCategory.PIADINE_BASI,
+    "basi pizza" to FoodCategory.PIADINE_BASI,
+    "te freddo" to FoodCategory.SUCCHI_BIBITE,
+    "the freddo" to FoodCategory.SUCCHI_BIBITE,
+    "crema spalmabile" to FoodCategory.CONFETTURE_CREME,
+    "detersivo lavatrice" to FoodCategory.BUCATO,
+    "sapone bucato" to FoodCategory.BUCATO,
+    "sapone piatti" to FoodCategory.CASA,
 )
 
 private val KEYWORDS: Map<String, FoodCategory> = buildMap {
@@ -209,4 +239,41 @@ private val KEYWORDS: Map<String, FoodCategory> = buildMap {
         "pannolini", "salviette", "cotone", "cotton", "rasoio", "rasoi", "lamette",
         "fazzoletti", "cerotti",
     )
+
+    put(FoodCategory.ERBE_AROMATICHE, "basilico", "prezzemolo", "rosmarino", "salvia", "menta")
+    put(FoodCategory.FRUTTA_SECCA, "noci", "mandorle", "nocciole", "pistacchi", "arachidi", "anacardi", "semi")
+    put(FoodCategory.SALUMI, "prosciutto", "speck", "salame", "salami", "mortadella", "bresaola", "pancetta", "guanciale", "affettati", "cotto", "crudo", "porchetta", "wurstel")
+    put(FoodCategory.UOVA, "uovo", "uova")
+    put(FoodCategory.LATTE_PANNA, "latte", "panna")
+    put(FoodCategory.YOGURT, "yogurt", "kefir", "skyr", "budino", "budini")
+    put(FoodCategory.BURRO_MARGARINA, "burro", "margarina")
+    put(FoodCategory.FORMAGGI_FRESCHI, "mozzarella", "mozzarelle", "ricotta", "mascarpone", "stracchino", "burrata", "philadelphia", "feta", "crescenza", "fiordilatte")
+    put(FoodCategory.FORMAGGI_STAGIONATI, "parmigiano", "grana", "pecorino", "emmental", "fontina", "taleggio", "asiago", "provola", "scamorza", "gorgonzola")
+    put(FoodCategory.PIADINE_BASI, "piadina", "piadine")
+    put(FoodCategory.CRACKERS_GALLETTE, "crackers", "cracker", "grissini", "gallette", "taralli")
+    put(FoodCategory.BISCOTTI, "biscotto", "biscotti", "frollini")
+    put(FoodCategory.MERENDINE, "merendina", "merendine", "snackdolce")
+    put(FoodCategory.CEREALI_COLAZIONE, "cereali", "cereale", "muesli", "granola", "cornflakes", "fiocchi")
+    put(FoodCategory.CONFETTURE_CREME, "marmellata", "confettura", "miele", "nutella")
+    put(FoodCategory.DOLCI, "caramelle", "cioccolato", "cioccolata", "torta", "torte", "dolci")
+    put(FoodCategory.PASTA_SECCA, "pasta", "spaghetti", "penne", "fusilli", "rigatoni", "tagliatelle", "lasagne")
+    put(FoodCategory.PASTA_FRESCA, "gnocchi", "ravioli", "tortellini", "cappelletti")
+    put(FoodCategory.RISO_CEREALI, "riso", "orzo", "couscous", "farro", "quinoa", "polenta")
+    put(FoodCategory.LEGUMI, "legumi", "fagioli", "ceci", "lenticchie")
+    put(FoodCategory.CONSERVE_VEGETALI, "sottoli", "sottaceti", "olive", "capperi", "mais")
+    put(FoodCategory.CONSERVE_PESCE_CARNE, "simmenthal")
+    put(FoodCategory.FARINE_DOLCI, "farina", "farine", "zucchero", "lievito", "cacao", "pangrattato")
+    put(FoodCategory.SUGHI_PASSATE, "passata", "pelati", "polpa", "pesto", "sugo", "sughi")
+    put(FoodCategory.SALSE, "maionese", "ketchup", "senape", "salsa", "salse")
+    put(FoodCategory.OLI_ACETI, "olio", "aceto")
+    put(FoodCategory.SALE_SPEZIE, "sale", "pepe", "spezie", "origano", "curry", "paprika", "peperoncino", "brodo", "dado")
+    put(FoodCategory.PIATTI_PRONTI, "gastronomia", "lasagna", "risotto")
+    put(FoodCategory.ALTERNATIVE_VEGETALI, "tofu", "seitan", "tempeh")
+    put(FoodCategory.SNACK_SALATI, "patatine", "popcorn", "salatini")
+    put(FoodCategory.GELATI, "gelato", "gelati", "ghiaccioli")
+    put(FoodCategory.ACQUA, "acqua")
+    put(FoodCategory.SUCCHI_BIBITE, "succo", "succhi", "aranciata", "cola", "coca", "spremuta", "bibite", "bibita", "tonica", "chinotto", "gassosa", "energy")
+    put(FoodCategory.CAFFE_INFUSI, "caffe", "te", "the", "camomilla", "tisana", "tisane")
+    put(FoodCategory.ALCOLICI, "vino", "birra", "birre", "prosecco", "spumante", "liquore", "amaro", "grappa")
+    put(FoodCategory.BUCATO, "ammorbidente", "lavatrice")
 }

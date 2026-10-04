@@ -85,10 +85,11 @@ class ShoppingViewModelTest {
             ),
         )
         foodRepository.remove(previous, RemovalReason.CONSUMATO)
-        shoppingRepository.addIfAbsent("Latte")
+        val vm = viewModel()
+        vm.add("Latte")
+        dispatcher.scheduler.advanceUntilIdle()
         shoppingRepository.setChecked(shoppingDao.items.single(), checked = true)
 
-        val vm = viewModel()
         backgroundScope.launch { vm.uiState.collect {} }
         vm.uiState.first { !it.isLoading }
         vm.moveCheckedToInventory()
@@ -384,12 +385,12 @@ class ShoppingViewModelTest {
         val state = vm.uiState.first { !it.isLoading }
 
         assertEquals(
-            listOf(FoodCategory.FRUTTA, FoodCategory.LATTICINI),
+            listOf(FoodCategory.FRUTTA, FoodCategory.LATTE_PANNA, FoodCategory.YOGURT),
             state.toBuy.map { it.category },
         )
         assertEquals(
-            setOf("Latte", "Yogurt"),
-            state.toBuy.single { it.category == FoodCategory.LATTICINI }.items.map { it.name }.toSet(),
+            setOf("Latte"),
+            state.toBuy.single { it.category == FoodCategory.LATTE_PANNA }.items.map { it.name }.toSet(),
         )
         assertEquals(listOf("Pane"), state.inCart.map { it.name })
     }
@@ -467,13 +468,13 @@ class ShoppingViewModelTest {
     fun `l'ordine delle corsie arriva dalle impostazioni`() = runTest(dispatcher) {
         shoppingRepository.addIfAbsent("Latte")
         shoppingRepository.addIfAbsent("Mele")
-        val order = listOf(FoodCategory.LATTICINI) + FoodCategory.entries.filterNot { it == FoodCategory.LATTICINI }
+        val order = listOf(FoodCategory.LATTE_PANNA) + FoodCategory.entries.filterNot { it == FoodCategory.LATTE_PANNA }
         val vm = ShoppingViewModel(shoppingRepository, foodRepository, FakePhotoStore(), kotlinx.coroutines.flow.flowOf(order))
 
         backgroundScope.launch { vm.uiState.collect {} }
         val state = vm.uiState.first { !it.isLoading }
 
-        assertEquals(listOf(FoodCategory.LATTICINI, FoodCategory.FRUTTA), state.toBuy.map { it.category })
+        assertEquals(listOf(FoodCategory.LATTE_PANNA, FoodCategory.FRUTTA), state.toBuy.map { it.category })
         assertTrue(vm.shareText { it.name }.indexOf("Latte") < vm.shareText { it.name }.indexOf("Mele"))
     }
 
