@@ -81,7 +81,7 @@ il lavoro senza spostare o cancellare modifiche dell'utente.
 - Consumes: `FoodCategory`, `StorageLocation`, `Converters.toFoodCategory(String?)`, `categoryOrderFrom(String?)`.
 - Produces: enum ampliato; `@StringRes fun FoodCategory.labelRes(): Int`; `fun FoodCategory.icon(): String` conserva la firma; `fun shareText(sections: List<ShoppingSection>, totals: ShoppingTotals? = null, categoryLabel: (FoodCategory) -> String): String`; `ShoppingViewModel.shareText(categoryLabel: (FoodCategory) -> String): String`.
 
-- [ ] **1. Bloccare compatibilita' e comportamento delle nuove categorie con test.**
+- [x] **1. Bloccare compatibilita' e comportamento delle nuove categorie con test.**
 
 ```kotlin
 @Test fun `i codici della versione precedente restano leggibili`() {
@@ -110,7 +110,7 @@ il lavoro senza spostare o cancellare modifiche dell'utente.
 }
 ```
 
-- [ ] **2. Eseguire il primo ciclo di test.**
+- [x] **2. Eseguire il primo ciclo di test.**
 
 ```powershell
 .\gradlew.bat testDebugUnitTest --offline --console=plain --tests "com.igor.fridge.domain.FoodCategoryTest" --tests "com.igor.fridge.data.ConvertersTest" --tests "com.igor.fridge.domain.CategoryOrderTest"
@@ -119,7 +119,7 @@ il lavoro senza spostare o cancellare modifiche dell'utente.
 Atteso: compilazione fallita sui nuovi codici ancora assenti; i casi dei vecchi
 codici sono regressioni che devono continuare a passare.
 
-- [ ] **3. Aggiungere i codici e assegnare proprieta' esplicite.**
+- [x] **3. Aggiungere i codici e assegnare proprieta' esplicite.**
 
 Inserire le categorie nell'ordine della tabella. Risorsa = `category_` + codice
 in minuscolo. Profilo specifica posizione, deperibilita', vendita a peso e
@@ -202,7 +202,7 @@ Il primo test d'ordine esistente presume FRUTTA e VERDURA adiacenti: conservarle
 In `AisleOrderViewModelTest` sostituire lo spostamento fisso `-9` con
 `-FoodCategory.entries.size`, verificando che il clamp porti BEVANDE in testa.
 
-- [ ] **4. Centralizzare etichette nelle risorse e aggiornare i chiamanti.**
+- [x] **4. Centralizzare etichette nelle risorse e aggiornare i chiamanti.**
 
 La mappa `labelRes()` contiene tutti i codici della tabella con ramo esaustivo,
 senza `else`; eliminare solo `FoodCategory.label()` da Formatters. Quantita' e
@@ -287,7 +287,7 @@ Robolectric in CategoryPresentationTest risolve tutte le risorse e controlla
 etichette non vuote e le stringhe "Salumi e affettati", "Formaggi freschi",
 "Biscotti", "Merendine e snack dolci" tramite ApplicationProvider.
 
-- [ ] **5. Eseguire verifiche mirate, compilare e creare il commit del task.**
+- [x] **5. Eseguire verifiche mirate, compilare e creare il commit del task.**
 
 ```powershell
 .\gradlew.bat assembleDebug testDebugUnitTest --offline --console=plain --tests "com.igor.fridge.domain.FoodCategoryTest" --tests "com.igor.fridge.domain.CategoryOrderTest" --tests "com.igor.fridge.data.ConvertersTest" --tests "com.igor.fridge.ui.CategoryPresentationTest" --tests "com.igor.fridge.ui.FormattersTest" --tests "com.igor.fridge.ui.AisleOrderViewModelTest" --tests "com.igor.fridge.ui.ShoppingListModelTest" --tests "com.igor.fridge.ui.ShoppingViewModelTest"
@@ -309,7 +309,7 @@ Atteso: PASS. Commit dei soli file elencati modificati:
 - Consumes: enum del task 1, `nameWords(String)` e normalizzazione esistenti.
 - Produces: stessa firma `guessCategory(name: String): FoodCategory`, nessuna modifica all'identita' normalizzata del prodotto.
 
-- [ ] **1. Scrivere test degli esempi approvati e delle ambiguita'.**
+- [x] **1. Scrivere test degli esempi approvati e delle ambiguita'.**
 
 ```kotlin
 @Test fun `distingue alimenti freschi e confezionati`() {
@@ -332,13 +332,13 @@ Atteso: PASS. Commit dei soli file elencati modificati:
 }
 ```
 
-- [ ] **2. Eseguire CategoryGuessTest: gli esempi dettagliati devono fallire.**
+- [x] **2. Eseguire CategoryGuessTest: gli esempi dettagliati devono fallire.**
 
 ```powershell
 .\gradlew.bat testDebugUnitTest --offline --console=plain --tests "com.igor.fridge.domain.CategoryGuessTest"
 ```
 
-- [ ] **3. Estendere parole, espressioni e precedenze.**
+- [x] **3. Estendere parole, espressioni e precedenze.**
 
 Riassegnare le parole esistenti alle categorie della tabella: prosciutto/speck/
 salame/mortadella/bresaola/pancetta/guanciale/affettati -> SALUMI;
@@ -367,7 +367,7 @@ e "piadina" indicano PIADINE_BASI. Non inferire il confezionamento del tonno
 da una parola sola. Ampliare il dizionario per tutte le altre categorie della
 tabella senza cambiare `nameWords`, `productKey` o categorie note/manuali.
 
-- [ ] **4. Aggiornare le aspettative deliberate e verificare precedenze note.**
+- [x] **4. Aggiornare le aspettative deliberate e verificare precedenze note.**
 
 Nei test esistenti cambiano latte, yogurt, pasta, caffe', caramelle, crema
 spalmabile, salumi, formaggi, succo e bucato; conservare i test di
@@ -379,7 +379,7 @@ normalizzazione, "MINI", "GRAN", surgelati e categorie manuali. Eseguire:
 
 Atteso: PASS; categorie gia' conosciute prevalgono sul nuovo parser.
 
-- [ ] **5. Commit:** `feat: riconosce le nuove categorie da nomi e scontrini`.
+- [x] **5. Commit:** `feat: riconosce le nuove categorie da nomi e scontrini`.
 
 ## Task 3: Modello puro dell'inventario
 
@@ -418,7 +418,7 @@ fun inventoryListOf(
 ): InventoryListModel
 ```
 
-- [ ] **1. Scrivere test di combinazione, ordinamento e scomparsa.**
+- [x] **1. Scrivere test di combinazione, ordinamento e scomparsa.**
 
 ```kotlin
 @Test fun `la categoria sopravvive a un risultato vuoto e i conteggi sono filtrati`() {
@@ -457,13 +457,13 @@ articolo rimosso e luogo incompatibile. Verificare UUID unici nel risultato,
 Altro ultimo, assenza di sezioni vuote, conteggio TUTTI prima dello stato,
 stato "Scade oggi" incluso e passaggio a scaduto il giorno successivo.
 
-- [ ] **2. Eseguire il test: atteso errore di compilazione sui tipi nuovi.**
+- [x] **2. Eseguire il test: atteso errore di compilazione sui tipi nuovi.**
 
 ```powershell
 .\gradlew.bat testDebugUnitTest --offline --console=plain --tests "com.igor.fridge.ui.InventoryListModelTest"
 ```
 
-- [ ] **3. Implementare la proiezione pura.**
+- [x] **3. Implementare la proiezione pura.**
 
 ```kotlin
 val active = items.filter { it.removedAt == null }
@@ -499,8 +499,8 @@ Costruire `availableCategories` nello stesso ordine da tutte le categorie di
 `totalCount=active.size`, `matchingCount=base.size` e conteggi di stato su base,
 mai su visible o sull'intero inventario. Nessuna dipendenza da Context o Room.
 
-- [ ] **4. Eseguire InventoryListModelTest e InventoryViewModelTest: atteso PASS.**
-- [ ] **5. Commit:** `feat: raggruppa e filtra l'inventario con un modello testabile`.
+- [x] **4. Eseguire InventoryListModelTest e InventoryViewModelTest: atteso PASS.**
+- [x] **5. Commit:** `feat: raggruppa e filtra l'inventario con un modello testabile`.
 
 ## Task 4: Stato osservabile e ripristino dei criteri
 
@@ -512,7 +512,7 @@ mai su visible o sull'intero inventario. Nessuna dipendenza da Context o Room.
 - Consumes: `inventoryListOf`, repository e flussi esistenti.
 - Produces: `InventoryUiState.sections`, `.category`, `.availableCategories`, `.matchingCount`; conserva `.items` come elenco appiattito, conteggi e messaggi esistenti. Nuovi metodi `onCategoryChange(FoodCategory?)`, `resetFilters()`; costruttore aggiunge `savedStateHandle: SavedStateHandle = SavedStateHandle()` e `computeDispatcher: CoroutineDispatcher = Dispatchers.Default` dopo i parametri esistenti.
 
-- [ ] **1. Scrivere test di ripristino, azzeramento, variazioni Room e giorno.**
+- [x] **1. Scrivere test di ripristino, azzeramento, variazioni Room e giorno.**
 
 Estendere l'helper del test attuale per iniettare SavedStateHandle, dispatcher e
 `MutableStateFlow<LocalDate>`; conservare FakeFoodItemDao e FakeShoppingItemDao.
@@ -548,8 +548,8 @@ passaggio della data e soglia. Nei test di flussi usare `backgroundScope`
 per la raccolta continua e `runCurrent()`, evitando un advanceUntilIdle su
 currentDateFlow infinito.
 
-- [ ] **2. Eseguire InventoryViewModelTest: fallimento sui campi nuovi.**
-- [ ] **3. Separare criteri persistenti dal feedback e collegare il modello.**
+- [x] **2. Eseguire InventoryViewModelTest: fallimento sui campi nuovi.**
+- [x] **3. Separare criteri persistenti dal feedback e collegare il modello.**
 
 Ripristino sicuro dei nomi enum senza eccezioni e senza memorizzare prodotti,
 liste o lambda di annullamento nel SavedStateHandle:
@@ -591,13 +591,13 @@ dall'initializer. Non modificare consume, delete, undo o addExpiringToShoppingLi
 oltre ai riferimenti al feedback: l'azione collettiva conserva il perimetro
 dell'intero inventario, come oggi.
 
-- [ ] **4. Eseguire test e build: atteso PASS.**
+- [x] **4. Eseguire test e build: atteso PASS.**
 
 ```powershell
 .\gradlew.bat assembleDebug testDebugUnitTest --offline --console=plain --tests "com.igor.fridge.ui.InventoryViewModelTest" --tests "com.igor.fridge.ui.InventoryListModelTest"
 ```
 
-- [ ] **5. Commit:** `feat: mantiene filtri e categorie al ritorno nell'inventario`.
+- [x] **5. Commit:** `feat: mantiene filtri e categorie al ritorno nell'inventario`.
 
 ## Task 5: Selettori e lista Compose leggibili
 
@@ -616,14 +616,14 @@ dell'intero inventario, come oggi.
 - Produces: `@Composable fun CategoryPicker(value: FoodCategory, onSelect: (FoodCategory) -> Unit, modifier: Modifier = Modifier)`; `@Composable fun CategoryPickerSheet(selected: FoodCategory?, options: List<FoodCategory>, allowAll: Boolean, onSelect: (FoodCategory?) -> Unit, onDismiss: () -> Unit)`.
 - Inventory usa sheet con allowAll=true e availableCategories; inserimento/modifica usa tutte le categorie e allowAll=false. Nessuna categoria null nel modello persistito.
 
-- [ ] **1. Leggere craft-floor e applicare la checklist Android di Impeccable prima di editare.**
+- [x] **1. Leggere craft-floor e applicare la checklist Android di Impeccable prima di editare.**
 
 Mantenere tema, app bar, FAB e navigazione. Usare tipografia e spaziature M3,
 surface per intestazioni opache, body secondario per marca/luogo, niente altezza
 fissa per testi. Il riordino corsie e' gia' una LazyColumn: conservarlo, verificando
 che nomi lunghi vadano a capo senza spostare le azioni fuori schermo.
 
-- [ ] **2. Implementare il selettore ricercabile comune.**
+- [x] **2. Implementare il selettore ricercabile comune.**
 
 ```kotlin
 var query by rememberSaveable { mutableStateOf("") }
@@ -660,7 +660,7 @@ readOnly e nome corrente, callback non nullo protetto da `category?.let(onSelect
 Sostituire solo i tre EnumDropdown di categoria (alimento, spesa, scontrino),
 conservando gli EnumDropdown per unita' e luogo.
 
-- [ ] **3. Separare filtri di stato dai controlli Categoria e Luogo.**
+- [x] **3. Separare filtri di stato dai controlli Categoria e Luogo.**
 
 Prima riga: quattro chip orizzontali; Tutti usa matchingCount. Seconda riga:
 due controlli compatti con nome corrente, uno apre CategoryPickerSheet, l'altro
@@ -684,7 +684,7 @@ criteri ripristinati e aggiornarlo direttamente nel callback. Il reset imposta
 prima `query=""`, poi viewModel.resetFilters(); non copiare ogni emissione
 asincrona dello stato nel testo locale mentre l'utente digita.
 
-- [ ] **4. Rendere la lista per sezioni con sticky header e chiavi stabili.**
+- [x] **4. Rendere la lista per sezioni con sticky header e chiavi stabili.**
 
 ```kotlin
 state.sections.forEach { section ->
@@ -717,7 +717,7 @@ predefiniti, mostrare il reset anche quando totalCount diventa zero dopo
 l'eliminazione dell'ultimo articolo. Separare i tre stati prima di costruire
 la LazyColumn.
 
-- [ ] **5. Semplificare FoodItemCard senza perdere informazioni o azioni.**
+- [x] **5. Semplificare FoodItemCard senza perdere informazioni o azioni.**
 
 Eliminare la categoria ripetuta dal dettaglio della riga e dalla relativa
 contentDescription. Nome titleMedium su piu' righe, quantita' bodyMedium,
@@ -736,7 +736,7 @@ Text(listOfNotNull(item.brand?.takeIf { it.isNotBlank() }, item.location.label()
     color = MaterialTheme.colorScheme.onSurfaceVariant)
 ```
 
-- [ ] **6. Compilare, eseguire test mirati e provare l'interazione Android.**
+- [x] **6. Compilare, eseguire test mirati e provare l'interazione Android.**
 
 ```powershell
 .\gradlew.bat assembleDebug testDebugUnitTest --offline --console=plain --tests "com.igor.fridge.ui.InventoryViewModelTest" --tests "com.igor.fridge.ui.InventoryListModelTest" --tests "com.igor.fridge.ui.EditItemViewModelTest" --tests "com.igor.fridge.ui.ShoppingItemEditViewModelTest" --tests "com.igor.fridge.ui.ReceiptViewModelTest"
@@ -748,7 +748,7 @@ eliminare l'ultimo risultato, azzerare; riaprire tutti e tre i selettori, cercar
 testo e lista devono concordare. TalkBack annuncia categoria e selezione una sola
 volta. Le righe offrono consumo/eliminazione distinti dall'apertura.
 
-- [ ] **7. Commit:** `feat: rende leggibile l'inventario e ricercabili le categorie`.
+- [x] **7. Commit:** `feat: rende leggibile l'inventario e ricercabili le categorie`.
 
 ## Task 6: Compatibilita' reale, verifica complessiva e documentazione
 
@@ -763,7 +763,7 @@ volta. Le righe offrono consumo/eliminazione distinti dall'apertura.
 - Consumes: Room e DAO gia' presenti, implementazione dei task 1–5.
 - Produces: evidenza dei dati vecchi e nuovi leggibili, esiti di build/test e verifica UI nativa.
 
-- [ ] **1. Aggiungere test Room sulle categorie e i record conservati.**
+- [x] **1. Aggiungere test Room sulle categorie e i record conservati.**
 
 Dentro il fixture Room reale di FoodItemDaoTest usare `upsert` con vecchie
 LATTICINI/DISPENSA e nuove SALUMI/BISCOTTI, includendo una riga removedAt.
@@ -787,7 +787,7 @@ esistenti di migrazione verificano l'apertura delle versioni precedenti;
 eseguirli senza inventare una nuova migrazione. Controllare che la build non
 abbia prodotto variazioni allo schema esportato.
 
-- [ ] **2. Eseguire build e suite completa una volta dopo l'ultimo cambio.**
+- [x] **2. Eseguire build e suite completa una volta dopo l'ultimo cambio.**
 
 ```powershell
 .\gradlew.bat assembleDebug testDebugUnitTest --offline --console=plain
@@ -801,7 +801,7 @@ del comando gia' autorizzato anziche' cambiare SDK o installare dipendenze.
 La baseline verificata era 304 test in 45 classi; riportare il nuovo numero
 reale dai risultati XML, senza presumere che sia identico.
 
-- [ ] **3. Verificare la matrice Android e conservare screenshot ed esiti.**
+- [x] **3. Verificare la matrice Android e conservare screenshot ed esiti.**
 
 Device/emulatore debug, dati di prova separati dai dati personali; non cancellare
 il database dell'utente e non aggiungere un menu di seeding al prodotto.
@@ -827,7 +827,7 @@ SavedStateHandle. Se nessun emulatore/device e' disponibile, documentare
 precisamente le righe non verificate e dichiararle nella consegna: una build
 JVM riuscita non dimostra questa matrice.
 
-- [ ] **4. Aggiornare README e registrare il risultato reale.**
+- [x] **4. Aggiornare README e registrare il risultato reale.**
 
 Descrivere raggruppamento, nuovi filtri, categorie specifiche e permanenza delle
 vecchie categorie generiche. Conservare i difetti ancora aperti e il servizio
@@ -835,7 +835,7 @@ prezzi come lavoro futuro. Il rapporto di verifica deve contenere commit testato
 comandi, conteggio test, dispositivo/API, screenshot e scenari eseguiti o non
 eseguiti, senza dichiarazioni di verifica non effettuata.
 
-- [ ] **5. Commit:** `test: verifica compatibilita e documenta il nuovo inventario`.
+- [x] **5. Commit:** `test: verifica compatibilita e documenta il nuovo inventario`.
 
 ## Consegna ed esecuzione
 
@@ -853,3 +853,7 @@ La consegna finale deve indicare comportamento ottenuto, verifiche reali,
 limiti della verifica Android e commit. Poi si passa alla verifica della prima
 fonte prezzi prevista dal disegno separato, senza presentare queste modifiche
 come implementazione del servizio prezzi.
+
+## Esito esecuzione Native
+
+I sei task sono implementati. Build e 321 test in 48 classi passano; schema Room invariato. La matrice Android e i suoi limiti effettivi sono riportati nel [rapporto di verifica](../../verification/2026-10-04-inventario-categorie.md): la spunta indica esecuzione del passo con esiti documentati, non certificazione delle prove manuali non svolte (in particolare TalkBack vocale). Revisione indipendente finale prevista prima della consegna.

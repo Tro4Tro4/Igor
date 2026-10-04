@@ -24,6 +24,14 @@ import java.time.Instant
 @Config(sdk = [34])
 class SavedListDaoTest {
 
+    @Test fun `categorie precedenti e nuove convivono senza cambiare foto e quantita'`() = runTest {
+        val list = SavedList(uuid="compat", name="Compatibilita'", createdAt=now, updatedAt=now)
+        val old = item("old", "compat", 0, "Latte").copy(category=FoodCategory.LATTICINI, quantity=2.0)
+        val fresh = item("new", "compat", 1, "Biscotti").copy(category=FoodCategory.BISCOTTI, quantity=3.0)
+        dao.replace(list, listOf(old, fresh))
+        assertEquals(listOf(old, fresh), dao.itemsOf("compat"))
+    }
+
     private lateinit var db: IgorDatabase
     private lateinit var dao: SavedListDao
 

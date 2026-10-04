@@ -27,6 +27,24 @@ import java.time.LocalDate
 @Config(sdk = [34])
 class FoodItemDaoTest {
 
+    @Test fun `categorie precedenti e nuove conservano i dati anche dopo la rimozione`() = runTest {
+        val date = LocalDate.of(2026, 10, 4)
+        val records = listOf(
+            FoodItem("old", "Latte", category=FoodCategory.LATTICINI,
+                quantity=2.0, unit=QuantityUnit.L, expiryDate=date, updatedAt=now),
+            FoodItem("pantry", "Pasta", category=FoodCategory.DISPENSA,
+                location=StorageLocation.DISPENSA, updatedAt=now),
+            FoodItem("new", "Prosciutto", category=FoodCategory.SALUMI,
+                quantity=0.125, unit=QuantityUnit.KG, expiryDate=date,
+                removedAt=now, removalReason=RemovalReason.CONSUMATO, updatedAt=now),
+            FoodItem("cookies", "Biscotti", category=FoodCategory.BISCOTTI,
+                location=StorageLocation.DISPENSA, updatedAt=now),
+        )
+        records.forEach { dao.upsert(it) }
+        records.forEach { assertEquals(it, dao.findByUuid(it.uuid)) }
+        assertEquals(setOf("old", "pantry", "cookies"), dao.observeAll().first().map { it.uuid }.toSet())
+    }
+
     private lateinit var db: IgorDatabase
     private lateinit var dao: FoodItemDao
 

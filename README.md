@@ -8,8 +8,15 @@ L’unica eccezione è Open Prices, facoltativo e spento finché l’utente non 
 
 - **Inventario**: aggiunta, modifica ed eliminazione di alimenti con quantità, unità di
   misura, categoria, luogo di conservazione (frigo / freezer / dispensa) e note.
-- **Scadenze**: la lista è ordinata per urgenza; ogni articolo mostra lo stato
-  (scaduto, in scadenza, fresco) con il numero di giorni residui. Filtri rapidi e ricerca per nome.
+  La lista è raggruppata per categoria, con intestazioni durante lo scorrimento,
+  filtri combinabili per categoria, luogo e stato, ricerca per nome o marca e
+  conteggio degli articoli mostrati. Ricerca e filtri si ripristinano al ritorno.
+- **Categorie**: 49 categorie condivise tra inventario, spesa e scontrini,
+  incluse salumi, formaggi freschi e stagionati, biscotti e merendine; selettore
+  con ricerca. I prodotti già salvati conservano la loro categoria, comprese
+  quelle generiche: si può scegliere una categoria più precisa modificando il prodotto.
+- **Scadenze**: dentro ogni categoria la lista è ordinata per urgenza; ogni articolo
+  mostra lo stato (scaduto, in scadenza, fresco o senza data) e la scadenza in testo.
 - **Notifiche**: un controllo giornaliero (WorkManager) invia una notifica riepilogativa
   dei prodotti scaduti o in scadenza entro la soglia di preavviso (3 giorni di default).
 - **Codice a barre**: lettura EAN/UPC/Code-128 con fotocamera (CameraX + ML Kit). Se il codice
