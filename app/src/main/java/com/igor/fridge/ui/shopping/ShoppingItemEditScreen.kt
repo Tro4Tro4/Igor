@@ -68,6 +68,7 @@ import com.igor.fridge.ui.formatShort
 import com.igor.fridge.ui.formatUnitPrice
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
+import com.igor.fridge.ui.labelRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,6 +81,7 @@ fun ShoppingItemEditScreen(
         factory = ShoppingItemEditViewModel.factory(uuid),
     ),
 ) {
+    val categoryContext = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     if (confirmDelete) {
@@ -218,7 +220,7 @@ fun ShoppingItemEditScreen(
                 label = stringResource(R.string.edit_category),
                 value = state.category,
                 options = FoodCategory.entries,
-                optionLabel = { "${it.icon()}  ${it.label()}" },
+                optionLabel = { "${it.icon()}  ${categoryContext.getString(it.labelRes())}" },
                 onSelect = viewModel::onCategoryChange,
                 modifier = Modifier.fillMaxWidth(),
             )

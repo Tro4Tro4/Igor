@@ -474,7 +474,7 @@ class ShoppingViewModelTest {
         val state = vm.uiState.first { !it.isLoading }
 
         assertEquals(listOf(FoodCategory.LATTICINI, FoodCategory.FRUTTA), state.toBuy.map { it.category })
-        assertTrue(vm.shareText().indexOf("Latte") < vm.shareText().indexOf("Mele"))
+        assertTrue(vm.shareText { it.name }.indexOf("Latte") < vm.shareText { it.name }.indexOf("Mele"))
     }
 
     @Test

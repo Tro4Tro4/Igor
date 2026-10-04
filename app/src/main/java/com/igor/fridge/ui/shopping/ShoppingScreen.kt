@@ -73,6 +73,7 @@ import com.igor.fridge.ui.formatQuantity
 import com.igor.fridge.ui.formatShort
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
+import com.igor.fridge.ui.labelRes
 import java.io.File
 import java.time.LocalDate
 
@@ -153,7 +154,7 @@ fun ShoppingScreen(
                                 menuOpen = false
                                 val send = Intent(Intent.ACTION_SEND).apply {
                                     type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, viewModel.shareText())
+                                    putExtra(Intent.EXTRA_TEXT, viewModel.shareText { context.getString(it.labelRes()) })
                                 }
                                 context.startActivity(Intent.createChooser(send, shareTitle))
                             },
@@ -272,7 +273,7 @@ fun ShoppingScreen(
                         stickyHeader(key = "header-${section.category.name}") {
                             SectionHeader(
                                 icon = section.category.icon(),
-                                title = section.category.label(),
+                                title = stringResource(section.category.labelRes()),
                                 count = section.items.size,
                             )
                         }

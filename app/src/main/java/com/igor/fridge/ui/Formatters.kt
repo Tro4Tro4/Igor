@@ -1,6 +1,5 @@
 package com.igor.fridge.ui
 
-import com.igor.fridge.data.local.FoodCategory
 import com.igor.fridge.data.local.QuantityUnit
 import com.igor.fridge.data.local.StorageLocation
 import java.time.LocalDate
@@ -111,42 +110,6 @@ fun StorageLocation.label(): String = when (this) {
     StorageLocation.FRIGO -> "Frigo"
     StorageLocation.FREEZER -> "Freezer"
     StorageLocation.DISPENSA -> "Dispensa"
-}
-
-fun FoodCategory.label(): String = when (this) {
-    FoodCategory.FRUTTA -> "Frutta"
-    FoodCategory.VERDURA -> "Verdura"
-    FoodCategory.PANE -> "Pane e forno"
-    FoodCategory.CARNE -> "Carne"
-    FoodCategory.PESCE -> "Pesce"
-    FoodCategory.LATTICINI -> "Latticini e uova"
-    FoodCategory.SURGELATI -> "Surgelati"
-    FoodCategory.DISPENSA -> "Dispensa"
-    FoodCategory.CONDIMENTI -> "Condimenti"
-    FoodCategory.BEVANDE -> "Bevande"
-    FoodCategory.CASA -> "Casa e pulizia"
-    FoodCategory.IGIENE -> "Igiene personale"
-    FoodCategory.ALTRO -> "Altro"
-}
-
-/**
- * Icona della categoria, come emoji: a colori e riconoscibile anche in piccolo. Sono tutte
- * emoji presenti da Android 8 (minSdk 26), cosi' nessuna diventa un quadratino vuoto.
- */
-fun FoodCategory.icon(): String = when (this) {
-    FoodCategory.FRUTTA -> "\uD83C\uDF4E" // mela rossa
-    FoodCategory.VERDURA -> "\uD83E\uDD66" // broccolo
-    FoodCategory.PANE -> "\uD83C\uDF5E" // pane
-    FoodCategory.CARNE -> "\uD83E\uDD69" // taglio di carne
-    FoodCategory.PESCE -> "\uD83D\uDC1F" // pesce
-    FoodCategory.LATTICINI -> "\uD83E\uDD5B" // bicchiere di latte
-    FoodCategory.SURGELATI -> "\u2744\uFE0F" // fiocco di neve
-    FoodCategory.DISPENSA -> "\uD83E\uDD6B" // cibo in scatola
-    FoodCategory.CONDIMENTI -> "\uD83C\uDF36\uFE0F" // peperoncino
-    FoodCategory.BEVANDE -> "\uD83E\uDD64" // bicchiere con cannuccia
-    FoodCategory.CASA -> "\uD83C\uDFE0" // casa
-    FoodCategory.IGIENE -> "\uD83D\uDEC1" // vasca da bagno
-    FoodCategory.ALTRO -> "\uD83D\uDED2" // carrello
 }
 
 /**

@@ -126,8 +126,8 @@ class ShoppingViewModel(
     fun setStoreFilter(store: String?) = storeFilter.update { store }
 
     /** La lista da condividere, cosi' come la si vede (filtro compreso). */
-    fun shareText(): String =
-        uiState.value.let { com.igor.fridge.ui.shopping.shareText(it.toBuy, it.totals) }
+    fun shareText(categoryLabel: (FoodCategory) -> String): String =
+        uiState.value.let { com.igor.fridge.ui.shopping.shareText(it.toBuy, it.totals, categoryLabel) }
 
     fun photoFile(name: String): File = photoStore.fileOf(name)
 

@@ -34,6 +34,7 @@ import com.igor.fridge.ui.expiryLabel
 import com.igor.fridge.ui.formatQuantity
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
+import com.igor.fridge.ui.labelRes
 import com.igor.fridge.ui.theme.expiryColors
 import java.time.LocalDate
 
@@ -48,6 +49,7 @@ fun FoodItemCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val categoryLabel = stringResource(item.category.labelRes())
     val status = item.expiryStatus(today, warningDays)
     val colors = expiryColors()
     val statusColor = when (status) {
@@ -85,13 +87,13 @@ fun FoodItemCard(
                     item.location.label(),
                 )
                 Text(
-                    text = (details + "${item.category.icon()} ${item.category.label()}")
+                    text = (details + "${item.category.icon()} ${categoryLabel}")
                         .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     // A TalkBack la stessa riga senza l'emoji della categoria.
                     modifier = Modifier.semantics {
-                        contentDescription = (details + item.category.label()).joinToString(", ")
+                        contentDescription = (details + categoryLabel).joinToString(", ")
                     },
                 )
             }

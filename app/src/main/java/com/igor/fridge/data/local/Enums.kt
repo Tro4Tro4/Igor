@@ -13,60 +13,84 @@ package com.igor.fridge.data.local
 enum class FoodCategory(val isFood: Boolean = true) {
     FRUTTA,
     VERDURA,
-    PANE,
+    ERBE_AROMATICHE,
+    FRUTTA_SECCA,
     CARNE,
+    SALUMI,
     PESCE,
+    UOVA,
+    LATTE_PANNA,
+    YOGURT,
+    BURRO_MARGARINA,
+    FORMAGGI_FRESCHI,
+    FORMAGGI_STAGIONATI,
     LATTICINI,
-    SURGELATI,
+    PANE,
+    PIADINE_BASI,
+    CRACKERS_GALLETTE,
+    BISCOTTI,
+    MERENDINE,
+    CEREALI_COLAZIONE,
+    CONFETTURE_CREME,
+    DOLCI,
+    PASTA_SECCA,
+    PASTA_FRESCA,
+    RISO_CEREALI,
+    LEGUMI,
+    CONSERVE_VEGETALI,
+    CONSERVE_PESCE_CARNE,
+    FARINE_DOLCI,
     DISPENSA,
+    SUGHI_PASSATE,
+    SALSE,
+    OLI_ACETI,
+    SALE_SPEZIE,
     CONDIMENTI,
+    PIATTI_PRONTI,
+    ALTERNATIVE_VEGETALI,
+    SNACK_SALATI,
+    SURGELATI,
+    GELATI,
+    ACQUA,
+    SUCCHI_BIBITE,
+    CAFFE_INFUSI,
+    ALCOLICI,
     BEVANDE,
     CASA(isFood = false),
+    BUCATO(isFood = false),
     IGIENE(isFood = false),
     ALTRO,
     ;
 
-    /**
-     * Prodotti che vanno a male in pochi giorni: per questi, entrando in frigo, l'app chiede
-     * la scadenza invece di lasciarla vuota.
-     */
     val isPerishable: Boolean
         get() = when (this) {
-            FRUTTA, VERDURA, PANE, CARNE, PESCE, LATTICINI -> true
+            FRUTTA, VERDURA, ERBE_AROMATICHE, CARNE, SALUMI, PESCE, UOVA, LATTE_PANNA, YOGURT, BURRO_MARGARINA, FORMAGGI_FRESCHI, FORMAGGI_STAGIONATI, LATTICINI, PANE, PASTA_FRESCA, PIATTI_PRONTI, ALTERNATIVE_VEGETALI -> true
             else -> false
         }
 
-    /**
-     * Si comprano a peso: se lo scontrino non dice quanto, la quantita' va chiesta, perche'
-     * "1 pezzo" di banane non significa nulla.
-     */
     val isSoldByWeight: Boolean
         get() = when (this) {
-            FRUTTA, VERDURA, CARNE, PESCE -> true
+            FRUTTA, VERDURA, ERBE_AROMATICHE, CARNE, PESCE, SALUMI,
+            FORMAGGI_FRESCHI, FORMAGGI_STAGIONATI -> true
             else -> false
         }
 
-    /**
-     * Giorni di conservazione tipici di un prodotto fresco, usati solo come data da cui
-     * parte il calendario quando si sceglie la scadenza: non diventano mai una scadenza
-     * senza che l'utente la confermi.
-     */
+    /** Suggerimento per il calendario: mai una scadenza assegnata senza conferma. */
     val typicalShelfLifeDays: Long
         get() = when (this) {
-            PESCE -> 2
-            CARNE, PANE -> 3
-            VERDURA -> 5
-            FRUTTA, LATTICINI -> 7
-            SURGELATI -> 90
-            else -> 30
+            FRUTTA, UOVA, LATTE_PANNA, YOGURT, BURRO_MARGARINA, FORMAGGI_FRESCHI, FORMAGGI_STAGIONATI, LATTICINI, ALTERNATIVE_VEGETALI -> 7L
+            VERDURA, ERBE_AROMATICHE -> 5L
+            FRUTTA_SECCA, PIADINE_BASI, CRACKERS_GALLETTE, BISCOTTI, MERENDINE, CEREALI_COLAZIONE, CONFETTURE_CREME, DOLCI, PASTA_SECCA, RISO_CEREALI, LEGUMI, CONSERVE_VEGETALI, CONSERVE_PESCE_CARNE, FARINE_DOLCI, DISPENSA, SUGHI_PASSATE, SALSE, OLI_ACETI, SALE_SPEZIE, CONDIMENTI, SNACK_SALATI, ACQUA, SUCCHI_BIBITE, CAFFE_INFUSI, ALCOLICI, BEVANDE, CASA, BUCATO, IGIENE, ALTRO -> 30L
+            CARNE, SALUMI, PANE, PASTA_FRESCA, PIATTI_PRONTI -> 3L
+            PESCE -> 2L
+            SURGELATI, GELATI -> 90L
         }
 
-    /** Dove finisce di solito un prodotto appena comprato di questa categoria. */
     val defaultLocation: StorageLocation
         get() = when (this) {
-            SURGELATI -> StorageLocation.FREEZER
-            PANE, DISPENSA, CONDIMENTI, BEVANDE, CASA, IGIENE -> StorageLocation.DISPENSA
-            else -> StorageLocation.FRIGO
+            SURGELATI, GELATI -> StorageLocation.FREEZER
+            FRUTTA, VERDURA, ERBE_AROMATICHE, CARNE, SALUMI, PESCE, UOVA, LATTE_PANNA, YOGURT, BURRO_MARGARINA, FORMAGGI_FRESCHI, FORMAGGI_STAGIONATI, LATTICINI, PASTA_FRESCA, PIATTI_PRONTI, ALTERNATIVE_VEGETALI, ALTRO -> StorageLocation.FRIGO
+            else -> StorageLocation.DISPENSA
         }
 }
 

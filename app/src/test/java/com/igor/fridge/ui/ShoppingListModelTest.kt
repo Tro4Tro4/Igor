@@ -83,12 +83,18 @@ class ShoppingListModelTest {
     fun `il testo da condividere ha corsie, quantita' e dettagli`() {
         val state = ShoppingUiState(items = listOf(latte, pane))
 
-        val text = shareText(state.toBuy, state.totals)
+        val text = shareText(state.toBuy, state.totals) {
+            when (it) {
+                FoodCategory.PANE -> "Pane e forno"
+                FoodCategory.LATTICINI -> "Latticini e uova"
+                else -> it.name
+            }
+        }
 
         assertEquals(
             "Lista della spesa\n\n" +
-                "🍞 Pane e forno\n• Pane — 1 pz\n\n" +
                 "🥛 Latticini e uova\n• Latte — 2 l (Granarolo, da Esselunga)\n\n" +
+                "🍞 Pane e forno\n• Pane — 1 pz\n\n" +
                 "Totale stimato: 2,58 €",
             text,
         )

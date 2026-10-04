@@ -34,7 +34,7 @@ class AisleOrderViewModelTest {
         backgroundScope.launch { vm.order.collect {} }
         dispatcher.scheduler.advanceUntilIdle()
 
-        vm.move(FoodCategory.BEVANDE, -9)
+        vm.move(FoodCategory.BEVANDE, -FoodCategory.entries.size)
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(FoodCategory.BEVANDE, stored.value.first())

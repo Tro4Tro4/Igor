@@ -6,6 +6,14 @@ import org.junit.Test
 
 class CategoryOrderTest {
 
+    @Test fun `le nuove categorie si accodano alle corsie salvate senza duplicati`() {
+        val old = "BEVANDE,FRUTTA,LATTICINI,ALTRO"
+        val actual = categoryOrderFrom(old)
+        assertEquals(old.split(',').map(FoodCategory::valueOf), actual.take(4))
+        assertEquals(FoodCategory.entries.toSet(), actual.toSet())
+        assertEquals(actual.size, actual.distinct().size)
+    }
+
     @Test
     fun `senza preferenza vale l'ordine predefinito`() {
         assertEquals(FoodCategory.entries, categoryOrderFrom(null))

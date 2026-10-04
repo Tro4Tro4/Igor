@@ -31,7 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.igor.fridge.R
 import com.igor.fridge.ui.icon
-import com.igor.fridge.ui.label
+import com.igor.fridge.ui.labelRes
 
 /** Ordine delle corsie: la lista della spesa raggruppa le voci in quest'ordine. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,7 +89,7 @@ fun AisleOrderScreen(
                         modifier = Modifier.clearAndSetSemantics {},
                     )
                     Text(
-                        text = category.label(),
+                        text = stringResource(category.labelRes()),
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier
                             .weight(1f)
@@ -98,13 +98,13 @@ fun AisleOrderScreen(
                     IconButton(onClick = { viewModel.move(category, -1) }, enabled = index > 0) {
                         Icon(
                             Icons.Filled.KeyboardArrowUp,
-                            contentDescription = stringResource(R.string.aisle_order_up, category.label()),
+                            contentDescription = stringResource(R.string.aisle_order_up, stringResource(category.labelRes())),
                         )
                     }
                     IconButton(onClick = { viewModel.move(category, 1) }, enabled = index < order.lastIndex) {
                         Icon(
                             Icons.Filled.KeyboardArrowDown,
-                            contentDescription = stringResource(R.string.aisle_order_down, category.label()),
+                            contentDescription = stringResource(R.string.aisle_order_down, stringResource(category.labelRes())),
                         )
                     }
                 }

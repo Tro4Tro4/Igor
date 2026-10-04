@@ -85,6 +85,7 @@ import com.igor.fridge.ui.formatEuro
 import com.igor.fridge.ui.formatShort
 import com.igor.fridge.ui.icon
 import com.igor.fridge.ui.label
+import com.igor.fridge.ui.labelRes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -385,6 +386,7 @@ private fun DraftCard(
     onPickExpiry: () -> Unit,
     onClearExpiry: () -> Unit,
 ) {
+    val categoryContext = LocalContext.current
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.fillMaxWidth(),
@@ -423,7 +425,7 @@ private fun DraftCard(
                     label = stringResource(R.string.edit_category),
                     value = draft.category,
                     options = FoodCategory.entries,
-                    optionLabel = { "${it.icon()}  ${it.label()}" },
+                    optionLabel = { "${it.icon()}  ${categoryContext.getString(it.labelRes())}" },
                     onSelect = onCategory,
                     modifier = Modifier.fillMaxWidth(),
                 )

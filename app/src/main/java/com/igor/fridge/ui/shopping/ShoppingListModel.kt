@@ -108,10 +108,10 @@ fun totalsOf(items: List<ShoppingItem>): ShoppingTotals {
  * La lista da mandare a qualcuno (WhatsApp, SMS): solo cio' che resta da comprare, per
  * corsia, con quanto, marca, negozio e note. Testo semplice, leggibile ovunque.
  */
-fun shareText(sections: List<ShoppingSection>, totals: ShoppingTotals? = null): String = buildString {
+fun shareText(sections: List<ShoppingSection>, totals: ShoppingTotals? = null, categoryLabel: (FoodCategory) -> String): String = buildString {
     append("Lista della spesa")
     for (section in sections) {
-        append("\n\n").append(section.category.icon()).append(' ').append(section.category.label())
+        append("\n\n").append(section.category.icon()).append(' ').append(categoryLabel(section.category))
         for (item in section.items) {
             append("\n• ").append(item.name).append(" — ").append(formatQuantity(item.quantity, item.unit))
             val extra = listOfNotNull(item.brand, item.store?.let { "da $it" }, item.notes)
