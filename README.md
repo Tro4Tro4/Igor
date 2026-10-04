@@ -143,7 +143,7 @@ Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi 
 corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
 "3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-I test sono quasi 300, tutti sulla JVM; Room e le foto girano sotto Robolectric. Non
+La suite comprende 344 test in 49 classi, tutti sulla JVM; Room e le foto girano sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
 **Database: versione 6.** Ogni cambio di schema alza la versione e porta la sua migrazione
@@ -166,13 +166,21 @@ backup. Prima di condividere uno scontrino se ne vede l’anteprima e si possono
 strisce con dati personali. ML Kit legge scontrini e codici sul telefono, ma può inviare a
 Google statistiche d’uso: l’app lo dice nella stessa sezione.
 
-### Difetti noti
+### Affidabilita' e correzioni
 
-**L’elenco si aggiorna con qualche secondo di ritardo.** Dopo aver aggiunto o spostato un
-prodotto, la lista può impiegare qualche istante a mostrarlo: il dato è salvato
-correttamente e compare da solo, senza bisogno di riaprire l’app. La causa non è ancora
-stata isolata; il sospetto è il momento in cui le schermate riprendono a osservare il
-database dopo essere tornate in primo piano.
+Inventario e spesa mantengono i dati aggiornati anche durante una permanenza lunga nella
+schermata di modifica: al ritorno non mostrano prima una copia obsoleta della lista.
+
+“Annulla” ripristina la voce originale, inclusi dettagli e spunta, e non sovrascrive
+modifiche intervenute dopo l'operazione. In caso di conflitto l'annullamento si interrompe
+senza modificare i dati; gli errori temporanei permettono di riprovare. Le scritture su
+piu' tabelle sono atomiche, con test di rollback su Room reale.
+
+I salvataggi ripetuti non creano duplicati; gli errori conservano il modulo. Scanner e
+scontrini rispettano le categorie scelte manualmente. La ricerca delle categorie ignora
+gli accenti, e la classificazione riconosce anche “tonno sott’olio” e “latte bio di soia”.
+
+Verifiche e limiti di accessibilita' e prestazioni: [rapporto delle correzioni](docs/verification/2026-10-04-correzioni-bug.md).
 
 ## Prossimi passi
 

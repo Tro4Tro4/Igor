@@ -61,3 +61,7 @@ Decisioni sui comportamenti che il revisore non ha giudicato:
 - Nessun benchmark: fluidita' su dispositivi reali non quantificata.
 
 Gli screenshot dei campioni 1/200, della rotazione e del ripristino precedono il passaggio di correzione; illustrano quei controlli. Chiaro/scuro/font verticale e le nuove regressioni in orizzontale sono stati ripetuti sulla versione finale. Nessuna dichiarazione di verifica empirica su hardware fisico.
+
+## Aggiornamento successivo
+
+I punti minori rinviati e i difetti di Undo, salvataggi, categorie manuali e aggiornamento delle liste sono stati affrontati nel [rapporto delle correzioni](2026-10-04-correzioni-bug.md), con 344 test. Restano espliciti i limiti delle prove su hardware fisico e dell'esperienza vocale completa.
