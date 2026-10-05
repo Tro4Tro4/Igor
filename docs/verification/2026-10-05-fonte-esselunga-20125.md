@@ -26,3 +26,18 @@ acquisizioni e modalita' di riutilizzo. Se serve autenticazione o un accesso
 non riutilizzabile, cercare un feed compatibile; niente bypass o credenziali
 personali negli adattatori. La fonte resta visibile come non disponibile
 finche' queste verifiche non passano.
+
+## Seconda verifica
+
+La sitemap_index risponde HTTP 200 e indica sitemap_product, listing_page,
+landing_page e page. La sitemap prodotti supera 2 MB; lettura limitata,
+senza conservare l'intero catalogo. Primo URL consentito individuato:
+`/commerce/nav/supermercato/store/prodotto/553743/langhe-bianco-ca-rossa-75-cl`.
+Due letture di questa scheda restituiscono entrambe HTTP 200, 6962 caratteri
+e nessun JSON-LD: la stessa shell della home, senza prezzo estraibile.
+Nessun endpoint escluso o parametro freevisit interrogato.
+Il percorso ipotizzato /it-it/condizioni-generali.html restituisce 404 e non
+costituisce evidenza dei termini. Riutilizzo ancora non verificato.
+Gli strumenti della sessione non includono un browser controllabile; il
+controllo del catalogo JavaScript resta incompleto. Nessun adattatore
+Esselunga attivato sulla base della sitemap.

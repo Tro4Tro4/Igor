@@ -1,0 +1,8 @@
+{"schema_version":1,"sources":[
+  {"id":"carrefour","status":"candidate","priority":1,"scope":"generic","reuse_verified":false,"product_urls":[],"limitation":"Riutilizzo da verificare; zona non verificata"},
+  {"id":"conad","status":"candidate","priority":2,"scope":"generic","reuse_verified":false,"product_urls":[],"limitation":"Riutilizzo e campioni da verificare"},
+  {"id":"esselunga","status":"candidate","priority":3,"scope":"unknown","reuse_verified":false,"product_urls":[],"limitation":"Prima estensione; catalogo dinamico da verificare"},
+  {"id":"tigros","status":"candidate","priority":4,"scope":"unknown","reuse_verified":false,"product_urls":[],"limitation":"Catalogo dinamico da verificare"},
+  {"id":"lidl","status":"candidate","priority":5,"scope":"unknown","reuse_verified":false,"product_urls":[],"limitation":"Copertura promozionale da verificare"},
+  {"id":"eurospin","status":"candidate","priority":6,"scope":"unknown","reuse_verified":false,"product_urls":[],"limitation":"Catalogo e riutilizzo da verificare"}
+]}

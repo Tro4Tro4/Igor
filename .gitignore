@@ -25,3 +25,9 @@ captures/
 # Superpowers SDD scratch
 .superpowers/
 CLAUDE.local.md
+
+# Servizio prezzi Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.sqlite3
