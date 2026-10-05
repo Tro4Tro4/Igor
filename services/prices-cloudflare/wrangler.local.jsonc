@@ -1,5 +1,6 @@
 {
   "name": "igor-prices-local",
+  "main": "src/index.ts",
   "compatibility_date": "2026-10-05",
   "observability": {"enabled": false},
   "d1_databases": [{"binding":"DB", "database_name":"igor-prices-local", "database_id":"local-only", "migrations_dir":"migrations"}]

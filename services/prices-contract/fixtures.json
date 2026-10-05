@@ -1,0 +1,65 @@
+{
+  "synthetic": true,
+  "offers": [
+    {
+      "offer_id": "carrefour:0:generic",
+      "product_id": "carrefour:0",
+      "source": "carrefour",
+      "source_sku": "0",
+      "gtin": null,
+      "gtin_verified": false,
+      "name": "Latte 1 L",
+      "brand": "Marca",
+      "pack": null,
+      "pack_price_cents": 139,
+      "currency": "EUR",
+      "observed_at": "2026-10-05T00:00:00Z",
+      "source_url": "https://www.carrefour.it/p/0",
+      "scope": "generic",
+      "postcode": null,
+      "availability": "unknown",
+      "condition": "ordinary",
+      "valid_until": null
+    },
+    {
+      "offer_id": "conad:0:generic",
+      "product_id": "conad:0",
+      "source": "conad",
+      "source_sku": "0",
+      "gtin": null,
+      "gtin_verified": false,
+      "name": "Latte 1 L",
+      "brand": "Marca",
+      "pack": null,
+      "pack_price_cents": 199,
+      "currency": "EUR",
+      "observed_at": "2026-10-05T00:00:00Z",
+      "source_url": "https://spesaonline.conad.it/p/0",
+      "scope": "generic",
+      "postcode": null,
+      "availability": "unknown",
+      "condition": "ordinary",
+      "valid_until": null
+    }
+  ],
+  "queries": [
+    {
+      "query": "q=latte%20marca&postcode=20125",
+      "ids": [
+        "carrefour:0:generic",
+        "conad:0:generic"
+      ]
+    },
+    {
+      "query": "q=missing&postcode=20125",
+      "ids": []
+    },
+    {
+      "query": "q=latte&limit=1",
+      "ids": [
+        "carrefour:0:generic"
+      ],
+      "next_offset": 1
+    }
+  ]
+}
