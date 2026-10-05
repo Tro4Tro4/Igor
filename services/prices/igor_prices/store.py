@@ -79,5 +79,11 @@ class CatalogStore:
             result=db.execute('INSERT OR IGNORE INTO runs VALUES(?,?,?,?)',(source,now.astimezone(timezone.utc).date().isoformat(),'running',now.isoformat()))
             return result.rowcount==1
 
+    def source_offers(self,source):
+        """Export only the successfully ingested local batch to the remote publisher."""
+        with self.connect() as db:
+            return [Offer.model_validate_json(r[0]) for r in
+                    db.execute('SELECT payload FROM offers WHERE source=? ORDER BY offer_id',(source,))]
+
     def finish_run(self,source,now,status):
         with self.connect() as db: db.execute('UPDATE runs SET status=? WHERE source=? AND day=?',(status,source,now.astimezone(timezone.utc).date().isoformat()))
