@@ -52,10 +52,14 @@ import com.igor.fridge.ui.label
 fun CompareScreen(
     onBack: () -> Unit,
     onOpenOpenPrices: () -> Unit,
+    onOpenSettings: () -> Unit = onOpenOpenPrices,
     modifier: Modifier = Modifier,
     viewModel: CompareViewModel = viewModel(factory = CompareViewModel.Factory),
+    onlineViewModel: OnlineCompareViewModel = viewModel(factory = OnlineCompareViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val online by onlineViewModel.uiState.collectAsStateWithLifecycle()
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.message) {
@@ -98,6 +102,12 @@ fun CompareScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item {
+                OnlinePricesSection(online,onlineViewModel::refresh,onlineViewModel::search,onlineViewModel::select,
+                    onlineViewModel::unselect,onOpenSource={ url ->
+                        if (runCatching { java.net.URI(url).scheme == "https" }.getOrDefault(false)) uriHandler.openUri(url)
+                    },onSettings=onOpenSettings)
+            }
             item {
                 Text(stringResource(R.string.compare_stores), style = MaterialTheme.typography.titleSmall)
             }

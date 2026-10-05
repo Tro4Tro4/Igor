@@ -16,8 +16,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SavedListItem::class,
         PriceRecord::class,
         ProductCode::class,
+        OnlineOffer::class,
+        OnlineBinding::class,
+        OnlineSource::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -33,8 +36,18 @@ abstract class IgorDatabase : RoomDatabase() {
 
     abstract fun productCodeDao(): ProductCodeDao
 
+    abstract fun onlinePricesDao(): OnlinePricesDao
+
     companion object {
         const val DATABASE_NAME = "igor-database"
+
+        val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `online_offers` (`offerId` TEXT NOT NULL, `requestedPostcode` TEXT NOT NULL, `productId` TEXT NOT NULL, `source` TEXT NOT NULL, `sourceSku` TEXT NOT NULL, `name` TEXT NOT NULL, `brand` TEXT, `gtin` TEXT, `gtinVerified` INTEGER NOT NULL, `packAmount` TEXT, `packUnit` TEXT, `packCount` INTEGER NOT NULL, `packPriceCents` INTEGER NOT NULL, `observedAt` INTEGER NOT NULL, `sourceUrl` TEXT NOT NULL, `scope` TEXT NOT NULL, `postcode` TEXT, `availability` TEXT NOT NULL, `condition` TEXT NOT NULL, `validUntil` INTEGER, PRIMARY KEY(`offerId`, `requestedPostcode`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `online_bindings` (`shoppingUuid` TEXT NOT NULL, `source` TEXT NOT NULL, `productId` TEXT NOT NULL, `selectedNameKey` TEXT NOT NULL, `selectedBrandKey` TEXT NOT NULL, `selectedPackAmount` TEXT, `selectedPackUnit` TEXT, `equivalenceConfirmed` INTEGER NOT NULL, PRIMARY KEY(`shoppingUuid`, `source`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `online_sources` (`source` TEXT NOT NULL, `status` TEXT NOT NULL, `priority` INTEGER NOT NULL, `lastSuccessfulAt` INTEGER, `limitation` TEXT NOT NULL, PRIMARY KEY(`source`))")
+            }
+        }
 
         /**
          * Dettagli della lista della spesa (categoria, marca, note, foto, quantita' presa)
@@ -179,6 +192,7 @@ abstract class IgorDatabase : RoomDatabase() {
                 MIGRATION_3_4,
                 MIGRATION_4_5,
                 MIGRATION_5_6,
+                MIGRATION_6_7,
             ).build()
     }
 }

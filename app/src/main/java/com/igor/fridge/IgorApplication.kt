@@ -27,6 +27,11 @@ class IgorApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        startupScope.launch {
+            container.settingsStore.onlinePrices.collect {
+                container.onlinePricesWorkScheduler.sync(it.enabled && container.onlinePricesClient.configured)
+            }
+        }
 
         // Il canale va creato prima di qualsiasi notifica; e' un'operazione idempotente.
         ExpiryNotifier(this).createChannel()

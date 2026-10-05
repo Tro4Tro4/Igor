@@ -12,6 +12,17 @@ def test_robots_esclude_url_autorizzato():
     a=SourceAccess('carrefour',['https://www.carrefour.it/search'],True,'User-agent: *\nDisallow: /search')
     with pytest.raises(ValueError): a.validate(a.urls[0])
 
+@pytest.mark.parametrize('rule',['/*?search=','/p/a?search=x$'])
+def test_robots_wildcard_e_ancora(rule):
+    url='https://www.carrefour.it/p/a?search=x'
+    a=SourceAccess('carrefour',[url],True,'User-agent: *\nDisallow: '+rule)
+    with pytest.raises(ValueError): a.validate(url)
+
+def test_robots_allow_piu_specifico():
+    url='https://www.carrefour.it/p/a'
+    a=SourceAccess('carrefour',[url],True,'User-agent: *\nDisallow: /p/\nAllow: /p/a$')
+    a.validate(url)
+
 def test_riutilizzo_necessario():
     with pytest.raises(ValueError): SourceAccess('carrefour',['https://www.carrefour.it/p/a'],False,'').validate('https://www.carrefour.it/p/a')
 

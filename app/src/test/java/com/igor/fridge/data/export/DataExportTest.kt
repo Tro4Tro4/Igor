@@ -24,6 +24,16 @@ class DataExportTest {
     private val day = LocalDate.of(2026, 10, 3)
 
     @Test
+    fun `esporta cache e associazioni prezzi online`() {
+        val offer = com.igor.fridge.data.onlineprices.OnlinePricesJson.parseOffers(com.igor.fridge.data.onlineEnvelope(),"20125").items.single()
+        val content = ExportContent(emptyList(),emptyList(),emptyList(),emptyList(),emptyList(),
+            onlineOffers=listOf(offer),onlineBindings=listOf(com.igor.fridge.data.local.OnlineBinding("s","conad",offer.productId,"latte","",offer.packAmount,offer.packUnit,true)))
+        val root = Json.parseToJsonElement(exportJson(content,now)).jsonObject
+        assertEquals("0000080050865",root["onlineOffers"]!!.jsonArray.single().jsonObject["gtin"]!!.jsonPrimitive.content)
+        assertEquals("s",root["onlineBindings"]!!.jsonArray.single().jsonObject["shoppingUuid"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun `l'esportazione contiene tutti i dati, compresi gli alimenti usciti`() {
         val json = exportJson(
             ExportContent(

@@ -10,6 +10,9 @@ import java.time.LocalDate
  */
 class Converters {
 
+    @TypeConverter fun toDecimal(value: String?): java.math.BigDecimal? = value?.let { java.math.BigDecimal(it) }
+    @TypeConverter fun fromDecimal(value: java.math.BigDecimal?): String? = value?.toPlainString()
+
     @TypeConverter
     fun toLocalDate(epochDay: Long?): LocalDate? = epochDay?.let(LocalDate::ofEpochDay)
 

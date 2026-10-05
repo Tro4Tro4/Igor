@@ -95,6 +95,15 @@ class SettingsStore(
 
     val notificationsEnabled: Flow<Boolean> = settings.map { it.notificationsEnabled }
 
+    val onlinePrices: Flow<com.igor.fridge.data.onlineprices.OnlinePricesSettings> = preferences.map {
+        com.igor.fridge.data.onlineprices.OnlinePricesSettings(it[KEY_ONLINE_PRICES_ENABLED] ?: false,it[KEY_ONLINE_POSTCODE] ?: "20125")
+    }
+    suspend fun setOnlinePricesEnabled(enabled: Boolean) { store.edit { it[KEY_ONLINE_PRICES_ENABLED] = enabled } }
+    suspend fun setOnlinePostcode(postcode: String) {
+        require(postcode.matches(Regex("[0-9]{5}")))
+        store.edit { it[KEY_ONLINE_POSTCODE] = postcode }
+    }
+
     /**
      * Ordine delle corsie della lista della spesa. Sta fuori da [Settings], che raccoglie
      * cio' che serve alle notifiche.
@@ -178,6 +187,8 @@ class SettingsStore(
         const val DEFAULT_NOTIFICATIONS_ENABLED = true
 
         private val KEY_WARNING_DAYS = intPreferencesKey("warning_days")
+        private val KEY_ONLINE_PRICES_ENABLED = booleanPreferencesKey("online_prices_enabled")
+        private val KEY_ONLINE_POSTCODE = stringPreferencesKey("online_postcode")
         private val KEY_NOTIFICATION_HOUR = intPreferencesKey("notification_hour")
         private val KEY_NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         private val KEY_CATEGORY_ORDER = stringPreferencesKey("category_order")

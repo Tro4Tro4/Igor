@@ -17,6 +17,19 @@ def test_idempotenza(store):
     assert store.replace_batch('carrefour',[offer],offer.observed_at)==1
     assert len(store.offers(offer.product_id,'20125'))==1
 
+def test_sospensione_resiste_ricarica_manifest(store):
+    old=Offer(**sample())
+    store.replace_batch('carrefour',[old],old.observed_at)
+    store.set_status('carrefour','suspended')
+    store.configure_sources([{'id':'carrefour','status':'active','reuse_verified':True,'priority':1}])
+    assert store.sources()[0]['status']=='suspended'
+    assert store.offers(old.product_id,'20125')==[]
+
+def test_nome_e_marca_non_devono_essere_contigui(store):
+    offer=Offer(**sample(name='Latte 1 L',brand='Marca'))
+    store.replace_batch('carrefour',[offer],offer.observed_at)
+    assert len(store.search('Latte Marca',None,'20125',20,0))==1
+
 def test_rollback_errore_seconda_scrittura(store):
     old=Offer(**sample())
     store.replace_batch('carrefour',[old],old.observed_at)

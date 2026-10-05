@@ -29,6 +29,7 @@ data class SettingsUiState(
     val notificationsEnabled: Boolean = SettingsStore.DEFAULT_NOTIFICATIONS_ENABLED,
     val isWorking: Boolean = false,
     val message: String? = null,
+    val onlinePrices: com.igor.fridge.data.onlineprices.OnlinePricesSettings = com.igor.fridge.data.onlineprices.OnlinePricesSettings(),
 )
 
 class SettingsViewModel(
@@ -50,7 +51,7 @@ class SettingsViewModel(
         status,
     ) { days, hour, enabled, status ->
         SettingsUiState(days, hour, enabled, status.working, status.message)
-    }.stateIn(
+    }.combine(settingsStore.onlinePrices) { state,online -> state.copy(onlinePrices=online) }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
         initialValue = SettingsUiState(),
@@ -58,6 +59,11 @@ class SettingsViewModel(
 
     fun onWarningDaysChange(value: Int) {
         viewModelScope.launch { settingsStore.setWarningDays(value) }
+    }
+
+    fun onOnlinePricesToggle(enabled: Boolean) { viewModelScope.launch { settingsStore.setOnlinePricesEnabled(enabled) } }
+    fun onOnlinePostcodeChange(value: String) {
+        if (value.matches(Regex("[0-9]{5}"))) viewModelScope.launch { settingsStore.setOnlinePostcode(value) }
     }
 
     /** Cambiare l'ora riprogramma il controllo: il valore salvato da solo non basta. */

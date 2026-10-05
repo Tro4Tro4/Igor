@@ -69,6 +69,42 @@ class MigrationTest {
     }
 
     @Test
+    fun `migrazione da sei conserva prezzi barcode e dati mentre aggiunge cache online`() = runTest {
+        val schemaPath = "schemas/com.igor.fridge.data.local.IgorDatabase/6.json"
+        val file = java.io.File(schemaPath).takeIf { it.exists() } ?: java.io.File("app/$schemaPath")
+        val schema = kotlinx.serialization.json.Json.parseToJsonElement(file.readText()).let {
+            (it as kotlinx.serialization.json.JsonObject)["database"] as kotlinx.serialization.json.JsonObject
+        }
+        val dbFile = context.getDatabasePath(TEST_DB)
+        dbFile.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(dbFile,null).use { six ->
+            val entities = schema["entities"] as kotlinx.serialization.json.JsonArray
+            entities.forEach { element ->
+                val entity = element as kotlinx.serialization.json.JsonObject
+                val table = (entity["tableName"] as kotlinx.serialization.json.JsonPrimitive).content
+                six.execSQL((entity["createSql"] as kotlinx.serialization.json.JsonPrimitive).content.replace("\u0024{TABLE_NAME}", table))
+                (entity["indices"] as kotlinx.serialization.json.JsonArray).forEach { index ->
+                    six.execSQL(((index as kotlinx.serialization.json.JsonObject)["createSql"] as kotlinx.serialization.json.JsonPrimitive).content.replace("\u0024{TABLE_NAME}",table))
+                }
+            }
+            six.execSQL("INSERT INTO food_items(uuid,name,nameKey,category,location,quantity,unit,addedAt,updatedAt,brand,removedAt,removalReason) VALUES('f6','Latte','latte','LATTICINI','FRIGO',1,'L',20000,1000,'Marca',20001,'CONSUMATO')")
+            six.execSQL("INSERT INTO shopping_items(uuid,name,nameKey,quantity,unit,isChecked,createdAt,updatedAt,category,brand,unitPriceCents,store) VALUES('s6','Latte','latte',2,'L',0,20000,1000,'LATTICINI','Marca',139,'Fisico')")
+            six.execSQL("INSERT INTO price_records VALUES('p6','latte','Latte',20000,'Fisico',2,'L',278,139,'L',1000)")
+            six.execSQL("INSERT INTO product_codes VALUES('latte','0000080050865',1000)")
+            six.version = 6
+        }
+        val migrated = IgorDatabase.build(context, TEST_DB).also { db = it }
+        assertEquals("Marca",migrated.foodItemDao().findByUuid("f6")?.brand)
+        assertEquals(java.time.Instant.ofEpochMilli(20001),migrated.foodItemDao().findByUuid("f6")?.removedAt)
+        assertEquals(139L,migrated.shoppingItemDao().findByUuid("s6")?.unitPriceCents)
+        assertEquals(278L,migrated.priceRecordDao().observeAll().first().single().totalCents)
+        assertEquals("0000080050865",migrated.productCodeDao().all().single().barcode)
+        val offer = com.igor.fridge.data.onlineprices.OnlinePricesJson.parseOffers(onlineEnvelope(),"20125").items.single()
+        migrated.onlinePricesDao().upsertOffers(listOf(offer))
+        assertEquals(offer,migrated.onlinePricesDao().allOffers().single())
+    }
+
+    @Test
     fun `la migrazione conserva inventario e lista e assegna le categorie`() = runTest {
         createVersion1()
 

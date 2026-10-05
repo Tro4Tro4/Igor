@@ -25,6 +25,13 @@ def test_carta_esclusa_dal_prezzo_ordinario():
     offer=CarrefourAdapter().parse(html()+'<p>Prezzo con carta fedeltà</p>','https://www.carrefour.it/p/a',NOW,'generic',None)[0]
     assert offer.condition=='loyalty'
 
+def test_prezzo_visibile_discordante_non_viene_pubblicato():
+    with pytest.raises(ValueError): CarrefourAdapter().parse(html()+'<p class="price">Prezzo 2,49 EUR</p>','https://www.carrefour.it/p/a',NOW,'generic',None)
+
+def test_prezzo_unitario_non_scambiato_per_confezione():
+    offer=CarrefourAdapter().parse(html()+'<p class="price">Prezzo 1,39 EUR</p><p class="unit-price">2,78 €/kg</p>','https://www.carrefour.it/p/a',NOW,'generic',None)[0]
+    assert offer.pack_price_cents==139
+
 @pytest.mark.parametrize('body',['<script type="application/ld+json">broken</script>',html(offers={'@type':'AggregateOffer','lowPrice':'1.39'}),html(offers={'price':'0','priceCurrency':'EUR'}),'<html/>'])
 def test_scheda_rotta_non_pubblica_zero(body):
     with pytest.raises(ValueError): CarrefourAdapter().parse(body,'https://www.carrefour.it/p/a',NOW,'generic',None)

@@ -21,6 +21,9 @@ data class ExportContent(
     val savedLists: List<Pair<SavedListSummary, List<SavedListItem>>>,
     val prices: List<PriceRecord>,
     val barcodes: List<ProductCode>,
+    val onlineOffers: List<com.igor.fridge.data.local.OnlineOffer> = emptyList(),
+    val onlineBindings: List<com.igor.fridge.data.local.OnlineBinding> = emptyList(),
+    val onlineSources: List<com.igor.fridge.data.local.OnlineSource> = emptyList(),
 )
 
 /**
@@ -108,6 +111,31 @@ fun exportJson(content: ExportContent, exportedAt: Instant): String = buildJsonO
                 put("barcode", code.barcode)
             }
         }
+    }
+    putJsonArray("onlineOffers") {
+        content.onlineOffers.forEach { o -> addJsonObject {
+            put("offerId",o.offerId); put("requestedPostcode",o.requestedPostcode)
+            put("productId",o.productId); put("source",o.source); put("sourceSku",o.sourceSku)
+            put("name",o.name); putNullable("brand",o.brand); putNullable("gtin",o.gtin); put("gtinVerified",o.gtinVerified)
+            putNullable("packAmount",o.packAmount?.toPlainString()); putNullable("packUnit",o.packUnit); put("packCount",o.packCount)
+            put("packPriceCents",o.packPriceCents); put("observedAt",o.observedAt.toString()); put("sourceUrl",o.sourceUrl)
+            put("scope",o.scope); putNullable("postcode",o.postcode); put("availability",o.availability); put("condition",o.condition)
+            putNullable("validUntil",o.validUntil?.toString())
+        } }
+    }
+    putJsonArray("onlineBindings") {
+        content.onlineBindings.forEach { b -> addJsonObject {
+            put("shoppingUuid",b.shoppingUuid); put("source",b.source); put("productId",b.productId)
+            put("selectedNameKey",b.selectedNameKey); put("selectedBrandKey",b.selectedBrandKey)
+            putNullable("selectedPackAmount",b.selectedPackAmount?.toPlainString()); putNullable("selectedPackUnit",b.selectedPackUnit)
+            put("equivalenceConfirmed",b.equivalenceConfirmed)
+        } }
+    }
+    putJsonArray("onlineSources") {
+        content.onlineSources.forEach { s -> addJsonObject {
+            put("source",s.source); put("status",s.status); put("priority",s.priority)
+            putNullable("lastSuccessfulAt",s.lastSuccessfulAt?.toString()); put("limitation",s.limitation)
+        } }
     }
 }.toString()
 

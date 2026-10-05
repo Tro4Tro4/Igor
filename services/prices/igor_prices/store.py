@@ -31,7 +31,7 @@ class CatalogStore:
         with self.connect() as db:
             for s in sources:
                 if s['status']=='active' and not s.get('reuse_verified'): raise ValueError('Fonte non validata')
-                db.execute('INSERT INTO sources(id,status,priority,metadata) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,priority=excluded.priority,metadata=excluded.metadata',(s['id'],s['status'],s['priority'],json.dumps(s)))
+                db.execute("INSERT INTO sources(id,status,priority,metadata) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=CASE WHEN sources.status='suspended' AND excluded.status='active' THEN sources.status ELSE excluded.status END,priority=excluded.priority,metadata=excluded.metadata",(s['id'],s['status'],s['priority'],json.dumps(s)))
 
     def set_status(self,source,status):
         with self.connect() as db: db.execute('UPDATE sources SET status=? WHERE id=?',(status,source))
@@ -62,10 +62,11 @@ class CatalogStore:
             return db.execute('SELECT version FROM catalog').fetchone()[0]
 
     def search(self,q,gtin,postcode,limit,offset):
-        clause='o.gtin=?' if gtin else "lower(o.name) LIKE ? ESCAPE '\\'"
-        term=gtin if gtin else '%'+q.lower().replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%'
+        terms=[gtin] if gtin else ['%'+token.casefold().replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%' for token in q.split()]
+        clause='o.gtin=?' if gtin else ' AND '.join("lower(o.name) LIKE ? ESCAPE '\\'" for _ in terms)
+        if not terms: return []
         with self.connect() as db:
-            rows=db.execute("SELECT o.payload FROM offers o JOIN sources s ON s.id=o.source WHERE s.status='active' AND (o.scope='generic' OR o.postcode=?) AND "+clause+' ORDER BY s.priority,o.offer_id LIMIT ? OFFSET ?',(postcode,term,limit,offset))
+            rows=db.execute("SELECT o.payload FROM offers o JOIN sources s ON s.id=o.source WHERE s.status='active' AND (o.scope='generic' OR o.postcode=?) AND "+clause+' ORDER BY s.priority,o.offer_id LIMIT ? OFFSET ?',(postcode,*terms,limit,offset))
             return [Offer.model_validate_json(r[0]) for r in rows]
 
     def offers(self,product_id,postcode):

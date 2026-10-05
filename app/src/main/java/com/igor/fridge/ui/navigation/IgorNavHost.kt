@@ -210,6 +210,7 @@ fun IgorApp(
         composable(Routes.COMPARE) {
             CompareScreen(
                 onBack = { navController.popFrom(it) },
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenOpenPrices = { navController.navigate(Routes.OPEN_PRICES) },
             )
         }

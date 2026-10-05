@@ -62,6 +62,16 @@ class AppContainer(context: Context) {
 
     val similarProductSearch: SimilarProductSearch by lazy { SimilarProductSearch(openPricesClient) }
 
+    val onlinePricesClient by lazy {
+        com.igor.fridge.data.onlineprices.OnlinePricesClient(UrlConnectionTransport(),com.igor.fridge.BuildConfig.ONLINE_PRICES_URL,com.igor.fridge.BuildConfig.DEBUG)
+    }
+    val onlinePricesRepository by lazy {
+        com.igor.fridge.data.repository.OnlinePricesRepository(database.onlinePricesDao(),settingsStore.onlinePrices,shoppingRepository::findByUuid,
+            fetchSources=onlinePricesClient::sources,fetchOffers=onlinePricesClient::offers,
+            search={ q,postcode -> onlinePricesClient.search(q,null,postcode) },transactor=transactor)
+    }
+    val onlinePricesWorkScheduler by lazy { com.igor.fridge.notification.OnlinePricesWorkScheduler(appContext) }
+
     val photoStore: PhotoStore by lazy { FilePhotoStore(appContext) }
 
     val receiptReader: ReceiptReader by lazy { MlKitReceiptReader(appContext) }
@@ -80,6 +90,9 @@ class AppContainer(context: Context) {
                 savedLists = summaries.map { it to savedListRepository.itemsOf(it.uuid) },
                 prices = priceRepository.observeAll().first(),
                 barcodes = priceRepository.allCodes(),
+                onlineOffers = database.onlinePricesDao().allOffers(),
+                onlineBindings = database.onlinePricesDao().observeBindings().first(),
+                onlineSources = database.onlinePricesDao().observeSources().first(),
             ),
             exportedAt = Instant.now(),
         )
@@ -91,6 +104,9 @@ class AppContainer(context: Context) {
      * licenza ODbL e si cancellano dal sito del servizio.
      */
     suspend fun deleteAllData() = withContext(Dispatchers.IO) {
+        settingsStore.setOnlinePricesEnabled(false)
+        onlinePricesWorkScheduler.sync(false)
+        onlinePricesRepository.clear()
         database.clearAllTables()
         photoStore.deleteAllExcept(keep = emptySet(), graceMillis = 0)
         settingsStore.clearAll()

@@ -37,6 +37,21 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `prezzi online spenti cap iniziale validato e cancellazione preferenze`() = runTest {
+        val store = newStore()
+        assertFalse(store.onlinePrices.first().enabled)
+        assertEquals("20125",store.onlinePrices.first().postcode)
+        store.setOnlinePricesEnabled(true)
+        store.setOnlinePostcode("20126")
+        assertTrue(store.onlinePrices.first().enabled)
+        assertTrue(runCatching { store.setOnlinePostcode("２０１２５") }.isFailure)
+        assertFalse(store.openPrices.first().enabled)
+        store.clearAll()
+        assertFalse(store.onlinePrices.first().enabled)
+        assertEquals("20125",store.onlinePrices.first().postcode)
+    }
+
+    @Test
     fun `i valori di partenza sono quelli di default`() = runTest {
         val store = newStore()
 
