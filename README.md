@@ -191,3 +191,22 @@ Le fasi successive sono descritte in
   riconoscimento vocale di Android e apre `EditItemScreen` con i campi precompilati da un
   parser testuale (`domain/voice/`); la conferma manuale resta obbligatoria prima di
   salvare, perché il parser è la parte incerta del sistema.
+
+## Prezzi online — integrazione locale
+
+Preparati servizio Python in `services/prices`, API v1, cache Room7 e nuova
+sezione Confronta/Impostazioni, con consenso separato e CAP iniziale 20125.
+Il confronto usa confezioni intere e gli stessi prodotti coperti dalle fonti;
+prezzi vecchi, condizionati o senza formato non diventano totali attuali.
+Non modifica i prezzi degli scontrini. Le equivalenze automatiche fra fonti
+richiedono GTIN verificato e formato coerente; la prima scelta generica e' manuale.
+
+**Non ancora operativo con listini reali:** tutte le sei fonti restano candidate,
+senza acquisizioni automatiche, e manca un endpoint HTTPS autonomo.
+Carrefour/Conad hanno adattatori provvisori testati su fixture sintetiche.
+Esselunga resta la prima estensione, prima di Tigros, Lidl ed Eurospin.
+Per configurare un endpoint di sviluppo usare `-PigorOnlinePricesUrl=...`;
+HTTP localhost e' ammesso solo nel debug per eventuale prova USB.
+Il default vuoto non contatta la rete e viene spiegato nell'app.
+
+Verifiche, decisioni e limiti: [rapporto prezzi online](docs/verification/2026-10-05-confronto-prezzi-online.md).

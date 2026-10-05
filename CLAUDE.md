@@ -42,3 +42,15 @@ Room, versione corrente in `IgorDatabase.kt`. Ogni cambio di schema richiede: au
 - I commenti nel codice Kotlin evitano le lettere accentate (`e'`, `piu'`, `perche'`), mentre `strings.xml` e i messaggi mostrati all'utente usano accenti e apostrofi tipografici corretti.
 - I commenti spiegano il perché (casi limite, motivi delle scelte), non cosa fa il codice.
 - I testi fissi stanno in `res/values/strings.xml`; restano in Kotlin solo i messaggi composti a runtime dai ViewModel.
+
+## Servizio prezzi online
+
+`services/prices` e' indipendente da Gradle: Python3.12, FastAPI, SQLite, pytest
+con venv e `requirements.lock`. Fonti e stato nel manifest verificato in
+`docs/verification/2026-10-05-fonti-online-manifest.json`: attualmente tutte
+candidate, non abilitare sulla sola risposta HTTP200. Android `onlineprices/`,
+OnlinePricesRepository e OnlineComparison mantengono cache/associazioni separate
+dagli scontrini. Room7 aggiunge solo tre tabelle, con migrazione6→7.
+Endpoint BuildConfig.ONLINE_PRICES_URL da `igorOnlinePricesUrl`, default vuoto.
+Consenso iniziale spento e CAP20125; niente lista completa, foto o scontrini
+in rete. Il job periodico richiede consenso/rete/endpoint configurato.
