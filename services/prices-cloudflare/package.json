@@ -1,0 +1,20 @@
+{
+  "name": "igor-prices-cloudflare",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dry-run": "wrangler deploy --dry-run --config wrangler.local.jsonc",
+    "configure": "node scripts/configure.mjs",
+    "test:config": "node --test scripts/configure.test.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.3.6",
+    "@cloudflare/workers-types": "5.20261005.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11",
+    "wrangler": "4.147.0"
+  }
+}

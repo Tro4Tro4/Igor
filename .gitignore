@@ -31,3 +31,10 @@ CLAUDE.local.md
 __pycache__/
 .pytest_cache/
 *.sqlite3
+
+# Cloudflare development artifacts
+.tools/
+node_modules/
+.wrangler/
+.dev.vars
+wrangler.deploy.jsonc
