@@ -37,6 +37,7 @@ def ingest(store,source,*,transport_factory=Transport,robots_fetch=None,now=None
         store.finish_run(source,now,'success')
         return version
     except Exception as error:
-        if isinstance(error,AccessSuspended): store.set_status(source,'suspended')
+        if isinstance(error,AccessSuspended) or isinstance(error,httpx.HTTPStatusError) and error.response.status_code==403:
+            store.set_status(source,'suspended')
         store.finish_run(source,now,'failed')
         raise

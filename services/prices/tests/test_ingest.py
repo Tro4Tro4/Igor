@@ -1,5 +1,6 @@
 from datetime import timedelta
 import pytest
+import httpx
 from igor_prices.ingest import ingest
 from igor_prices.transport import HttpResult,AccessSuspended
 from igor_prices.models import Offer
@@ -26,3 +27,12 @@ def test_errore_conserva_precedente_e_403_sospende(store):
     with pytest.raises(AccessSuspended): ingest(store,'carrefour',transport_factory=lambda _:Fake(),robots_fetch=lambda _:'User-agent: *\nAllow: /',now=NOW+timedelta(days=1))
     assert store.sources()[0]['status']=='suspended'
     assert store.sources()[0]['last_successful_at']==NOW.isoformat()
+
+def test_robots_403_sospende_fonte_per_job_remoto(store):
+    activate(store)
+    def forbidden(url):
+        response=httpx.Response(403,request=httpx.Request('GET',url))
+        response.raise_for_status()
+    with pytest.raises(httpx.HTTPStatusError):
+        ingest(store,'carrefour',robots_fetch=forbidden,now=NOW)
+    assert store.sources()[0]['status']=='suspended'
