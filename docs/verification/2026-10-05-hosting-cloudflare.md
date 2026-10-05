@@ -4,6 +4,10 @@
 pubblicato:** Wrangler non risulta autenticato a Cloudflare. GitHub CLI e'
 autenticato come Tro4Tro4 quando eseguito con accesso al keyring autorizzato.
 Nessun account, piano a pagamento, database remoto o dominio creato.
+Repository verificato in sola lettura: Tro4Tro4/Igor e' gia' pubblico,
+branch predefinita claude/android-fridge-monitor-app-vlbci3. La visibilita'
+non e' stata cambiata. Runner standard gratuiti per questo repository;
+schedule pubblica soggetta a disabilitazione dopo 60 giorni senza attivita'.
 
 ## Implementazione
 
@@ -89,5 +93,42 @@ stata reinstallata l'app durante questo lavoro di hosting: il suo URL resta
 vuoto. Tutte le fonti restano candidate; Esselunga mantiene la priorita'
 di prima estensione dopo Carrefour e Conad.
 
-La revisione indipendente finale e gli eventuali fix vengono registrati
-qui prima di considerare concluso il lavoro locale.
+## Revisione indipendente finale
+
+Revisore fresh-context su `7ea1843..0b188ed`, sola lettura: nessun Critical
+ o Important individuato. La gravita' e' stata rivalutata in base all'effetto
+sull'utente; nessun fix funzionale necessario. Nessuna seconda revisione.
+
+**Minor rinviato:** dopo A → B → C → A riutilizzato → D, il cleanup puo'
+conservare C e D anziche' A e D, perche' ordina published_at che nel riuso
+mantiene la vecchia data di osservazione. D resta corretto e disponibile;
+si perde il lotto per ripristinare lo stato immediatamente precedente.
+Riproduzione del revisore con Publisher e SqlD1 reali, SQLite in memoria.
+Il rinvio segue la regola della skill executing-plans per i finding Minor.
+
+### Ambiti non certificati: decisioni e costi
+
+- Accesso e permessi Cloudflare: non dichiarati validi finche' l'utente
+  non accede e si verificano gli scope; costo: deploy ancora in attesa.
+- D1, migrazioni, HTTPS e smoke remoti: task 8 incompleto; costo: il servizio
+  non e' disponibile all'app prima della verifica remota.
+- GitHub Actions reali, secrets e schedule: preparati ma non eseguiti;
+  costo: errori di configurazione emergono solo alla prima esecuzione.
+- Piano Free, budget, quote condivise e log dell'account: da verificare
+  nell'account prima dell'attivazione; costo: nessuna garanzia operativa
+  di gratuitita' certificata dal solo codice.
+- CPU remota, traffico ostile, quote effettive e guasti distribuiti:
+  il pilot sintetico locale non li dimostra; costo: possibili limiti
+  operativi da misurare dopo il deploy.
+- Listini reali e riuso dei dati: fonti candidate fino alla validazione;
+  costo: inizialmente zero offerte, nessun confronto prezzi effettivo.
+- Android con URL reale, consenso e telefono fuori USB: task 9 non avviato;
+  costo: il telefono conserva la configurazione precedente.
+- OFF estraneo al range, audit completo dipendenze e parser preesistenti:
+  preservati senza dichiararli certificati da questa revisione;
+  costo: questa verifica non copre quei rischi preesistenti.
+
+Ulteriore decisione tecnica: pilot Miniflare v5 tramite conversione delle
+opzioni v4; costo: dipendenza di sviluppo transitiva bloccata dal lockfile,
+non runtime del Worker pubblicato. Workspace e ledger conservati per
+riprendere i task remoti; nessun push, merge o pubblicazione eseguiti.

@@ -54,3 +54,15 @@ dagli scontrini. Room7 aggiunge solo tre tabelle, con migrazione6→7.
 Endpoint BuildConfig.ONLINE_PRICES_URL da `igorOnlinePricesUrl`, default vuoto.
 Consenso iniziale spento e CAP20125; niente lista completa, foto o scontrini
 in rete. Il job periodico richiede consenso/rete/endpoint configurato.
+
+## Hosting gratuito prezzi — preparazione Cloudflare
+
+Preparati API Workers, archivio D1 con lotti atomici e publisher Python
+per GitHub Actions. Il contratto Android v1 resta compatibile. Deploy
+manuale e acquisizione giornaliera separati; nessun piano a pagamento
+o dominio necessario. Configurazione e accessi dell’account Cloudflare
+sono ancora da completare: nessun endpoint remoto pubblicato.
+L’app sul telefono conserva per ora la configurazione precedente.
+
+Istruzioni: [servizio Cloudflare](services/prices-cloudflare/README.md).
+Prove e limiti: [verifica hosting gratuito](docs/verification/2026-10-05-hosting-cloudflare.md).

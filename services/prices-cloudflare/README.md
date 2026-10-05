@@ -54,6 +54,8 @@ I dati dell'inventario non vengono caricati sul server.
 8. La pianificazione 04:17 UTC richiede il workflow sulla branch predefinita.
    Un eventuale merge viene revisionato separatamente. GitHub puo' ritardare
    o perdere esecuzioni; la cache Android mantiene i limiti di anzianita'.
+   Nel repository pubblico i workflow pianificati si disabilitano dopo
+   60 giorni senza attivita': controllare Actions e riabilitarli quando serve.
 
 La pubblicazione locale alternativa usa `npm run configure` con
 CF_ACCOUNT_ID/CF_DATABASE_ID impostati nell'ambiente, poi migrazioni e deploy
@@ -64,13 +66,21 @@ Il publisher legge il token solo da CF_D1_API_TOKEN nell'ambiente.
 
 Lotti immutabili caricati a chunk di 20 offerte; lo switch corrente e'
 transazionale tramite trigger D1. Retry idempotenti, limite complessivo
-2.000 offerte, ultimi due lotti conservati, cleanup dopo almeno 24 ore.
+2.000 offerte, conservazione del lotto corrente e di un lotto precedente,
+cleanup dopo almeno 24 ore. Limite noto: dopo il riuso di un vecchio lotto,
+il cleanup puo' conservare un precedente diverso da quello immediatamente
+precedente; il catalogo corrente rimane integro. Dettagli nel rapporto
+`docs/verification/2026-10-05-hosting-cloudflare.md`.
 Errori mantengono il lotto precedente; 403 sospende la fonte e il manifest
 non la riattiva. Prenotazione D1 di una sola acquisizione per fonte/giorno UTC.
 
 Limiti Free da verificare nel proprio account: Workers100.000 richieste/giorno,
 D1 500 MB/database, 5 milioni righe lette e100.000 scritte/giorno incluse quelle
 degli indici; GitHub Free2.000 minuti/mese privati condivisi con altre Actions.
+Il repository Tro4Tro4/Igor risulta gia' pubblico e la branch predefinita e'
+claude/android-fridge-monitor-app-vlbci3: per questo repository i runner
+standard GitHub-hosted sono gratuiti, con la limitazione dei 60 giorni sopra.
+La visibilita' non e' stata modificata e non vengono usati runner maggiorati.
 Il limite catalogo non garantisce le quote complessive dell'account, la durata
 di ogni acquisizione o una disponibilita' SLA. Nessun upgrade automatico.
 
