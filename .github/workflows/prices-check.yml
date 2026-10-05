@@ -1,0 +1,33 @@
+name: Prices checks
+on:
+  push:
+    paths: ['services/prices/**', 'services/prices-cloudflare/**', 'services/prices-contract/**', '.github/workflows/prices-*.yml']
+  pull_request:
+    paths: ['services/prices/**', 'services/prices-cloudflare/**', 'services/prices-contract/**', '.github/workflows/prices-*.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: prices-check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r services/prices/requirements.lock
+      - run: python -m pytest -q
+        working-directory: services/prices
+      - run: npm ci --no-audit --no-fund
+        working-directory: services/prices-cloudflare
+      - run: npm run typecheck && npm test && npm run test:config && npm run dry-run
+        working-directory: services/prices-cloudflare
