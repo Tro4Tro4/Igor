@@ -12,6 +12,18 @@ pagati negli scontrini personali, arricchendo i prodotti con Open Food Facts e
 l'analisi con ISTAT. L'area iniziale e' Milano; le catene richieste sono
 Esselunga, Tigros, Lidl, Eurospin, Conad e Carrefour.
 
+Il 5 ottobre 2026 l'utente ha indicato **20125** come CAP di riferimento.
+La prima verifica Carrefour e' registrata in
+`docs/verification/2026-10-05-fonte-carrefour-20125.md`: fonte ancora candidata,
+con accesso riutilizzabile da validare.
+
+Decisione successiva dell'utente: usare **i prezzi online** come riferimento
+anche per acquistare fisicamente; eventuali differenze allo scaffale sono
+accettate. **Open Prices non e' una fonte della nuova integrazione** per la
+copertura italiana ritenuta insufficiente. La funzione gia' presente non viene
+rimossa automaticamente. Il disegno esecutivo della prima versione e' in
+`2026-10-05-confronto-prezzi-online-design.md`.
+
 Si intende una copertura progressiva e dichiarata. La disponibilita' di una
 pagina pubblica non dimostra ancora che la sua raccolta automatica sia stabile
 o riutilizzabile. Il supporto a una catena dipende dalla verifica della fonte.
