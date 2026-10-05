@@ -1,6 +1,6 @@
 # Confronto prezzi online — prima versione
 
-Data: 5 ottobre 2026. Stato: **specifica proposta per revisione**.
+Data: 5 ottobre 2026. Stato: **specifica approvata in chat**.
 Deriva dal disegno generale gia' approvato; non approva hosting o spese.
 
 ## Obiettivo e decisioni dell'utente
@@ -17,6 +17,12 @@ campioni hanno risposto direttamente via HTTP con informazioni strutturate.
 Questo e' un riscontro tecnico, non validazione della copertura territoriale,
 stabilita' o riutilizzabilita'. Le altre catene compaiono come non disponibili
 finche' non esiste un adattatore validato. ISTAT e' fuori da questa prima versione.
+
+Priorita' confermata dall'utente dopo la revisione: **Esselunga e' la catena
+piu' usata ed e' la prima estensione dopo Carrefour e Conad**. La verifica
+dell'accesso Esselunga parte durante il lavoro sulle prime due fonti, senza
+aspettare la fine del progetto. Tigros, Lidl ed Eurospin rimangono nel perimetro.
+Il supporto non viene promesso prima di aver validato la fonte.
 
 ## Soluzione e alternative
 
@@ -145,6 +151,6 @@ locale resta dichiarato incompleto rispetto all'uso quotidiano sul telefono.
 - [FastAPI: distribuzione del servizio](https://fastapi.tiangolo.com/deployment/concepts/).
 - [SQLite con Python](https://docs.python.org/3.12/library/sqlite3.html).
 
-Questa specifica deve essere revisionata dall'utente prima del piano di
-implementazione. La proposta di stack e le due fonti iniziali sono scelte
-nuove rispetto al disegno generale; non sono considerate gia' approvate.
+La revisione dell'utente approva stack proposto e partenza Carrefour/Conad,
+con priorita' Esselunga per l'estensione. Il prossimo passaggio e' la revisione
+del piano scritto e la scelta del metodo di esecuzione, prima del codice.
