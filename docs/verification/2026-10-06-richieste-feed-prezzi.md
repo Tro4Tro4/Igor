@@ -6,8 +6,9 @@ gia' un accordo o che Igor sia una societa'.
 
 L'utente ha confermato il 6 ottobre 2026 che Igor e' esclusivamente per
 uso personale e non verra' distribuita. Le bozze riflettono questo vincolo.
-L'accesso riservato al servizio e' previsto, ma non ancora implementato:
-l'endpoint attualmente distribuito rimane raggiungibile pubblicamente.
+L'accesso riservato al servizio e' implementato e distribuito:
+l'endpoint richiede la chiave dedicata all'APK personale. Verifiche in
+`2026-10-06-prezzi-uso-personale.md`.
 
 Canali ufficiali individuati il 6 ottobre:
 
