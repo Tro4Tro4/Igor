@@ -202,14 +202,24 @@ Non modifica i prezzi degli scontrini. Le equivalenze automatiche fra fonti
 richiedono GTIN verificato e formato coerente; la prima scelta generica e' manuale.
 
 **Non ancora operativo con listini reali:** tutte le sei fonti restano candidate,
-senza acquisizioni automatiche, e manca un endpoint HTTPS autonomo.
-Carrefour/Conad hanno adattatori provvisori testati su fixture sintetiche.
+senza acquisizioni automatiche; l'endpoint HTTPS e' pubblicato su Cloudflare.
+Carrefour/Conad hanno adattatori verificati anche su campioni reali,
+ma riuso, territorio e copertura non sono ancora validati.
 Esselunga resta la prima estensione, prima di Tigros, Lidl ed Eurospin.
 Per configurare un endpoint di sviluppo usare `-PigorOnlinePricesUrl=...`;
 HTTP localhost e' ammesso solo nel debug per eventuale prova USB.
 Il default vuoto non contatta la rete e viene spiegato nell'app.
 
 Verifiche, decisioni e limiti: [rapporto prezzi online](docs/verification/2026-10-05-confronto-prezzi-online.md).
+
+Verifica e correzioni del 6 ottobre: dieci prodotti per Carrefour e Conad,
+due letture ciascuno, tutte le 40 risposte HTTP riuscite. Gli adattatori
+corretti leggono 10/10 campioni Carrefour e 2/10 Conad; le altre otto schede
+Conad non espongono il prezzo e vengono rifiutate. Totale confezione,
+promozioni PAYBACK, date e peso variabile sono distinti; 122 test Python verdi.
+Il riuso resta da chiarire; nessuna fonte attivata o offerta pubblicata.
+[Prima verifica](docs/verification/2026-10-06-validazione-fonti-prezzi.md),
+[correzioni](docs/verification/2026-10-06-correzione-adattatori-prezzi.md).
 
 ## Hosting gratuito prezzi — preparazione Cloudflare
 
