@@ -4,6 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Igor è un'app Android (Kotlin, Jetpack Compose, Room) per inventario del frigo, scadenze, lista della spesa, scontrini e prezzi. Tutti i dati restano sul dispositivo; l'unico accesso a Internet è Open Prices, facoltativo e spento di default. Il `README.md` descrive funzionalità, stato e difetti noti: tenerlo aggiornato quando cambia qualcosa di rilevante.
 
+## Vincolo d'uso concordato
+
+Il 6 ottobre 2026 l'utente ha confermato che Igor e' esclusivamente per
+uso personale e non verra' distribuita. Applicare questo vincolo anche al
+servizio prezzi e alle richieste di accesso alle fonti. Non confondere
+l'uso personale con una verifica delle condizioni di acquisizione dei dati.
+
 ## Comandi
 
 ```bash

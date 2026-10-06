@@ -1,9 +1,9 @@
 import {beforeEach,it,expect} from 'vitest';
 import {env} from 'cloudflare:workers';
 import worker from '../src/index';
-import {applySchema,db,seedSource,stage,insertOffer,publish} from './helpers';
+import {applySchema,db,seedSource,stage,insertOffer,publish,privateRequest,TEST_TOKEN} from './helpers';
 beforeEach(applySchema);
-const get=(path:string)=>worker.fetch(new Request('https://igor.test'+path),env as unknown as {DB:D1Database});
+const get=(path:string)=>worker.fetch(privateRequest('https://igor.test'+path),env as any);
 it('returns six candidates without fake offers',async()=>{
   for(const [i,id] of ['carrefour','conad','esselunga','tigros','lidl','eurospin'].entries())await seedSource(id,'candidate',i+1);
   const response=await get('/v1/sources');const body=await response.json() as any;
@@ -53,8 +53,20 @@ it('supports 100-character query without D1 LIKE pattern limit',async()=>{
   expect((await get('/v1/products?q='+encodeURIComponent('à'.repeat(100)))).status).toBe(200);
 });
 it('reports database failure and rejects writes',async()=>{
-  const broken={DB:{batch:async()=>{throw new Error('private internal error')}}} as unknown as {DB:D1Database};
-  const response=await worker.fetch(new Request('https://igor.test/v1/sources'),broken);
+  const broken={PRIVATE_API_TOKEN:TEST_TOKEN,DB:{batch:async()=>{throw new Error('private internal error')}}} as any;
+  const response=await worker.fetch(privateRequest('https://igor.test/v1/sources'),broken);
   expect(response.status).toBe(503);expect(await response.text()).not.toContain('private');
-  expect((await worker.fetch(new Request('https://igor.test/v1/sources',{method:'POST'}),env as any)).status).toBe(405);
+  expect((await worker.fetch(privateRequest('https://igor.test/v1/sources',{method:'POST'}),env as any)).status).toBe(405);
+});
+it.each([undefined,'Bearer wrong','Basic '+TEST_TOKEN,'Bearer '+TEST_TOKEN+'x'])
+('rejects unauthorized requests before database access',async authorization=>{
+  const protectedEnv={PRIVATE_API_TOKEN:TEST_TOKEN,get DB():D1Database{throw new Error('Must not access database');}};
+  const headers:Record<string,string>={};if(authorization)headers.Authorization=authorization;
+  const response=await worker.fetch(new Request('https://igor.test/v1/sources',{headers}),protectedEnv);
+  expect(response.status).toBe(401);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(await response.text()).not.toContain(TEST_TOKEN);
+});
+it('fails closed when server secret is absent',async()=>{
+  expect((await worker.fetch(privateRequest('https://igor.test/v1/sources'),{DB:env.DB})).status).toBe(503);
 });

@@ -1,7 +1,6 @@
 name: Prices daily
 on:
-  schedule:
-    - cron: '17 4 * * *'
+  # Uso personale: solo avvio manuale; run_daily mantiene il limite giornaliero.
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,7 +9,6 @@ concurrency:
   cancel-in-progress: false
 jobs:
   daily:
-    if: vars.IGOR_PRICES_DAILY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

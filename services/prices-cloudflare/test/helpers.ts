@@ -1,6 +1,12 @@
 import {env} from 'cloudflare:workers';
 export const db = env.DB as D1Database;
 export const NOW='2026-10-05T00:00:00+00:00';
+export const TEST_TOKEN='synthetic-test-private-token-00000000';
+export function privateRequest(url:string,init:RequestInit={}) {
+  const headers=new Headers(init.headers);
+  headers.set('Authorization','Bearer '+TEST_TOKEN);
+  return new Request(url,{...init,headers});
+}
 export async function applySchema() {
   // Current plugin shares D1 storage across tests; reset only the local test binding.
   await db.prepare('DROP TRIGGER IF EXISTS protect_current').run();

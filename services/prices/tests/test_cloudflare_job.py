@@ -50,3 +50,11 @@ def test_publisher_failure_is_failed_run_not_success():
 
 def test_invalid_manifest_fails_before_any_acquisition():
     with pytest.raises(ValueError):run_daily(Publisher(SqlD1()),{'schema_version':2,'sources':[]},now=NOW)
+
+def test_personal_catalog_limit_rejects_before_publication():
+    source=config()
+    source['product_urls']=['https://www.carrefour.it/p/'+str(i) for i in range(51)]
+    remote=SqlD1()
+    with pytest.raises(ValueError,match='50 URL'):
+        run_daily(Publisher(remote),{'schema_version':1,'sources':[source]},now=NOW)
+    assert Publisher(remote).sources()==[]

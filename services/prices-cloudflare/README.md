@@ -1,7 +1,9 @@
 # Igor prices on Cloudflare Free
 
-API Workers di sola lettura, archivio D1 persistente e acquisizione Python
-giornaliera su GitHub Actions. Il servizio locale FastAPI resta disponibile.
+API Workers di sola lettura ad accesso riservato, archivio D1 persistente e
+acquisizione Python manuale su GitHub Actions, al massimo una volta per
+fonte/giorno UTC. Catalogo personale limitato a 50 URL espliciti.
+Il servizio locale FastAPI resta disponibile.
 Il codice e' preparato; nessun account o catalogo reale e' attivato dalla build.
 Tutte le sei catene rimangono candidate fino alla validazione delle fonti.
 
@@ -10,8 +12,9 @@ Tutte le sei catene rimangono candidate fino alla validazione delle fonti.
 API pubblicata e verificata su https://igor-prices.andreatro.workers.dev.
 Migrazioni D1 e inizializzazione metadata riuscite: sei fonti candidate,
 zero offerte. Test CI e smoke HTTPS 200/404/422/405 passati.
-`IGOR_PRICES_DAILY_ENABLED=false`: acquisizione giornaliera spenta.
-APK sul telefono ancora senza URL; fonti reali e quote account da verificare.
+Il workflow **Prices daily** ora ha solo avvio manuale; la variabile storica
+`IGOR_PRICES_DAILY_ENABLED` non controlla piu' il job. Fonti reali ancora
+da validare. Per l'ultimo deploy e APK vedere il rapporto uso personale.
 Rapporto: [prima pubblicazione](../../docs/verification/2026-10-06-deploy-cloudflare.md).
 
 ## Sviluppo e test
@@ -48,23 +51,26 @@ I dati dell'inventario non vengono caricati sul server.
    applicare migrazioni e le letture account/subdomain richieste da Wrangler.
    `CF_D1_API_TOKEN` richiede D1 Edit e viene usato solo dal publisher.
    Inserirli direttamente in GitHub Secrets, senza file, chat o argomenti CLI.
+   Configurare anche `IGOR_PRICES_API_TOKEN`, chiave casuale dedicata al client
+   (almeno 32 caratteri, consigliati 32 byte casuali in esadecimale). Il deploy
+   la installa nel Worker come secret `PRIVATE_API_TOKEN`. Non usare un token
+   amministrativo Cloudflare nell'APK. Chiave assente: 503; accesso senza
+   `Authorization: Bearer ...` valido: 401, prima di leggere D1.
    Verificare i permessi correnti nel pannello Cloudflare, non espanderli
    indiscriminatamente in caso di errore.
 5. I file devono essere disponibili nella branch selezionata per il deploy.
    Avviare manualmente **Prices deploy**: test, migrazioni, inizializzazione
    metadata candidate e distribuzione API. Nessuna fixture viene pubblicata.
-6. Verificare via HTTPS `/v1/sources`, ricerca `q=latte&postcode=20125`,
+6. Verificare via HTTPS con la chiave privata `/v1/sources`, ricerca `q=latte&postcode=20125`,
    422 per CAP invalido, 404 per prodotto assente e 405 per POST.
    Sei candidate e zero offerte sono il risultato iniziale previsto.
 7. Verificare piano Free, quote condivise GitHub e budget che blocchi uso
    extra se una carta e' gia' presente. Non attivare un piano Paid.
-   Impostare poi `IGOR_PRICES_DAILY_ENABLED=true` e provare **Prices daily**
+   Provare **Prices daily**
    manualmente. Con fonti candidate non effettua richieste alle catene.
-8. La pianificazione 04:17 UTC richiede il workflow sulla branch predefinita.
-   Un eventuale merge viene revisionato separatamente. GitHub puo' ritardare
-   o perdere esecuzioni; la cache Android mantiene i limiti di anzianita'.
-   Nel repository pubblico i workflow pianificati si disabilitano dopo
-   60 giorni senza attivita': controllare Actions e riabilitarli quando serve.
+8. Avviare manualmente **Prices daily** quando serve aggiornare il catalogo.
+   Non esiste una pianificazione automatica. Le richieste dell'app leggono
+   il catalogo gia' acquisito; non avviano letture dei siti delle catene.
 
 La pubblicazione locale alternativa usa `npm run configure` con
 CF_ACCOUNT_ID/CF_DATABASE_ID impostati nell'ambiente, poi migrazioni e deploy
@@ -97,6 +103,10 @@ Observability Workers disattivata nella config, nessun console.log con query.
 I log infrastrutturali Cloudflare e l'accesso amministrativo rimangono soggetti
 alle impostazioni dell'account. Non usare live tail per registrare ricerche.
 
-Dopo un deploy HTTPS verificato, compilare Android con la proprieta'
-`igorOnlinePricesUrl` impostata all'URL reale. L'APK predefinita senza URL
+Per l'APK personale impostare `igorOnlinePricesUrl` all'URL reale e
+`ORG_GRADLE_PROJECT_igorOnlinePricesToken` nell'ambiente, con la stessa chiave
+dedicata del Worker. Non metterla negli argomenti CLI, nei file versionati
+o nei log. La chiave e' inclusa nell'APK personale: non distribuire questo
+artefatto. Per ruotarla aggiornare il secret GitHub, ridistribuire e
+ricompilare/installare l'APK. L'APK predefinita senza URL
 non attiva il servizio; gli accessi dell'utente rimangono facoltativi.

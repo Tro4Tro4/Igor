@@ -2,7 +2,7 @@ import {beforeEach,it,expect} from 'vitest';
 import {env} from 'cloudflare:workers';
 import worker from '../src/index';
 import fixture from '../../prices-contract/fixtures.json';
-import {applySchema,db,NOW,seedSource,stage,publish} from './helpers';
+import {applySchema,db,NOW,seedSource,stage,publish,privateRequest} from './helpers';
 beforeEach(applySchema);
 it('satisfies shared FastAPI Android v1 fixtures',async()=>{
   for(const [i,source] of ['carrefour','conad'].entries()) {
@@ -14,7 +14,7 @@ it('satisfies shared FastAPI Android v1 fixtures',async()=>{
     await publish(source,source);
   }
   for(const query of fixture.queries) {
-    const response=await worker.fetch(new Request('https://igor.test/v1/products?'+query.query),env as any);
+    const response=await worker.fetch(privateRequest('https://igor.test/v1/products?'+query.query),env as any);
     const body=await response.json() as any;
     expect(body.schema_version).toBe(1);expect(body.items.map((o:any)=>o.offer_id)).toEqual(query.ids);
     expect(body.next_offset).toBe(query.next_offset??null);

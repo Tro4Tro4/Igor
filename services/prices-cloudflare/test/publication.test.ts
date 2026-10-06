@@ -2,13 +2,13 @@ import {beforeEach,it,expect} from 'vitest';
 import {env} from 'cloudflare:workers';
 import worker from '../src/index';
 import fixture from '../../prices-contract/publication.json';
-import {applySchema,db} from './helpers';
+import {applySchema,db,privateRequest} from './helpers';
 beforeEach(applySchema);
 async function run(operation:{sql:string,params:unknown[]}) {
   return db.prepare(operation.sql).bind(...operation.params).run();
 }
 async function search() {
-  return await (await worker.fetch(new Request('https://igor.test/v1/products?q=latte'),env as any)).json() as any;
+  return await (await worker.fetch(privateRequest('https://igor.test/v1/products?q=latte'),env as any)).json() as any;
 }
 it('executes real publisher SQL without exposing partial catalog',async()=>{
   for(const operation of fixture.operations.slice(0,fixture.initial))await run(operation);
@@ -59,7 +59,7 @@ it('measures a synthetic 2000-offer pilot in D1 locally',async()=>{
       .bind(batch,batch).run();written+=result.meta.rows_written;
   }
   for(const token of ['latte','marca 1999','absent']) {
-    const start=performance.now();const body=await worker.fetch(new Request('https://igor.test/v1/products?q='+encodeURIComponent(token)),env as any);
+    const start=performance.now();const body=await worker.fetch(privateRequest('https://igor.test/v1/products?q='+encodeURIComponent(token)),env as any);
     expect(body.status).toBe(200);await body.text();timings.push(performance.now()-start);
   }
   expect(written).toBeLessThan(100000);expect(bytes).toBeGreaterThan(0);expect(bytes).toBeLessThan(500*1024*1024);

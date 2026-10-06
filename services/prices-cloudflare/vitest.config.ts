@@ -4,6 +4,6 @@ import {readFileSync} from 'node:fs';
 
 export default defineConfig({
   plugins:[cloudflareTest({wrangler:{configPath:'./wrangler.local.jsonc'},
-    miniflare:{bindings:{SCHEMA:readFileSync('./migrations/0001_catalog.sql','utf8')}}})],
+    miniflare:{bindings:{SCHEMA:readFileSync('./migrations/0001_catalog.sql','utf8'),PRIVATE_API_TOKEN:'synthetic-test-private-token-00000000'}}})],
   test:{include:['test/**/*.test.ts']}
 });

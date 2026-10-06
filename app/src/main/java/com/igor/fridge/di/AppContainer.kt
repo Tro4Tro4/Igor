@@ -63,7 +63,7 @@ class AppContainer(context: Context) {
     val similarProductSearch: SimilarProductSearch by lazy { SimilarProductSearch(openPricesClient) }
 
     val onlinePricesClient by lazy {
-        com.igor.fridge.data.onlineprices.OnlinePricesClient(UrlConnectionTransport(),com.igor.fridge.BuildConfig.ONLINE_PRICES_URL,com.igor.fridge.BuildConfig.DEBUG)
+        com.igor.fridge.data.onlineprices.OnlinePricesClient(UrlConnectionTransport(),com.igor.fridge.BuildConfig.ONLINE_PRICES_URL,com.igor.fridge.BuildConfig.DEBUG,com.igor.fridge.BuildConfig.ONLINE_PRICES_TOKEN)
     }
     val onlinePricesRepository by lazy {
         com.igor.fridge.data.repository.OnlinePricesRepository(database.onlinePricesDao(),settingsStore.onlinePrices,shoppingRepository::findByUuid,

@@ -227,10 +227,21 @@ API Workers pubblicata il 6 ottobre 2026 su
 https://igor-prices.andreatro.workers.dev, con archivio D1 e publisher Python
 per GitHub Actions. Test CI, migrazioni remote e smoke HTTPS riusciti.
 Sei fonti candidate e zero offerte; acquisizione giornaliera disattivata.
-Il contratto Android v1 resta compatibile. L’app sul telefono conserva
-per ora la configurazione precedente, senza URL del servizio.
+Il contratto Android v1 resta compatibile. L'APK collegato al servizio e'
+stato installato il 6 ottobre; rapporto e verifiche del servizio personale
+sono in `docs/verification/2026-10-06-prezzi-uso-personale.md`.
 Fonti reali e quote dell’account restano da verificare. Rapporto:
 [prima pubblicazione](docs/verification/2026-10-06-deploy-cloudflare.md).
 
 Istruzioni: [servizio Cloudflare](services/prices-cloudflare/README.md).
 Prove e limiti: [verifica hosting gratuito](docs/verification/2026-10-05-hosting-cloudflare.md).
+
+## Uso personale
+
+Igor e' esclusivamente per l'utente e non verra' distribuita. Il servizio
+prezzi richiede una chiave dedicata nell'header Authorization; non espone
+prezzi a richieste anonime. L'importazione su GitHub Actions e' solo manuale,
+con massimo 50 URL nel manifest e un tentativo per fonte/giorno UTC.
+La ricerca nell'app legge la cache del servizio, senza acquisire prodotti
+su richiesta. Le fonti restano candidate fino alla verifica dei dati e
+delle condizioni di accesso per questo uso.

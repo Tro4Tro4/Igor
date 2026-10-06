@@ -33,6 +33,14 @@ jobs:
         env:
           CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
           CF_DATABASE_ID: ${{ vars.CF_DATABASE_ID }}
+      - name: Configure private API access
+        run: |
+          test ${#IGOR_PRICES_API_TOKEN} -ge 32
+          printf '%s' "$IGOR_PRICES_API_TOKEN" | npx --no-install wrangler secret put PRIVATE_API_TOKEN --config wrangler.deploy.jsonc
+        working-directory: services/prices-cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_DEPLOY_API_TOKEN }}
+          IGOR_PRICES_API_TOKEN: ${{ secrets.IGOR_PRICES_API_TOKEN }}
       - name: Apply D1 migrations
         run: npx --no-install wrangler d1 migrations apply DB --remote --config wrangler.deploy.jsonc
         working-directory: services/prices-cloudflare

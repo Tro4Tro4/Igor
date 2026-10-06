@@ -2,8 +2,20 @@ import {InputError,parseInput} from './input';
 import {readCatalog} from './catalog';
 import {jsonEnvelope} from './envelope';
 const error=(status:number,detail:string)=>Response.json({detail},{status,headers:{'cache-control':'no-store'}});
+export type PricesEnv={DB:D1Database;PRIVATE_API_TOKEN?:string};
+async function authorized(request:Request,token:string):Promise<boolean> {
+  const header=request.headers.get('authorization');
+  if(!header?.startsWith('Bearer ')||header.length>256)return false;
+  const digest=async(value:string)=>new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)));
+  const [actual,expected]=await Promise.all([digest(header.slice(7)),digest(token)]);
+  let difference=0;
+  for(let i=0;i<expected.length;i++)difference|=actual[i]^expected[i];
+  return difference===0;
+}
 export default {
-  async fetch(request:Request,env:{DB:D1Database}):Promise<Response> {
+  async fetch(request:Request,env:PricesEnv):Promise<Response> {
+    if(!env.PRIVATE_API_TOKEN||env.PRIVATE_API_TOKEN.length<32)return error(503,'Accesso privato non configurato');
+    if(!await authorized(request,env.PRIVATE_API_TOKEN))return error(401,'Accesso non autorizzato');
     if(request.method!=='GET')return error(405,'Metodo non consentito');
     try {
       const query=parseInput(new URL(request.url));
@@ -15,4 +27,4 @@ export default {
       return error(503,'Catalogo temporaneamente indisponibile');
     }
   }
-} satisfies ExportedHandler<{DB:D1Database}>;
+} satisfies ExportedHandler<PricesEnv>;

@@ -4,7 +4,7 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {build} from 'esbuild';
 const bundle=await build({entryPoints:['src/index.ts'],bundle:true,format:'esm',write:false,platform:'browser',target:'es2022'});
 const runtime=new Miniflare(convertV4MiniflareOptions({modules:true,script:bundle.outputFiles[0].text,compatibilityDate:'2026-10-05',
-  d1Databases:{DB:'igor-synthetic-pilot'},d1Persist:false}));
+  bindings:{PRIVATE_API_TOKEN:'synthetic-test-private-token-00000000'},d1Databases:{DB:'igor-synthetic-pilot'},d1Persist:false}));
 const fixture=JSON.parse(readFileSync('../prices-contract/publication.json','utf8'));
 const offer=JSON.parse(readFileSync('../prices-contract/fixtures.json','utf8')).offers[0];
 const upload=fixture.operations.find(o=>o.sql.includes('json_each')).sql;
@@ -37,7 +37,7 @@ try {
   }
   meter(await db.prepare("DELETE FROM offer_batches WHERE id='pilot1'").run());
   for(const q of ['latte','marca 1999','assente','à'.repeat(100)]) {
-    const start=performance.now(),response=await runtime.dispatchFetch('https://igor.test/v1/products?q='+encodeURIComponent(q));
+    const start=performance.now(),response=await runtime.dispatchFetch('https://igor.test/v1/products?q='+encodeURIComponent(q),{headers:{Authorization:'Bearer synthetic-test-private-token-00000000'}});
     const body=await response.json();
     if(response.status!==200)throw new Error('Pilot search failed');
     result.queries.push({query:q.length>20?'100 unicode characters':q,wall_ms:performance.now()-start,items:body.items.length});

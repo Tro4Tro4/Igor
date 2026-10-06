@@ -8,9 +8,10 @@ import kotlinx.coroutines.CancellationException
 import java.net.URI
 import java.net.URLEncoder
 
-class OnlinePricesClient(private val transport: HttpTransport, private val baseUrl: String, private val allowLocalHttp: Boolean = false) {
+class OnlinePricesClient(private val transport: HttpTransport, private val baseUrl: String, private val allowLocalHttp: Boolean = false, private val accessToken: String = "") {
     val configured: Boolean get() = baseUrl.isNotBlank()
     init {
+        require(accessToken.isEmpty() || accessToken.matches(Regex("[A-Za-z0-9_-]{32,128}")))
         if (configured) {
             val uri = URI(baseUrl)
             require(uri.userInfo == null && uri.query == null && uri.fragment == null && uri.host != null)
@@ -29,7 +30,9 @@ class OnlinePricesClient(private val transport: HttpTransport, private val baseU
     }
     private suspend fun get(path: String): String {
         if (!configured) throw OnlinePricesException("Servizio prezzi non configurato")
-        val response = transport.execute(HttpRequest("GET",baseUrl.trimEnd('/')+path,headers=mapOf("User-Agent" to "Igor/0.1.0 (Android)")))
+        val headers = mutableMapOf("User-Agent" to "Igor/0.1.0 (Android)")
+        if (accessToken.isNotEmpty()) headers["Authorization"] = "Bearer $accessToken"
+        val response = transport.execute(HttpRequest("GET",baseUrl.trimEnd('/')+path,headers=headers))
         if (!response.isSuccessful) throw OnlinePricesException("Servizio prezzi HTTP ${response.code}",response.code == 429 || response.code >= 500)
         if (response.body.length > 2*1024*1024) throw OnlinePricesException("Risposta prezzi troppo grande")
         return response.body

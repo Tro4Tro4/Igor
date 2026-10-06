@@ -20,6 +20,9 @@ def run_daily(publisher, manifest, *, now=None, ingest_fn=ingest):
     utc(now)
     if manifest.get('schema_version') != 1 or not isinstance(manifest.get('sources'),list):
         raise ValueError('Manifest non supportato')
+    # Il servizio personale importa solo un elenco esplicito e piccolo.
+    if sum(len(source.get('product_urls',[])) for source in manifest['sources']) > 50:
+        raise ValueError('Catalogo personale oltre il limite di 50 URL')
     publisher.sync_sources(manifest['sources'])
     sources=publisher.sources()
     result=JobSummary()
