@@ -31,13 +31,30 @@ dall'utente con GitHub CLI; verificati solo i nomi, nessun token letto.
    remota riuscita; inizializzazione metadata riuscita. Pubblicazione API
    interrotta per assenza del sottodominio workers.dev dell'account.
 
-## Passaggio necessario
+## Pubblicazione HTTPS riuscita
 
-Registrare il sottodominio gratuito tramite l'onboarding Workers indicato
-dal log Cloudflare. Poi rieseguire Prices deploy e verificare HTTPS,
-sei fonti candidate, catalogo vuoto e risposte 404/422/405.
+Il link onboarding indicato da Wrangler restituiva 404 nel browser. Il
+pannello Workers & Pages mostrava invece `andreatro.workers.dev` gia'
+configurato. Nessun progetto manuale o dominio acquistato.
 
-Nessun endpoint pubblicato o APK aggiornato in questa fase. Nessuna fonte
+[Terza esecuzione](https://github.com/Tro4Tro4/Igor/actions/runs/37448222310):
+tutti gli step riusciti, incluso il deploy. URL pubblicato:
+https://igor-prices.andreatro.workers.dev
+Versione Worker: `46b43a96-e559-4040-8cc1-9e2b423a72e5`.
+
+Smoke HTTPS del 6 ottobre alle 12:13, ora di Roma:
+
+- GET `/v1/sources`: 200, schema 1, versione catalogo 0, sei fonti candidate.
+- GET `/v1/products?q=latte&postcode=20125`: 200, catalogo vuoto.
+- GET con CAP `abc`: 422.
+- GET offerte di prodotto assente: 404.
+- POST `/v1/sources`: 405.
+
+L'API e' pubblicata e raggiungibile; l'acquisizione giornaliera resta
+disattivata. Prossimi passi: validare le fonti reali e configurare l'APK
+con questo URL. Nessun test remoto di cataloghi sintetici effettuato.
+
+Nessun APK aggiornato in questa fase. Nessuna fonte
 attivata, nessun catalogo sintetico pubblicato, nessuna acquisizione delle
 catene. Piano, quote e impostazioni di fatturazione dell'account non sono
 verificabili dai soli log del workflow; nessun upgrade richiesto dal codice.

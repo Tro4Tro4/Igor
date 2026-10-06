@@ -213,12 +213,14 @@ Verifiche, decisioni e limiti: [rapporto prezzi online](docs/verification/2026-1
 
 ## Hosting gratuito prezzi — preparazione Cloudflare
 
-Preparati API Workers, archivio D1 con lotti atomici e publisher Python
-per GitHub Actions. Il contratto Android v1 resta compatibile. Deploy
-manuale e acquisizione giornaliera separati; nessun piano a pagamento
-o dominio necessario. Configurazione e accessi dell’account Cloudflare
-sono ancora da completare: nessun endpoint remoto pubblicato.
-L’app sul telefono conserva per ora la configurazione precedente.
+API Workers pubblicata il 6 ottobre 2026 su
+https://igor-prices.andreatro.workers.dev, con archivio D1 e publisher Python
+per GitHub Actions. Test CI, migrazioni remote e smoke HTTPS riusciti.
+Sei fonti candidate e zero offerte; acquisizione giornaliera disattivata.
+Il contratto Android v1 resta compatibile. L’app sul telefono conserva
+per ora la configurazione precedente, senza URL del servizio.
+Fonti reali e quote dell’account restano da verificare. Rapporto:
+[prima pubblicazione](docs/verification/2026-10-06-deploy-cloudflare.md).
 
 Istruzioni: [servizio Cloudflare](services/prices-cloudflare/README.md).
 Prove e limiti: [verifica hosting gratuito](docs/verification/2026-10-05-hosting-cloudflare.md).

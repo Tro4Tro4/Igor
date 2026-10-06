@@ -5,6 +5,15 @@ giornaliera su GitHub Actions. Il servizio locale FastAPI resta disponibile.
 Il codice e' preparato; nessun account o catalogo reale e' attivato dalla build.
 Tutte le sei catene rimangono candidate fino alla validazione delle fonti.
 
+## Stato remoto — 6 ottobre 2026
+
+API pubblicata e verificata su https://igor-prices.andreatro.workers.dev.
+Migrazioni D1 e inizializzazione metadata riuscite: sei fonti candidate,
+zero offerte. Test CI e smoke HTTPS 200/404/422/405 passati.
+`IGOR_PRICES_DAILY_ENABLED=false`: acquisizione giornaliera spenta.
+APK sul telefono ancora senza URL; fonti reali e quote account da verificare.
+Rapporto: [prima pubblicazione](../../docs/verification/2026-10-06-deploy-cloudflare.md).
+
 ## Sviluppo e test
 
 Node 24 e Python 3.12. Le dipendenze Node sono fissate in package-lock.json.
