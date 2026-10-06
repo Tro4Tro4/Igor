@@ -49,8 +49,8 @@ CREATE TABLE runs(source TEXT NOT NULL REFERENCES sources(id),day TEXT NOT NULL,
 -- statement boundary
 CREATE TRIGGER offer_source BEFORE INSERT ON offers
 BEGIN
-  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM offer_batches WHERE id=NEW.batch_id AND source=NEW.source AND status='staging')
-    THEN RAISE(ABORT,'offer batch unavailable') END;
+  SELECT (CASE WHEN NOT EXISTS(SELECT 1 FROM offer_batches WHERE id=NEW.batch_id AND source=NEW.source AND status='staging')
+    THEN RAISE(ABORT,'offer batch unavailable') END);
 END;
 -- statement boundary
 CREATE TRIGGER immutable_offer BEFORE UPDATE ON offers
@@ -59,14 +59,14 @@ BEGIN SELECT RAISE(ABORT,'immutable offer'); END;
 CREATE TRIGGER guard_publication BEFORE UPDATE OF current_batch ON sources
 WHEN NEW.current_batch IS NOT OLD.current_batch
 BEGIN
-  SELECT CASE WHEN NEW.status!='active' OR NOT EXISTS(
+  SELECT (CASE WHEN NEW.status!='active' OR NOT EXISTS(
     SELECT 1 FROM offer_batches b WHERE b.id=NEW.current_batch AND b.source=NEW.id
       AND b.digest=NEW.digest AND b.observed_at=NEW.last_successful_at
       AND b.expected_count=(SELECT COUNT(*) FROM offers WHERE batch_id=b.id)
-  ) THEN RAISE(ABORT,'batch incomplete or source inactive') END;
-  SELECT CASE WHEN (SELECT COUNT(*) FROM offers o JOIN sources s ON o.batch_id=s.current_batch WHERE s.id!=NEW.id)
+  ) THEN RAISE(ABORT,'batch incomplete or source inactive') END);
+  SELECT (CASE WHEN (SELECT COUNT(*) FROM offers o JOIN sources s ON o.batch_id=s.current_batch WHERE s.id!=NEW.id)
     +(SELECT COUNT(*) FROM offers WHERE batch_id=NEW.current_batch)>2000
-    THEN RAISE(ABORT,'catalog limit') END;
+    THEN RAISE(ABORT,'catalog limit') END);
 END;
 -- statement boundary
 CREATE TRIGGER publish_version AFTER UPDATE OF current_batch ON sources
