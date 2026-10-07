@@ -204,6 +204,21 @@ fun SettingsScreen(
                 Text(stringResource(R.string.open_prices_title))
             }
 
+            Row(
+                modifier = Modifier.fillMaxWidth().toggleable(
+                    value = state.openFoodFactsEnabled,
+                    role = Role.Switch,
+                    onValueChange = viewModel::onOpenFoodFactsToggle,
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.off_enable), modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium)
+                Switch(checked = state.openFoodFactsEnabled, onCheckedChange = null)
+            }
+            Text(stringResource(R.string.off_enable_help), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+
             HorizontalDivider()
             Row(
                 modifier = Modifier.fillMaxWidth().toggleable(value=state.onlinePrices.enabled,role=Role.Switch,onValueChange=viewModel::onOnlinePricesToggle),

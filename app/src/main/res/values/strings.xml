@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="off_enable">Riconosci con Open Food Facts</string>
+    <string name="off_enable_help">Per i codici sconosciuti, invia il barcode a Open Food Facts per recuperare nome e marca e suggerire la categoria. Richiede Internet, senza account. I dati salvati restano sul telefono. Fonte: Open Food Facts, licenza ODbL.</string>
+    <string name="off_loading">Ricerca su Open Food Facts… Puoi continuare a compilare.</string>
+    <string name="off_found">Dati da Open Food Facts (ODbL). Verifica i campi prima di salvare.</string>
+    <string name="off_incomplete">Prodotto presente su Open Food Facts (ODbL), ma senza nome. Completa i campi.</string>
+    <string name="off_not_found">Prodotto assente da Open Food Facts. Inserisci i dati a mano.</string>
+    <string name="off_error">Ricerca non riuscita. Riprova o inserisci i dati a mano.</string>
+    <string name="off_rate_limited">Troppe richieste. Attendi un minuto o inserisci i dati a mano.</string>
+    <string name="off_disabled">Codice sconosciuto. Puoi attivare la ricerca su Open Food Facts nelle Impostazioni.</string>
+    <string name="off_unsupported">Questo codice non è un EAN/UPC valido per la ricerca online. Inserisci i dati a mano.</string>
+    <string name="off_retry">Riprova la ricerca</string>
     <string name="app_name">Igor</string>
     <string name="expiry_notification_channel_name">Scadenze</string>
     <string name="expiry_notification_channel_description">Avvisi sugli alimenti in scadenza o scaduti</string>
@@ -10,7 +21,7 @@
     <string name="settings_hour">Ora del controllo: %1$d</string>
     <string name="settings_hour_help">L’orario è indicativo: il sistema può rimandare il controllo di qualche ora per risparmiare batteria.</string>
     <string name="settings_privacy">Privacy e dati</string>
-    <string name="settings_privacy_info">Inventario, liste, prezzi e foto restano sul telefono. Scontrini e codici a barre si leggono sul telefono con ML Kit di Google, che può inviare a Google statistiche d’uso e diagnostica, senza le immagini. I pulsanti «Cerca su…» aprono nel browser il sito della catena o una ricerca Google con il nome del prodotto. Il backup di Android salva questi dati nel tuo account Google solo se è cifrato (telefono con blocco schermo); l’accesso a Open Prices non va mai nel backup.</string>
+    <string name="settings_privacy_info">Inventario, liste, prezzi e foto restano sul telefono. Se attivi il riconoscimento con Open Food Facts, i barcode sconosciuti vengono inviati al servizio per recuperarne i dati; inventario e foto non vengono inviati. Scontrini e codici a barre si leggono sul telefono con ML Kit di Google, che può inviare a Google statistiche d’uso e diagnostica, senza le immagini. I pulsanti «Cerca su…» aprono nel browser il sito della catena o una ricerca Google con il nome del prodotto. Il backup di Android salva questi dati nel tuo account Google solo se è cifrato (telefono con blocco schermo); l’accesso a Open Prices non va mai nel backup.</string>
     <string name="settings_export">Esporta i miei dati</string>
     <string name="settings_delete_all">Elimina tutti i miei dati</string>
     <string name="settings_delete_all_confirm">Inventario, lista della spesa, liste salvate, storico dei prezzi, foto e impostazioni verranno cancellati, e uscirai da Open Prices. Non si può annullare. I prezzi già condivisi su Open Prices sono pubblici e si cancellano dal sito del servizio.</string>
@@ -195,7 +206,7 @@
     <string name="open_prices_title">Open Prices</string>
     <string name="open_prices_intro">Open Prices è un database aperto di prezzi raccolti dalla comunità di Open Food Facts. Igor può leggere i prezzi degli altri per confrontarli con i tuoi e, se vuoi, condividere i prezzi dei tuoi scontrini.</string>
     <string name="open_prices_enable">Usa Open Prices</string>
-    <string name="open_prices_enable_help">È l’unica funzione di Igor che scambia dati con un servizio online. Spenta, Igor non contatta Open Prices: né per leggere prezzi né per accedere.</string>
+    <string name="open_prices_enable_help">Usa il servizio online Open Prices per i prezzi della comunità e la condivisione degli scontrini. Spenta, Igor non contatta Open Prices: né per leggere prezzi né per accedere. Il riconoscimento con Open Food Facts ha una preferenza separata.</string>
     <string name="open_prices_enable_first">Attiva Open Prices per accedere e condividere i tuoi prezzi.</string>
     <string name="open_prices_account">Condividere i tuoi prezzi</string>
     <string name="open_prices_account_help">Per condividere serve un account Open Food Facts (gratuito, su openfoodfacts.org). Per leggere i prezzi non serve.</string>

@@ -52,6 +52,21 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `ricerca barcode parte spenta ed e separata da Open Prices`() = runTest {
+        val store = newStore()
+        assertFalse(store.openFoodFactsEnabled.first())
+        store.setOpenFoodFactsEnabled(true)
+        assertTrue(store.openFoodFactsEnabled.first())
+        assertFalse(store.openPrices.first().enabled)
+        store.setOpenPricesEnabled(true)
+        store.setOpenFoodFactsEnabled(false)
+        assertFalse(store.openFoodFactsEnabled.first())
+        assertTrue(store.openPrices.first().enabled)
+        store.clearAll()
+        assertFalse(store.openFoodFactsEnabled.first())
+    }
+
+    @Test
     fun `i valori di partenza sono quelli di default`() = runTest {
         val store = newStore()
 

@@ -1,8 +1,9 @@
 # Igor — monitoraggio del frigorifero
 
 App Android per tenere sotto controllo cosa c’è in frigo, cosa sta per scadere e
-cosa va ricomprato. Tutti i dati restano sul dispositivo: nessun account, nessun server.
-L’unica eccezione è Open Prices, facoltativo e spento finché l’utente non lo attiva.
+cosa va ricomprato. Inventario, lista e scontrini restano sul dispositivo.
+Open Prices, il riconoscimento prodotti con Open Food Facts e il servizio privato
+dei prezzi online sono facoltativi e attivabili separatamente nelle Impostazioni.
 
 ## Funzionalità (MVP)
 
@@ -21,6 +22,11 @@ L’unica eccezione è Open Prices, facoltativo e spento finché l’utente non 
   dei prodotti scaduti o in scadenza entro la soglia di preavviso (3 giorni di default).
 - **Codice a barre**: lettura EAN/UPC/Code-128 con fotocamera (CameraX + ML Kit). Se il codice
   è già stato registrato in passato, nome, categoria e unità vengono precompilati.
+  Per i codici EAN/UPC sconosciuti, attivando **Riconosci con Open Food Facts** nelle
+  Impostazioni, Igor cerca online nome, marca e categoria suggerita. I campi modificati
+  manualmente prevalgono; quantità e scadenza restano da confermare. Errori di rete e
+  prodotti assenti permettono di continuare a mano. I prodotti salvati vengono poi
+  riconosciuti offline; nessun catalogo completo viene scaricato.
 - **Lista della spesa**: voci aggiunte a mano, oppure generate dai prodotti consumati o in
   scadenza, raggruppate per categoria (ognuna con la sua icona) nell’ordine delle corsie.
   Per ogni voce: quantità e unità, marca, note, foto, quantità effettivamente presa. Spunta
@@ -70,7 +76,8 @@ L’unica eccezione è Open Prices, facoltativo e spento finché l’utente non 
 ```
 app/src/main/java/com/igor/fridge/
 ├── data/
-│   ├── openprices/   # client di Open Prices (facoltativo, unico accesso a Internet)
+│   ├── openprices/   # client di Open Prices (facoltativo)
+│   ├── openfoodfacts/ # riconoscimento online dei barcode sconosciuti (facoltativo)
 │   ├── local/        # entità Room (UUID, cancellazione logica), DAO, database, migrazioni
 │   ├── photos/       # foto delle voci della spesa (file privati dell’app)
 │   ├── prefs/        # preferenze utente (DataStore, osservabili)
@@ -143,7 +150,7 @@ Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi 
 corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
 "3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-La suite comprende 344 test in 49 classi, tutti sulla JVM; Room e le foto girano sotto Robolectric. Non
+La suite verificata il 7 ottobre comprende 376 test in 56 classi, tutti sulla JVM; Room e le foto girano sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
 **Database: versione 6.** Ogni cambio di schema alza la versione e porta la sua migrazione
@@ -237,6 +244,10 @@ Istruzioni: [servizio Cloudflare](services/prices-cloudflare/README.md).
 Prove e limiti: [verifica hosting gratuito](docs/verification/2026-10-05-hosting-cloudflare.md).
 
 ## Uso personale
+
+L'APK completo del 7 ottobre include sia il riconoscimento barcode sia
+l'accesso prezzi privato. Correzione dell'APK del 6 ottobre che escludeva
+Open Food Facts: [verifica ripristino barcode](docs/verification/2026-10-07-ripristino-barcode-apk.md).
 
 Igor e' esclusivamente per l'utente e non verra' distribuita. Il servizio
 prezzi richiede una chiave dedicata nell'header Authorization; non espone

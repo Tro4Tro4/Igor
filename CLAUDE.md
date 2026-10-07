@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Igor è un'app Android (Kotlin, Jetpack Compose, Room) per inventario del frigo, scadenze, lista della spesa, scontrini e prezzi. Tutti i dati restano sul dispositivo; l'unico accesso a Internet è Open Prices, facoltativo e spento di default. Il `README.md` descrive funzionalità, stato e difetti noti: tenerlo aggiornato quando cambia qualcosa di rilevante.
+Igor è un'app Android (Kotlin, Jetpack Compose, Room) per inventario del frigo, scadenze, lista della spesa, scontrini e prezzi. Inventario, lista e scontrini restano sul dispositivo; gli accessi a Internet sono Open Prices, il riconoscimento Open Food Facts e il servizio privato dei prezzi online, facoltativi, separati e spenti di default. Il `README.md` descrive funzionalità, stato e difetti noti: tenerlo aggiornato quando cambia qualcosa di rilevante.
 
 ## Vincolo d'uso concordato
 

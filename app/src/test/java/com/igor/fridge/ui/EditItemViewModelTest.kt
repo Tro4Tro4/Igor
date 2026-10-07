@@ -42,6 +42,69 @@ class EditItemViewModelTest {
 
     private fun viewModel(uuid: String) = EditItemViewModel(uuid, repository)
 
+    private val code = "3017620422003"
+    private val onlineProduct = com.igor.fridge.data.openfoodfacts.BarcodeProduct("Latte", "Marca", FoodCategory.LATTE_PANNA)
+
+    @Test fun `codice sconosciuto precompila online senza inventare quantita o scadenza`() = runTest(dispatcher) {
+        val vm = EditItemViewModel(NEW_ITEM_UUID, repository, onlineEnabled = { true }, fetchProduct = { onlineProduct })
+        vm.onBarcodeScanned(code); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("Latte", vm.uiState.value.name)
+        assertEquals("Marca", vm.uiState.value.brand)
+        assertEquals(FoodCategory.LATTE_PANNA, vm.uiState.value.category)
+        assertEquals("1", vm.uiState.value.quantityText); assertNull(vm.uiState.value.expiryDate)
+        vm.save(); dispatcher.scheduler.advanceUntilIdle()
+        val offline = EditItemViewModel(NEW_ITEM_UUID, repository, fetchProduct = { error("Rete vietata") })
+        offline.onBarcodeScanned(code); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("Latte", offline.uiState.value.name)
+    }
+
+    @Test fun `consenso spento e prodotto locale non interrogano il servizio`() = runTest(dispatcher) {
+        val vm = EditItemViewModel(NEW_ITEM_UUID, repository, fetchProduct = { error("Rete vietata") })
+        vm.onBarcodeScanned(code); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(com.igor.fridge.ui.edit.BarcodeLookupStatus.DISABLED, vm.uiState.value.barcodeLookup)
+        repository.save(FoodItem(uuid = "", name = "Locale", barcode = code))
+        val local = EditItemViewModel(NEW_ITEM_UUID, repository, onlineEnabled = { true }, fetchProduct = { error("Rete vietata") })
+        local.onBarcodeScanned(code); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("Locale", local.uiState.value.name)
+    }
+
+    @Test fun `modifiche durante attesa prevalgono sulla risposta online`() = runTest(dispatcher) {
+        val pending = kotlinx.coroutines.CompletableDeferred<com.igor.fridge.data.openfoodfacts.BarcodeProduct?>()
+        val vm = EditItemViewModel(NEW_ITEM_UUID, repository, onlineEnabled = { true }, fetchProduct = { pending.await() })
+        vm.onBarcodeScanned(code); dispatcher.scheduler.runCurrent()
+        vm.onNameChange("Mio latte"); vm.onBrandChange(""); vm.onCategoryChange(FoodCategory.ALTERNATIVE_VEGETALI)
+        pending.complete(onlineProduct); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("Mio latte", vm.uiState.value.name); assertEquals("", vm.uiState.value.brand)
+        assertEquals(FoodCategory.ALTERNATIVE_VEGETALI, vm.uiState.value.category)
+    }
+
+    @Test fun `seconda scansione annulla la precedente`() = runTest(dispatcher) {
+        val pending = kotlinx.coroutines.CompletableDeferred<com.igor.fridge.data.openfoodfacts.BarcodeProduct?>()
+        val vm = EditItemViewModel(NEW_ITEM_UUID, repository, onlineEnabled = { true }, fetchProduct = {
+            if (it == code) pending.await() else onlineProduct.copy(name = "Pane")
+        })
+        vm.onBarcodeScanned(code); dispatcher.scheduler.runCurrent()
+        vm.onBarcodeScanned("4006381333931"); dispatcher.scheduler.runCurrent()
+        pending.complete(onlineProduct); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("Pane", vm.uiState.value.name); assertEquals("4006381333931", vm.uiState.value.barcode)
+    }
+
+    @Test fun `assenza errore e timeout conservano il modulo`() = runTest(dispatcher) {
+        val status = com.igor.fridge.ui.edit.BarcodeLookupStatus.entries
+        for (expected in listOf(status.first { it.name == "NOT_FOUND" }, status.first { it.name == "ERROR" })) {
+            val vm = EditItemViewModel(NEW_ITEM_UUID, repository, onlineEnabled = { true }, fetchProduct = {
+                if (expected.name == "ERROR") throw java.io.IOException() else null
+            })
+            vm.onNameChange("Manuale"); vm.onBarcodeScanned(code); dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(expected, vm.uiState.value.barcodeLookup); assertEquals("Manuale", vm.uiState.value.name)
+        }
+        val vm = EditItemViewModel(NEW_ITEM_UUID, repository, onlineEnabled = { true }, fetchProduct = {
+            kotlinx.coroutines.delay(20_000); onlineProduct
+        })
+        vm.onBarcodeScanned(code); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(com.igor.fridge.ui.edit.BarcodeLookupStatus.ERROR, vm.uiState.value.barcodeLookup)
+    }
+
     private suspend fun seedLatte(): FoodItem = repository.save(
         FoodItem(
             uuid = "",

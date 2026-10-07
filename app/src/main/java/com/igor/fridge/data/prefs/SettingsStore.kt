@@ -95,6 +95,8 @@ class SettingsStore(
 
     val notificationsEnabled: Flow<Boolean> = settings.map { it.notificationsEnabled }
 
+    val openFoodFactsEnabled: Flow<Boolean> = preferences.map { it[KEY_OPEN_FOOD_FACTS_ENABLED] ?: false }
+
     val onlinePrices: Flow<com.igor.fridge.data.onlineprices.OnlinePricesSettings> = preferences.map {
         com.igor.fridge.data.onlineprices.OnlinePricesSettings(it[KEY_ONLINE_PRICES_ENABLED] ?: false,it[KEY_ONLINE_POSTCODE] ?: "20125")
     }
@@ -102,6 +104,10 @@ class SettingsStore(
     suspend fun setOnlinePostcode(postcode: String) {
         require(postcode.matches(Regex("[0-9]{5}")))
         store.edit { it[KEY_ONLINE_POSTCODE] = postcode }
+    }
+
+    suspend fun setOpenFoodFactsEnabled(enabled: Boolean) {
+        store.edit { it[KEY_OPEN_FOOD_FACTS_ENABLED] = enabled }
     }
 
     /**
@@ -117,7 +123,7 @@ class SettingsStore(
 
     /**
      * Open Prices: prezzi della comunita' e invio dei propri scontrini. Spento finche'
-     * l'utente non lo attiva, perche' e' l'unica funzione che usa Internet.
+     * l'utente non lo attiva, con un consenso separato dalla ricerca prodotti Open Food Facts.
      *
      * Le versioni precedenti tenevano il token nel file delle impostazioni: lo si legge
      * ancora da li', finche' il prossimo accesso o uscita non lo sposta.
@@ -187,6 +193,7 @@ class SettingsStore(
         const val DEFAULT_NOTIFICATIONS_ENABLED = true
 
         private val KEY_WARNING_DAYS = intPreferencesKey("warning_days")
+        private val KEY_OPEN_FOOD_FACTS_ENABLED = booleanPreferencesKey("open_food_facts_enabled")
         private val KEY_ONLINE_PRICES_ENABLED = booleanPreferencesKey("online_prices_enabled")
         private val KEY_ONLINE_POSTCODE = stringPreferencesKey("online_postcode")
         private val KEY_NOTIFICATION_HOUR = intPreferencesKey("notification_hour")

@@ -24,6 +24,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -175,6 +180,32 @@ fun EditItemScreen(
                 )
                 IconButton(onClick = onOpenScanner) {
                     Icon(Icons.Filled.QrCodeScanner, contentDescription = stringResource(R.string.action_scan))
+                }
+            }
+
+            if (state.barcodeLookup != BarcodeLookupStatus.IDLE) {
+                val text = when (state.barcodeLookup) {
+                    BarcodeLookupStatus.LOADING -> R.string.off_loading
+                    BarcodeLookupStatus.FOUND -> R.string.off_found
+                    BarcodeLookupStatus.INCOMPLETE -> R.string.off_incomplete
+                    BarcodeLookupStatus.NOT_FOUND -> R.string.off_not_found
+                    BarcodeLookupStatus.ERROR -> R.string.off_error
+                    BarcodeLookupStatus.RATE_LIMITED -> R.string.off_rate_limited
+                    BarcodeLookupStatus.DISABLED -> R.string.off_disabled
+                    else -> R.string.off_unsupported
+                }
+                Column(modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }) {
+                    if (state.barcodeLookup == BarcodeLookupStatus.LOADING) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    Text(stringResource(text), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (state.barcodeLookup == BarcodeLookupStatus.ERROR ||
+                        state.barcodeLookup == BarcodeLookupStatus.RATE_LIMITED) {
+                        TextButton(onClick = viewModel::retryBarcodeLookup, enabled = !state.isSaving) {
+                            Text(stringResource(R.string.off_retry))
+                        }
+                    }
                 }
             }
 

@@ -29,6 +29,7 @@ data class SettingsUiState(
     val notificationsEnabled: Boolean = SettingsStore.DEFAULT_NOTIFICATIONS_ENABLED,
     val isWorking: Boolean = false,
     val message: String? = null,
+    val openFoodFactsEnabled: Boolean = false,
     val onlinePrices: com.igor.fridge.data.onlineprices.OnlinePricesSettings = com.igor.fridge.data.onlineprices.OnlinePricesSettings(),
 )
 
@@ -49,8 +50,9 @@ class SettingsViewModel(
         settingsStore.notificationHour,
         settingsStore.notificationsEnabled,
         status,
-    ) { days, hour, enabled, status ->
-        SettingsUiState(days, hour, enabled, status.working, status.message)
+        settingsStore.openFoodFactsEnabled,
+    ) { days, hour, enabled, status, offEnabled ->
+        SettingsUiState(days, hour, enabled, status.working, status.message, offEnabled)
     }.combine(settingsStore.onlinePrices) { state,online -> state.copy(onlinePrices=online) }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -59,6 +61,10 @@ class SettingsViewModel(
 
     fun onWarningDaysChange(value: Int) {
         viewModelScope.launch { settingsStore.setWarningDays(value) }
+    }
+
+    fun onOpenFoodFactsToggle(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setOpenFoodFactsEnabled(enabled) }
     }
 
     fun onOnlinePricesToggle(enabled: Boolean) { viewModelScope.launch { settingsStore.setOnlinePricesEnabled(enabled) } }

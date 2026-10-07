@@ -72,6 +72,15 @@ class AppContainer(context: Context) {
     }
     val onlinePricesWorkScheduler by lazy { com.igor.fridge.notification.OnlinePricesWorkScheduler(appContext) }
 
+    val openFoodFactsClient: com.igor.fridge.data.openfoodfacts.OpenFoodFactsClient by lazy {
+        val version = runCatching {
+            appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName
+        }.getOrNull() ?: "?"
+        com.igor.fridge.data.openfoodfacts.OpenFoodFactsClient(
+            UrlConnectionTransport(timeoutMillis = 8_000), "Igor/$version (Android)",
+        )
+    }
+
     val photoStore: PhotoStore by lazy { FilePhotoStore(appContext) }
 
     val receiptReader: ReceiptReader by lazy { MlKitReceiptReader(appContext) }
