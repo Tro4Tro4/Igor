@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Igor è un'app Android (Kotlin, Jetpack Compose, Room) per inventario del frigo, scadenze, lista della spesa, scontrini e prezzi. Inventario, lista e scontrini restano sul dispositivo; gli accessi a Internet sono Open Prices, il riconoscimento Open Food Facts e il servizio privato dei prezzi online, facoltativi, separati e spenti di default. Il `README.md` descrive funzionalità, stato e difetti noti: tenerlo aggiornato quando cambia qualcosa di rilevante.
+Igor è un'app Android (Kotlin, Jetpack Compose, Room) per inventario del frigo, scadenze, lista della spesa, scontrini e prezzi. Inventario, lista e scontrini restano sul dispositivo. Il confronto prezzi usa solo i propri acquisti; l'unico servizio esterno applicativo attivo e' il riconoscimento barcode Open Food Facts, facoltativo e spento di default. Il README.md descrive funzionalita', stato e difetti noti.
 
 ## Vincolo d'uso concordato
 
@@ -10,6 +10,12 @@ Il 6 ottobre 2026 l'utente ha confermato che Igor e' esclusivamente per
 uso personale e non verra' distribuita. Applicare questo vincolo anche al
 servizio prezzi e alle richieste di accesso alle fonti. Non confondere
 l'uso personale con una verifica delle condizioni di acquisizione dei dati.
+
+Dal 7 ottobre 2026 l'utente ha scelto di mantenere soltanto il confronto
+dai propri scontrini e di ritirare prezzi online e della comunita'. Questa
+scelta sostituisce l'ipotesi precedente sui prezzi indipendenti dal CAP.
+Open Food Facts rimane per i barcode. Non riattivare i servizi prezzi o
+reinserire URL/chiave nell'APK senza una nuova richiesta.
 
 ## Comandi
 
@@ -50,28 +56,13 @@ Room, versione corrente in `IgorDatabase.kt`. Ogni cambio di schema richiede: au
 - I commenti spiegano il perché (casi limite, motivi delle scelte), non cosa fa il codice.
 - I testi fissi stanno in `res/values/strings.xml`; restano in Kotlin solo i messaggi composti a runtime dai ViewModel.
 
-## Servizio prezzi online
+## Servizi prezzi ritirati
 
-`services/prices` e' indipendente da Gradle: Python3.12, FastAPI, SQLite, pytest
-con venv e `requirements.lock`. Fonti e stato nel manifest verificato in
-`docs/verification/2026-10-05-fonti-online-manifest.json`: attualmente tutte
-candidate, non abilitare sulla sola risposta HTTP200. Android `onlineprices/`,
-OnlinePricesRepository e OnlineComparison mantengono cache/associazioni separate
-dagli scontrini. Room7 aggiunge solo tre tabelle, con migrazione6→7.
-Endpoint BuildConfig.ONLINE_PRICES_URL da `igorOnlinePricesUrl`, default vuoto.
-Consenso iniziale spento e CAP20125; niente lista completa, foto o scontrini
-in rete. Il job periodico richiede consenso/rete/endpoint configurato.
-
-## Hosting gratuito prezzi — preparazione Cloudflare
-
-API Workers pubblicata il 6 ottobre 2026 su
-https://igor-prices.andreatro.workers.dev, con archivio D1 e publisher Python
-per GitHub Actions. Test CI, migrazioni remote e smoke HTTPS riusciti.
-Sei fonti candidate e zero offerte; acquisizione giornaliera disattivata.
-Il contratto Android v1 resta compatibile. L’app sul telefono conserva
-per ora la configurazione precedente, senza URL del servizio.
-Fonti reali e quote dell’account restano da verificare. Rapporto:
-[prima pubblicazione](docs/verification/2026-10-06-deploy-cloudflare.md).
-
-Istruzioni: [servizio Cloudflare](services/prices-cloudflare/README.md).
-Prove e limiti: [verifica hosting gratuito](docs/verification/2026-10-05-hosting-cloudflare.md).
+Dal 7 ottobre 2026 app e confronto usano solo i prezzi personali.
+API, adattatori, cache Room7 e modelli online restano come codice storico
+senza collegamenti attivi. Non eliminare le tabelle o usare migrazioni
+distruttive per rimuovere la funzione. Startup cancella il lavoro prezzi e
+OnlinePricesWorker termina senza rete anche per i job precedenti.
+Prices daily e Prices deploy sono disabilitati su GitHub e bloccati con
+`if: ${{ false }}`. Worker privato e D1 conservati, APK senza URL o chiave.
+Verifiche: `docs/verification/2026-10-07-confronto-solo-scontrini.md`.

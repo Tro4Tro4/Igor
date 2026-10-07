@@ -21,7 +21,7 @@
     <string name="settings_hour">Ora del controllo: %1$d</string>
     <string name="settings_hour_help">L’orario è indicativo: il sistema può rimandare il controllo di qualche ora per risparmiare batteria.</string>
     <string name="settings_privacy">Privacy e dati</string>
-    <string name="settings_privacy_info">Inventario, liste, prezzi e foto restano sul telefono. Se attivi il riconoscimento con Open Food Facts, i barcode sconosciuti vengono inviati al servizio per recuperarne i dati; inventario e foto non vengono inviati. Scontrini e codici a barre si leggono sul telefono con ML Kit di Google, che può inviare a Google statistiche d’uso e diagnostica, senza le immagini. I pulsanti «Cerca su…» aprono nel browser il sito della catena o una ricerca Google con il nome del prodotto. Il backup di Android salva questi dati nel tuo account Google solo se è cifrato (telefono con blocco schermo); l’accesso a Open Prices non va mai nel backup.</string>
+    <string name="settings_privacy_info">Inventario, liste, prezzi e foto restano sul telefono. Solo attivando il riconoscimento con Open Food Facts vengono inviati i barcode sconosciuti per recuperarne nome, marca e categoria; inventario, prezzi e foto non vengono inviati. Il confronto usa esclusivamente i prezzi dei tuoi acquisti. Scontrini e codici a barre si leggono sul telefono con ML Kit di Google, che può inviare a Google statistiche d’uso e diagnostica, senza le immagini. Il backup di Android salva i dati nel tuo account Google solo se è cifrato (telefono con blocco schermo).</string>
     <string name="settings_export">Esporta i miei dati</string>
     <string name="settings_delete_all">Elimina tutti i miei dati</string>
     <string name="settings_delete_all_confirm">Inventario, lista della spesa, liste salvate, storico dei prezzi, foto e impostazioni verranno cancellati, e uscirai da Open Prices. Non si può annullare. I prezzi già condivisi su Open Prices sono pubblici e si cancellano dal sito del servizio.</string>
@@ -168,13 +168,14 @@
     <string name="compare_title">Confronta i supermercati</string>
     <string name="compare_empty_list">La lista della spesa è vuota: aggiungi qualcosa da comprare per confrontare i negozi.</string>
     <string name="compare_stores">La tua lista in ogni negozio</string>
+    <string name="compare_receipts_help">Stima dai prezzi dei tuoi scontrini, con la data di ogni acquisto. Le voci senza prezzo non entrano nei totali.</string>
     <string name="compare_no_prices">Ancora nessun prezzo per queste voci. Carica gli scontrini dei negozi in cui fai la spesa: Igor confronterà i prezzi che hai pagato.</string>
     <string name="compare_complete">tutte le voci</string>
     <string name="compare_coverage">%1$d voci su %2$d</string>
     <string name="compare_split">Comprando ogni voce dove costa meno: %1$s (%2$d voci su %3$d)</string>
     <string name="compare_items">Voce per voce</string>
-    <string name="compare_item_no_prices">Nessun prezzo noto: cercalo sui siti delle catene.</string>
-    <string name="compare_source_mine">tuo, %1$s</string>
+    <string name="compare_item_no_prices">Nessun prezzo registrato nei tuoi scontrini.</string>
+    <string name="compare_source_mine">pagato il %1$s</string>
     <string name="compare_source_community">comunità, %1$s</string>
     <string name="compare_search_on">Cerca su %1$s</string>
     <string name="compare_community_title">Prezzi della comunità (Open Prices)</string>
@@ -186,7 +187,7 @@
     <string name="prices_by_store">Nei negozi (ultimo prezzo pagato)</string>
     <string name="prices_search_online">Cerca sui siti delle catene</string>
     <string name="prices_barcode">Codice a barre</string>
-    <string name="prices_barcode_none">Nessuno: associalo per confrontarti con i prezzi della comunità.</string>
+    <string name="prices_barcode_none">Nessun codice associato a questo prodotto.</string>
     <string name="prices_barcode_scan">Scansiona</string>
     <string name="prices_barcode_type">Scrivi il codice</string>
     <string name="prices_barcode_remove">Rimuovi</string>

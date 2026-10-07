@@ -33,7 +33,6 @@ import com.igor.fridge.ui.prices.PricesScreen
 import com.igor.fridge.ui.receipt.ReceiptScreen
 import com.igor.fridge.ui.scanner.BarcodeScannerScreen
 import com.igor.fridge.ui.settings.AisleOrderScreen
-import com.igor.fridge.ui.settings.OpenPricesScreen
 import com.igor.fridge.ui.settings.SettingsScreen
 import com.igor.fridge.ui.shopping.SavedListsScreen
 import com.igor.fridge.ui.shopping.ShoppingItemEditScreen
@@ -86,10 +85,10 @@ fun IgorApp(
     ) {
         composable(Routes.INVENTORY) {
             InventoryScreen(
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onAddItem = { navController.navigate(Routes.edit(NEW_ITEM_UUID)) },
                 onEditItem = { uuid -> navController.navigate(Routes.edit(uuid)) },
                 onOpenShoppingList = { navController.navigate(Routes.SHOPPING) },
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenReceipt = { navController.navigate(Routes.RECEIPT) },
             )
         }
@@ -191,7 +190,6 @@ fun IgorApp(
                 onScanBarcode = { navController.navigate(Routes.SCANNER) },
                 scannedBarcode = scanned,
                 onBarcodeConsumed = { backStackEntry.savedStateHandle[Routes.SCANNED_BARCODE] = null },
-                onOpenOpenPrices = { navController.navigate(Routes.OPEN_PRICES) },
             )
         }
 
@@ -199,19 +197,12 @@ fun IgorApp(
             SettingsScreen(
                 onBack = { navController.popFrom(it) },
                 onOpenAisleOrder = { navController.navigate(Routes.AISLE_ORDER) },
-                onOpenOpenPrices = { navController.navigate(Routes.OPEN_PRICES) },
             )
-        }
-
-        composable(Routes.OPEN_PRICES) {
-            OpenPricesScreen(onBack = { navController.popFrom(it) })
         }
 
         composable(Routes.COMPARE) {
             CompareScreen(
                 onBack = { navController.popFrom(it) },
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                onOpenOpenPrices = { navController.navigate(Routes.OPEN_PRICES) },
             )
         }
     }

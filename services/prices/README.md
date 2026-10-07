@@ -1,3 +1,8 @@
+> Ritirato il 7 ottobre 2026: Igor usa solo i prezzi degli scontrini.
+> Codice conservato come archivio; workflow acquisizione/deploy disabilitati.
+> Worker privato e D1 conservati, scollegati dall'app. Le istruzioni sotto
+> descrivono la precedente configurazione e non autorizzano una riattivazione.
+
 # Servizio prezzi Igor
 
 Python 3.12, API v1 di sola lettura, SQLite e acquisizione giornaliera separata.

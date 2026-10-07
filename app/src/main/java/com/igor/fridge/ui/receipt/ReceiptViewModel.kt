@@ -612,10 +612,7 @@ class ReceiptViewModel(
                     foodRepository = container.foodRepository,
                     shoppingRepository = container.shoppingRepository,
                     priceRepository = container.priceRepository,
-                    openPrices = container.settingsStore.openPrices,
-                    openPricesClient = container.openPricesClient,
                     transactor = container.transactor,
-                    clearOpenPricesSession = { container.settingsStore.setOpenPricesSession(null, null) },
                 )
             }
         }

@@ -2,8 +2,8 @@
 
 App Android per tenere sotto controllo cosa c’è in frigo, cosa sta per scadere e
 cosa va ricomprato. Inventario, lista e scontrini restano sul dispositivo.
-Open Prices, il riconoscimento prodotti con Open Food Facts e il servizio privato
-dei prezzi online sono facoltativi e attivabili separatamente nelle Impostazioni.
+Il riconoscimento barcode con Open Food Facts e' facoltativo e attivabile nelle
+Impostazioni. Il confronto prezzi funziona offline, dai tuoi acquisti.
 
 ## Funzionalità (MVP)
 
@@ -48,10 +48,10 @@ dei prezzi online sono facoltativi e attivabili separatamente nelle Impostazioni
   massimo, media e grafico dell'andamento; per ogni mese, la spesa totale. L'ultimo prezzo
   pagato viene proposto nella lista della spesa.
 - **Confronta i supermercati**: quanto costerebbe la lista in ogni negozio ai prezzi pagati,
-  voce per voce, con "Cerca su Esselunga, Tigros, Lidl…" che apre la ricerca sul sito della
-  catena. Facoltativo e spento di default: **Open Prices**, il database aperto di Open Food
-  Facts, per aggiungere al confronto i prezzi della comunità (prodotti con codice a barre) e
-  condividere i propri scontrini.
+  voce per voce. Le stime indicano la data del prezzo pagato e il numero di articoli
+  coperti; gli articoli senza prezzo non entrano nel totale. Anche i suggerimenti
+  di prodotti simili vengono esclusivamente dai propri scontrini. Nessun prezzo online
+  o della comunità viene scaricato e gli scontrini non vengono condivisi.
 
 ## Stack tecnico
 
@@ -65,7 +65,7 @@ dei prezzi online sono facoltativi e attivabili separatamente nelle Impostazioni
 | Background | WorkManager |
 | Fotocamera | CameraX + ML Kit Barcode Scanning |
 | Scontrini | ML Kit Text Recognition (modello incluso, offline) |
-| Prezzi della comunità | Open Prices (facoltativo; `HttpURLConnection` + kotlinx-serialization-json) |
+| Riconoscimento prodotti | Open Food Facts (facoltativo; `HttpURLConnection` + kotlinx-serialization-json) |
 | DI | container manuale (`AppContainer`), senza annotation processor |
 | minSdk / targetSdk | 26 / 35 |
 
@@ -150,10 +150,10 @@ Le stringhe dell’interfaccia stanno in `strings.xml`, con accenti e apostrofi 
 corretti; restano in Kotlin i messaggi che i ViewModel compongono a runtime (per esempio
 "3 prodotti aggiunti alla lista della spesa"), dove il testo dipende dai dati.
 
-La suite verificata il 7 ottobre comprende 376 test in 56 classi, tutti sulla JVM; Room e le foto girano sotto Robolectric. Non
+La suite verificata il 7 ottobre comprende 374 test in 56 classi, tutti sulla JVM; Room e le foto girano sotto Robolectric. Non
 esiste ancora un source set `androidTest`.
 
-**Database: versione 6.** Ogni cambio di schema alza la versione e porta la sua migrazione
+**Database: versione 7.** Ogni cambio di schema alza la versione e porta la sua migrazione
 (da `MIGRATION_1_2` a `MIGRATION_5_6`, che aggiunge la colonna `nameKey` per cercare i nomi
 senza distinguere maiuscole anche con le lettere accentate): a versione invariata Room rifiuterebbe di aprire il
 database. Le migrazioni sono provate da `MigrationTest`, che apre con `IgorDatabase.build`
@@ -199,60 +199,25 @@ Le fasi successive sono descritte in
   parser testuale (`domain/voice/`); la conferma manuale resta obbligatoria prima di
   salvare, perché il parser è la parte incerta del sistema.
 
-## Prezzi online — integrazione locale
+## Confronto solo dai propri acquisti
 
-Preparati servizio Python in `services/prices`, API v1, cache Room7 e nuova
-sezione Confronta/Impostazioni, con consenso separato e CAP iniziale 20125.
-Il confronto usa confezioni intere e gli stessi prodotti coperti dalle fonti;
-prezzi vecchi, condizionati o senza formato non diventano totali attuali.
-Non modifica i prezzi degli scontrini. Le equivalenze automatiche fra fonti
-richiedono GTIN verificato e formato coerente; la prima scelta generica e' manuale.
+Dal 7 ottobre 2026, su richiesta dell'utente, Confronta usa esclusivamente i
+prezzi registrati dagli scontrini. Rimangono storico, grafico, prezzi per
+kg/litro/pezzo e suggerimenti di prodotti simili gia' acquistati. Il prezzo
+e' quello pagato alla data indicata, non un listino attuale del supermercato.
+I totali parziali mostrano quante voci hanno un prezzo.
 
-**Non ancora operativo con listini reali:** tutte le sei fonti restano candidate,
-senza acquisizioni automatiche; l'endpoint HTTPS e' pubblicato su Cloudflare.
-Carrefour/Conad hanno adattatori verificati anche su campioni reali,
-ma riuso, territorio e copertura non sono ancora validati.
-Esselunga resta la prima estensione, prima di Tigros, Lidl ed Eurospin.
-Per configurare un endpoint di sviluppo usare `-PigorOnlinePricesUrl=...`;
-HTTP localhost e' ammesso solo nel debug per eventuale prova USB.
-Il default vuoto non contatta la rete e viene spiegato nell'app.
+Rimossi dall'interfaccia catalogo delle catene, prezzi della comunita',
+ricerche sui siti e condivisione a Open Prices. Il riconoscimento barcode
+con Open Food Facts rimane attivo su consenso separato.
 
-Verifiche, decisioni e limiti: [rapporto prezzi online](docs/verification/2026-10-05-confronto-prezzi-online.md).
+I lavori Android di aggiornamento prezzi sono cancellati e quelli gia'
+accodati non eseguono richieste. Il nuovo APK non contiene URL o chiave
+privata Cloudflare. I workflow GitHub Prices daily/deploy sono disabilitati
+e hanno anche un blocco nel codice. Tabelle cache e dati storici restano
+intatti, senza migrazione distruttiva; librerie e servizio sperimentale
+rimangono in archivio, scollegati dall'app. Worker privato e D1 non sono
+stati eliminati e non ricevono richieste da Igor.
 
-Verifica e correzioni del 6 ottobre: dieci prodotti per Carrefour e Conad,
-due letture ciascuno, tutte le 40 risposte HTTP riuscite. Gli adattatori
-corretti leggono 10/10 campioni Carrefour e 2/10 Conad; le altre otto schede
-Conad non espongono il prezzo e vengono rifiutate. Totale confezione,
-promozioni PAYBACK, date e peso variabile sono distinti; 122 test Python verdi.
-Il riuso resta da chiarire; nessuna fonte attivata o offerta pubblicata.
-[Prima verifica](docs/verification/2026-10-06-validazione-fonti-prezzi.md),
-[correzioni](docs/verification/2026-10-06-correzione-adattatori-prezzi.md).
-
-## Hosting gratuito prezzi — preparazione Cloudflare
-
-API Workers pubblicata il 6 ottobre 2026 su
-https://igor-prices.andreatro.workers.dev, con archivio D1 e publisher Python
-per GitHub Actions. Test CI, migrazioni remote e smoke HTTPS riusciti.
-Sei fonti candidate e zero offerte; acquisizione giornaliera disattivata.
-Il contratto Android v1 resta compatibile. L'APK collegato al servizio e'
-stato installato il 6 ottobre; rapporto e verifiche del servizio personale
-sono in `docs/verification/2026-10-06-prezzi-uso-personale.md`.
-Fonti reali e quote dell’account restano da verificare. Rapporto:
-[prima pubblicazione](docs/verification/2026-10-06-deploy-cloudflare.md).
-
-Istruzioni: [servizio Cloudflare](services/prices-cloudflare/README.md).
-Prove e limiti: [verifica hosting gratuito](docs/verification/2026-10-05-hosting-cloudflare.md).
-
-## Uso personale
-
-L'APK completo del 7 ottobre include sia il riconoscimento barcode sia
-l'accesso prezzi privato. Correzione dell'APK del 6 ottobre che escludeva
-Open Food Facts: [verifica ripristino barcode](docs/verification/2026-10-07-ripristino-barcode-apk.md).
-
-Igor e' esclusivamente per l'utente e non verra' distribuita. Il servizio
-prezzi richiede una chiave dedicata nell'header Authorization; non espone
-prezzi a richieste anonime. L'importazione su GitHub Actions e' solo manuale,
-con massimo 50 URL nel manifest e un tentativo per fonte/giorno UTC.
-La ricerca nell'app legge la cache del servizio, senza acquisire prodotti
-su richiesta. Le fonti restano candidate fino alla verifica dei dati e
-delle condizioni di accesso per questo uso.
+Verifiche: [confronto da scontrini](docs/verification/2026-10-07-confronto-solo-scontrini.md).
+Igor e' esclusivamente per uso personale e non verra' distribuita.

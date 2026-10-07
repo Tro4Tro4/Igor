@@ -258,9 +258,6 @@ class PriceHistoryViewModel(
                 PriceHistoryViewModel(
                     productKey = productKey,
                     priceRepository = container.priceRepository,
-                    openPrices = container.settingsStore.openPrices,
-                    fetchCommunity = { code -> container.openPricesClient.productPrices(code) },
-                    findSimilar = { name, code -> container.similarProductSearch.find(name, code) },
                 )
             }
         }

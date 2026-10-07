@@ -7,28 +7,21 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -39,7 +32,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.igor.fridge.R
 import com.igor.fridge.domain.prices.Alternative
 import com.igor.fridge.domain.prices.ItemQuote
-import com.igor.fridge.domain.prices.PriceSource
 import com.igor.fridge.domain.prices.StoreEstimate
 import com.igor.fridge.ui.formatEuro
 import com.igor.fridge.ui.formatQuantity
@@ -51,26 +43,12 @@ import com.igor.fridge.ui.label
 @Composable
 fun CompareScreen(
     onBack: () -> Unit,
-    onOpenOpenPrices: () -> Unit,
-    onOpenSettings: () -> Unit = onOpenOpenPrices,
     modifier: Modifier = Modifier,
     viewModel: CompareViewModel = viewModel(factory = CompareViewModel.Factory),
-    onlineViewModel: OnlineCompareViewModel = viewModel(factory = OnlineCompareViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val online by onlineViewModel.uiState.collectAsStateWithLifecycle()
-    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(state.message) {
-        val message = state.message ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
-        viewModel.onMessageShown()
-    }
-
     Scaffold(
         modifier = modifier,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.compare_title)) },
@@ -103,13 +81,9 @@ fun CompareScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                OnlinePricesSection(online,onlineViewModel::refresh,onlineViewModel::search,onlineViewModel::select,
-                    onlineViewModel::unselect,onOpenSource={ url ->
-                        if (runCatching { java.net.URI(url).scheme == "https" }.getOrDefault(false)) uriHandler.openUri(url)
-                    },onSettings=onOpenSettings)
-            }
-            item {
                 Text(stringResource(R.string.compare_stores), style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.compare_receipts_help), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (comparison.stores.isEmpty()) {
                 item {
@@ -137,17 +111,6 @@ fun CompareScreen(
             }
 
             item {
-                CommunityBox(
-                    enabled = state.communityEnabled,
-                    itemsWithBarcode = state.itemsWithBarcode,
-                    loaded = state.communityLoaded,
-                    loading = state.isLoadingCommunity,
-                    onLoad = viewModel::loadCommunityPrices,
-                    onOpenSettings = onOpenOpenPrices,
-                )
-            }
-
-            item {
                 HorizontalDivider()
                 Text(
                     stringResource(R.string.compare_items),
@@ -157,13 +120,6 @@ fun CompareScreen(
             }
             items(items = comparison.quotes, key = { "item-${it.item.uuid}" }) { quote ->
                 QuoteCard(quote, alternative = state.alternatives[quote.item.uuid])
-            }
-            item {
-                Text(
-                    text = stringResource(R.string.open_prices_attribution),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
@@ -185,45 +141,6 @@ private fun StoreRow(estimate: StoreEstimate) {
             )
         }
         Text(formatEuro(estimate.totalCents), fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun CommunityBox(
-    enabled: Boolean,
-    itemsWithBarcode: Int,
-    loaded: Boolean,
-    loading: Boolean,
-    onLoad: () -> Unit,
-    onOpenSettings: () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.compare_community_title), style = MaterialTheme.typography.titleSmall)
-            when {
-                !enabled -> {
-                    Text(stringResource(R.string.compare_community_off), style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_prices_title)) }
-                }
-                loading -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                    Text(stringResource(R.string.compare_community_loading), modifier = Modifier.padding(start = 12.dp))
-                }
-                else -> {
-                    Text(
-                        text = stringResource(R.string.compare_community_help, itemsWithBarcode),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    OutlinedButton(onClick = onLoad) {
-                        Text(
-                            stringResource(
-                                if (loaded) R.string.compare_community_reload else R.string.compare_community_load,
-                            ),
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -260,11 +177,7 @@ private fun QuoteCard(quote: ItemQuote, alternative: Alternative?) {
                     )
                     Text(
                         text = stringResource(
-                            if (observation.source == PriceSource.MINE) {
-                                R.string.compare_source_mine
-                            } else {
-                                R.string.compare_source_community
-                            },
+                            R.string.compare_source_mine,
                             observation.date.formatShort(),
                         ),
                         style = MaterialTheme.typography.bodySmall,
@@ -290,7 +203,6 @@ private fun QuoteCard(quote: ItemQuote, alternative: Alternative?) {
                 )
                 SimilarOfferRow(alternative.offer, cheaper = true)
             }
-            SearchOnChains(product = quote.item.name, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }

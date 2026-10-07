@@ -15,10 +15,6 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        val onlinePricesToken = providers.gradleProperty("igorOnlinePricesToken").orElse("").get()
-        require(onlinePricesToken.isEmpty() || onlinePricesToken.matches(Regex("[A-Za-z0-9_-]{32,128}"))) { "Chiave prezzi privata non valida" }
-        buildConfigField("String", "ONLINE_PRICES_TOKEN", "\"$onlinePricesToken\"")
-        buildConfigField("String", "ONLINE_PRICES_URL", "\"${providers.gradleProperty("igorOnlinePricesUrl").orElse("").get().replace("\\", "\\\\").replace("\"", "\\\"")}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

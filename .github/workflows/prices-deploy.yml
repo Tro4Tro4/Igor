@@ -8,6 +8,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
+    # Servizio prezzi online ritirato: conservato solo per riferimento.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

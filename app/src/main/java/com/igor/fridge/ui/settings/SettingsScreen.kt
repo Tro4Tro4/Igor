@@ -59,7 +59,6 @@ import kotlin.math.roundToInt
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenAisleOrder: () -> Unit,
-    onOpenOpenPrices: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
@@ -200,10 +199,6 @@ fun SettingsScreen(
                 Text(stringResource(R.string.aisle_order_title))
             }
 
-            OutlinedButton(onClick = onOpenOpenPrices, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.open_prices_title))
-            }
-
             Row(
                 modifier = Modifier.fillMaxWidth().toggleable(
                     value = state.openFoodFactsEnabled,
@@ -218,28 +213,6 @@ fun SettingsScreen(
             }
             Text(stringResource(R.string.off_enable_help), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-            HorizontalDivider()
-            Row(
-                modifier = Modifier.fillMaxWidth().toggleable(value=state.onlinePrices.enabled,role=Role.Switch,onValueChange=viewModel::onOnlinePricesToggle),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(stringResource(R.string.online_prices_title),modifier=Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
-                Switch(checked=state.onlinePrices.enabled,onCheckedChange=null)
-            }
-            Text(stringResource(R.string.online_prices_consent),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            var postcode by remember(state.onlinePrices.postcode) { mutableStateOf(state.onlinePrices.postcode) }
-            androidx.compose.material3.OutlinedTextField(
-                value=postcode,onValueChange={ value -> if (value.length <= 5 && value.all { it in '0'..'9' }) postcode=value },
-                label={ Text(stringResource(R.string.online_prices_postcode)) },singleLine=true,
-                keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number),
-                modifier=Modifier.fillMaxWidth(),
-            )
-            OutlinedButton(onClick={ viewModel.onOnlinePostcodeChange(postcode) },enabled=postcode.matches(Regex("[0-9]{5}")) && postcode != state.onlinePrices.postcode) {
-                Text(stringResource(R.string.online_prices_save_postcode))
-            }
-
-            HorizontalDivider()
 
             Text(
                 text = stringResource(R.string.settings_privacy),

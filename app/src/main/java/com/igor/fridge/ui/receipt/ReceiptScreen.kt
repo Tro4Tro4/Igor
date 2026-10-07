@@ -266,17 +266,6 @@ fun ReceiptScreen(
                 )
                 Button(onClick = onDone) { Text(stringResource(R.string.receipt_done)) }
                 OutlinedButton(onClick = onOpenPrices) { Text(stringResource(R.string.prices_open)) }
-                if (state.canContribute) {
-                    OutlinedButton(onClick = viewModel::openContribution) {
-                        Text(stringResource(R.string.contribute_open, state.contributable.size))
-                    }
-                } else if (state.contributable.isNotEmpty() && state.openPrices.enabled) {
-                    Text(
-                        text = stringResource(R.string.contribute_needs_login),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 OutlinedButton(onClick = viewModel::restart) { Text(stringResource(R.string.receipt_another)) }
             }
         }
@@ -301,21 +290,6 @@ fun ReceiptScreen(
                 viewModel.onDateChange(date)
                 pickingDate = false
             },
-        )
-    }
-
-    state.contribution?.let { contribution ->
-        ContributionDialog(
-            state = contribution,
-            imageUri = state.imageUri,
-            onCropChange = viewModel::onCropChange,
-            onQuery = viewModel::onContributionQuery,
-            onCity = viewModel::onContributionCity,
-            onSearch = viewModel::searchStores,
-            onSelectLocation = viewModel::selectLocation,
-            onToggleItem = viewModel::toggleContributionItem,
-            onSend = viewModel::sendContribution,
-            onClose = viewModel::closeContribution,
         )
     }
 

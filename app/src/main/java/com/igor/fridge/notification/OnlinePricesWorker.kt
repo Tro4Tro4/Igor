@@ -19,12 +19,7 @@ suspend fun runOnlinePricesWork(enabled: suspend () -> Boolean, refresh: suspend
 }
 class OnlinePricesWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context,params) {
     override suspend fun doWork(): Result {
-        val c = (applicationContext as IgorApplication).container
-        if (!c.onlinePricesClient.configured) return Result.success()
-        return when (runOnlinePricesWork({c.settingsStore.onlinePrices.first().enabled},c.onlinePricesRepository::refresh)) {
-            OnlineWorkOutcome.SUCCESS -> Result.success()
-            OnlineWorkOutcome.RETRY -> Result.retry()
-            OnlineWorkOutcome.FAILURE -> Result.failure()
-        }
+        // Disattivato anche per eventuali lavori gia' accodati prima dell'aggiornamento.
+        return Result.success()
     }
 }

@@ -48,7 +48,6 @@ import com.igor.fridge.R
 import com.igor.fridge.data.local.PriceRecord
 import com.igor.fridge.domain.prices.ProductPriceSummary
 import com.igor.fridge.domain.prices.SimilarOffer
-import com.igor.fridge.ui.compare.SearchOnChains
 import com.igor.fridge.ui.compare.SimilarOfferRow
 import com.igor.fridge.ui.components.ConfirmDeleteDialog
 import com.igor.fridge.ui.formatChange
@@ -204,7 +203,6 @@ fun PriceHistoryScreen(
     onScanBarcode: () -> Unit,
     scannedBarcode: String?,
     onBarcodeConsumed: () -> Unit,
-    onOpenOpenPrices: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PriceHistoryViewModel = viewModel(
         key = "prices-$productKey",
@@ -318,10 +316,6 @@ fun PriceHistoryScreen(
                 }
             }
             item {
-                Text(stringResource(R.string.prices_search_online), style = MaterialTheme.typography.titleSmall)
-                SearchOnChains(product = summary.productName, modifier = Modifier.padding(top = 4.dp))
-            }
-            item {
                 BarcodeSection(
                     barcode = state.barcode,
                     onScan = onScanBarcode,
@@ -329,20 +323,7 @@ fun PriceHistoryScreen(
                     onClear = viewModel::clearBarcode,
                 )
             }
-            item {
-                CommunitySection(
-                    state = state,
-                    onLoad = viewModel::loadCommunityPrices,
-                    onOpenSettings = onOpenOpenPrices,
-                )
-            }
-            item {
-                SimilarSection(
-                    state = state,
-                    onSearch = viewModel::loadSimilarProducts,
-                    onOpenSettings = onOpenOpenPrices,
-                )
-            }
+            item { SimilarSection(state) }
             item { Text(stringResource(R.string.prices_purchases), style = MaterialTheme.typography.titleSmall) }
             items(items = state.records, key = { it.uuid }) { record ->
                 PurchaseRow(record = record, onDelete = { pendingDelete = record })
@@ -386,14 +367,12 @@ private fun BarcodeSection(
 }
 
 /**
- * Prodotti dello stesso tipo: dai propri scontrini sempre, dalla comunita' su richiesta
- * (serve la rete). Evidenziati quelli che costano meno al kg o al litro di quanto si paga.
+ * Prodotti dello stesso tipo dai propri scontrini. Evidenziati quelli che
+ * costavano meno al kg o al litro nell'acquisto registrato.
  */
 @Composable
 private fun SimilarSection(
     state: PriceHistoryUiState,
-    onSearch: () -> Unit,
-    onOpenSettings: () -> Unit,
 ) {
     val summary = state.summary ?: return
     fun cheaper(offer: SimilarOffer) =
@@ -412,83 +391,10 @@ private fun SimilarSection(
             }
             state.similarMine.take(SIMILAR_SHOWN).forEach { SimilarOfferRow(it, cheaper = cheaper(it)) }
 
-            Text(stringResource(R.string.similar_from_community), style = MaterialTheme.typography.labelLarge)
-            val community = state.similarCommunity
-            when {
-                !state.communityEnabled -> {
-                    Text(stringResource(R.string.compare_community_off), style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_prices_title)) }
-                }
-                state.isLoadingSimilar -> CircularProgressIndicator()
-                community == null -> OutlinedButton(onClick = onSearch) {
-                    Text(stringResource(R.string.similar_search))
-                }
-                else -> {
-                    if (community.isEmpty()) {
-                        Text(stringResource(R.string.similar_community_none), style = MaterialTheme.typography.bodySmall)
-                    }
-                    community.take(SIMILAR_SHOWN).forEach { SimilarOfferRow(it, cheaper = cheaper(it)) }
-                    TextButton(onClick = onSearch) { Text(stringResource(R.string.similar_search_again)) }
-                }
-            }
         }
     }
 }
 
-@Composable
-private fun CommunitySection(
-    state: PriceHistoryUiState,
-    onLoad: () -> Unit,
-    onOpenSettings: () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(stringResource(R.string.compare_community_title), style = MaterialTheme.typography.titleSmall)
-            when {
-                !state.communityEnabled -> {
-                    Text(stringResource(R.string.compare_community_off), style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_prices_title)) }
-                }
-                state.barcode == null -> Text(
-                    text = stringResource(R.string.prices_community_needs_barcode),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                state.isLoadingCommunity -> CircularProgressIndicator()
-                state.community == null -> OutlinedButton(onClick = onLoad) {
-                    Text(stringResource(R.string.compare_community_load))
-                }
-                state.community.isEmpty() -> Text(
-                    text = stringResource(R.string.prices_community_empty),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                else -> state.community.take(COMMUNITY_SHOWN).forEach { price ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = price.location?.label.orEmpty(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            text = price.date.formatShort(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(end = 12.dp),
-                        )
-                        Text(formatEuro(price.priceCents))
-                    }
-                }
-            }
-            Text(
-                text = stringResource(R.string.open_prices_attribution),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/** I prezzi della comunita' piu' recenti bastano a farsi un'idea. */
-private const val COMMUNITY_SHOWN = 15
 private const val SIMILAR_SHOWN = 8
 
 @Composable
