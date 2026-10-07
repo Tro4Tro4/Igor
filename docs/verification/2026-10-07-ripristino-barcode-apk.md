@@ -37,9 +37,10 @@ SHA256: `829a2e017e3acae6233056496544a92561c283c2beb586c619d1ecac729be33c`.
 Dimensione: 86.916.032 byte. Artefatto personale con chiave privata inclusa,
 non destinato alla distribuzione.
 
-Telefono non rilevato via adb durante la preparazione; installazione ancora
-da effettuare con `adb install -r`, senza disinstallare Igor. Verifica visiva
-e prova barcode sul telefono ancora da completare.
+Telefono Samsung SM-A536B ricollegato successivamente. Installazione
+`adb install -r`: `Success`, senza disinstallare Igor. Avvio `am start -W`:
+`Status: ok`; processo presente al controllo successivo. Verifica visiva
+e prova barcode sul telefono ancora da completare. Consensi non modificati.
 
 Impostazione: **Riconosci con Open Food Facts**. Storico locale consultato
 prima della rete; ricerca online solo per EAN/UPC validi sconosciuti e con
